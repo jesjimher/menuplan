@@ -1,6 +1,8 @@
 node_modules/
 build/
+.svelte-kit/
 *.db
 *.db-shm
 *.db-wal
 .env
+.claude/
