@@ -1,0 +1,14 @@
+services:
+  menuplan:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - menuplan_data:/data
+    environment:
+      - ORIGIN=http://localhost:3000
+      - DATABASE_PATH=/data/menuplan.db
+    restart: unless-stopped
+
+volumes:
+  menuplan_data:

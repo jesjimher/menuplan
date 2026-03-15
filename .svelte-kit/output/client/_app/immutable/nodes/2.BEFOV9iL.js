@@ -1,0 +1,1 @@
+import"../chunks/Bzak7iHL.js";import{i as p}from"../chunks/BYkA5FM4.js";import{p as a,o as t,a as r}from"../chunks/njN3d8NC.js";import{g as i}from"../chunks/wAqRnE74.js";function c(m,o){a(o,!1),t(()=>i("/week")),p(),r()}export{c as component};
