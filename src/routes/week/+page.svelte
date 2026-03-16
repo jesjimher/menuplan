@@ -4,22 +4,21 @@
 	import { checkRules } from '$lib/utils/ruleChecker.js';
 	import { getWeekKey, getPreviousWeekKey, getWeekDates, WEEKDAY_NAMES, SHORT_MONTH_NAMES } from '$lib/utils/dates.js';
 
-	let weekKey = getWeekKey();
-	let weekData: WeekData | null = null;
-	let recipes: Recipe[] = [];
-	let rules: Rule[] = [];
-	let calculating = false;
-	// Slots con operación pendiente — solo su botón muestra spinner
-	let busySlots = new Set<string>();
+	let weekKey = $state(getWeekKey());
+	let weekData = $state<WeekData | null>(null);
+	let recipes = $state<Recipe[]>([]);
+	let rules = $state<Rule[]>([]);
+	let calculating = $state(false);
+	let busySlots = $state(new Set<string>());
 
 	// Recipe search state per slot
-	let openDropdown: string | null = null;
-	let searchQuery = '';
-	let searchResults: Recipe[] = [];
-	let topRecipes: Recipe[] = [];
+	let openDropdown = $state<string | null>(null);
+	let searchQuery = $state('');
+	let searchResults = $state<Recipe[]>([]);
+	let topRecipes = $state<Recipe[]>([]);
 	let searchTimeout: ReturnType<typeof setTimeout>;
 
-	$: weekDates = getWeekDates(weekKey);
+	let weekDates = $derived(getWeekDates(weekKey));
 
 	onMount(async () => {
 		await Promise.all([loadWeek(), loadRecipes(), loadRules()]);
@@ -27,39 +26,7 @@
 
 	async function loadWeek() {
 		const res = await fetch(`/api/week?weekKey=${weekKey}`);
-		mergeWeekData(await res.json());
-	}
-
-	// Fusiona los datos recibidos en weekData sin reemplazar el objeto raíz,
-	// así Svelte solo re-renderiza los slots que realmente cambian.
-	function mergeWeekData(fresh: WeekData) {
-		if (!weekData) {
-			weekData = fresh;
-			return;
-		}
-		// Actualiza slots existentes y añade los nuevos
-		for (const fs of fresh.slots) {
-			const existing = weekData.slots.find(s =>
-				s.weekday === fs.weekday && s.meal_type === fs.meal_type &&
-				s.slot_index === fs.slot_index && s.is_accompaniment === fs.is_accompaniment
-			);
-			if (existing) {
-				existing.recipe = fs.recipe;
-				existing.member = fs.member;
-			} else {
-				weekData.slots.push(fs);
-			}
-		}
-		// Elimina slots que ya no existen
-		weekData.slots = weekData.slots.filter(s =>
-			fresh.slots.some(fs =>
-				fs.weekday === s.weekday && fs.meal_type === s.meal_type &&
-				fs.slot_index === s.slot_index && fs.is_accompaniment === s.is_accompaniment
-			)
-		);
-		weekData.configs = fresh.configs;
-		weekData.violations = fresh.violations;
-		weekData = weekData; // dispara reactividad
+		weekData = await res.json();
 	}
 
 	async function loadRecipes() {
@@ -129,25 +96,27 @@
 		}, 200);
 	}
 
-	// Actualiza un slot localmente y recalcula violaciones en el cliente — un solo re-render
+	// Actualiza un slot localmente y recalcula violaciones — crea siempre referencias nuevas
 	function patchSlot(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipe: Recipe | null) {
 		if (!weekData) return;
-		const existing = weekData.slots.find(s =>
+		const exists = weekData.slots.some(s =>
 			s.weekday === weekday && s.meal_type === mealType &&
 			s.slot_index === slotIndex && s.is_accompaniment === isAcc
 		);
-		if (existing) {
-			existing.recipe = recipe;
+		let newSlots;
+		if (exists) {
+			newSlots = weekData.slots.map(s =>
+				s.weekday === weekday && s.meal_type === mealType &&
+				s.slot_index === slotIndex && s.is_accompaniment === isAcc
+					? { ...s, recipe }
+					: s
+			);
 		} else if (recipe) {
-			weekData.slots.push({
-				weekday, meal_type: mealType as 'comida' | 'cena',
-				slot_index: slotIndex, is_accompaniment: isAcc,
-				recipe, member: null
-			});
+			newSlots = [...weekData.slots, { weekday, meal_type: mealType as 'comida' | 'cena', slot_index: slotIndex, is_accompaniment: isAcc, recipe, member: null }];
+		} else {
+			return;
 		}
-		// Recalcula violaciones en el cliente: evita un segundo fetch + re-render
-		weekData.violations = checkRules(weekData.slots, rules);
-		weekData = weekData; // un único re-render
+		weekData = { ...weekData, slots: newSlots, violations: checkRules(newSlots, rules) };
 	}
 
 	async function selectRecipe(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipeId: number) {
@@ -173,8 +142,7 @@
 	async function randomSlot(weekday: number, mealType: 'comida' | 'cena', slotIndex: number, isAcc: number) {
 		const key = slotKey(weekday, mealType, slotIndex, isAcc);
 		if (busySlots.has(key)) return;
-		busySlots.add(key);
-		busySlots = busySlots;
+		busySlots = new Set([...busySlots, key]);
 		try {
 			const res = await fetch('/api/week/calculate-slot', {
 				method: 'POST',
@@ -186,8 +154,9 @@
 				patchSlot(weekday, mealType, slotIndex, isAcc, recipe);
 			}
 		} finally {
-			busySlots.delete(key);
-			busySlots = busySlots;
+			const next = new Set(busySlots);
+			next.delete(key);
+			busySlots = next;
 		}
 	}
 
@@ -199,7 +168,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ weekKey })
 			});
-			mergeWeekData(await res.json());
+			weekData = await res.json();
 		} finally {
 			calculating = false;
 		}
@@ -212,7 +181,8 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ weekKey })
 		});
-		await loadWeek();
+		const res = await fetch(`/api/week?weekKey=${weekKey}`);
+		weekData = await res.json();
 	}
 
 	async function copyPrevious() {
