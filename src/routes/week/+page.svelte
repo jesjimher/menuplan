@@ -63,7 +63,7 @@
 	}
 
 	function getDayConfig(weekday: number, mealType: 'comida' | 'cena') {
-		return weekData?.configs[weekday]?.[mealType] ?? { recipe_count: 1, accompaniment_per_recipe: 1, accompaniment_per_slot: 0 };
+		return weekData?.configs[weekday]?.[mealType] ?? { recipe_count: 1, accompaniment_per_recipe: 1, accompaniment_per_slot: 0, required_tag: null };
 	}
 
 	function slotKey(weekday: number, mealType: string, slotIndex: number, isAcc: number) {
@@ -204,6 +204,16 @@
 		await loadWeek();
 	}
 
+	async function setRequiredTag(weekday: number, mealType: string, tag: string) {
+		const value = tag.trim().toLowerCase() || null;
+		await fetch('/api/week/config', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, required_tag: value })
+		});
+		await loadWeek();
+	}
+
 	function closeDropdown() {
 		openDropdown = null;
 	}
@@ -262,7 +272,7 @@
 					{#each ['comida', 'cena'] as mealType}
 						{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
 						<div class="px-2 py-2 {mealType === 'cena' ? 'border-t border-gray-100' : ''}">
-							<div class="flex items-center justify-between mb-1.5">
+							<div class="flex items-center justify-between mb-1">
 								<span class="text-xs font-semibold text-gray-500 uppercase">{mealType === 'comida' ? '🍽️ Comida' : '🌙 Cena'}</span>
 								<div class="flex items-center gap-1">
 									<button
@@ -275,6 +285,16 @@
 										class="w-5 h-5 text-xs bg-gray-100 hover:bg-gray-200 rounded flex items-center justify-center"
 									>+</button>
 								</div>
+							</div>
+							<div class="mb-1.5">
+								<input
+									type="text"
+									placeholder="tag requerido…"
+									value={cfg.required_tag ?? ''}
+									on:blur={(e) => setRequiredTag(weekday, mealType, (e.target as HTMLInputElement).value)}
+									on:keydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+									class="w-full text-xs px-1.5 py-0.5 border rounded outline-none {cfg.required_tag ? 'border-amber-300 bg-amber-50 text-amber-700 placeholder-amber-300' : 'border-gray-200 bg-gray-50 text-gray-500 placeholder-gray-300'}"
+								/>
 							</div>
 
 							<!-- Recipe slots -->

@@ -41,6 +41,7 @@ export interface WeekDayConfig {
 	recipe_count: number;
 	accompaniment_per_recipe: number;
 	accompaniment_per_slot: number;
+	required_tag: string | null;
 }
 
 export interface Options {
@@ -60,17 +61,16 @@ export interface SlotData {
 	member: Member | null;
 }
 
+export interface MealConfig {
+	recipe_count: number;
+	accompaniment_per_recipe: number;
+	accompaniment_per_slot: number;
+	required_tag: string | null;
+}
+
 export interface DayConfig {
-	comida: {
-		recipe_count: number;
-		accompaniment_per_recipe: number;
-		accompaniment_per_slot: number;
-	};
-	cena: {
-		recipe_count: number;
-		accompaniment_per_recipe: number;
-		accompaniment_per_slot: number;
-	};
+	comida: MealConfig;
+	cena: MealConfig;
 }
 
 export interface WeekData {
