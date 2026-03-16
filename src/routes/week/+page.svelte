@@ -295,7 +295,7 @@
 												disabled={busySlots.has(slotKey(weekday, mealType, slotIdx, 0))}
 												class="text-xs px-1.5 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded disabled:opacity-50 disabled:cursor-wait"
 												title="Receta aleatoria"
-											>{busySlots.has(slotKey(weekday, mealType, slotIdx, 0)) ? '⏳' : '🎲'}</button>
+											>{busySlots.has(slotKey(weekday, mealType, slotIdx, 0)) ? '⏳' : '🔄'}</button>
 											{#if slot?.recipe}
 												<button
 													on:click={() => removeSlot(weekday, mealType, slotIdx, 0)}
