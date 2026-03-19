@@ -9,6 +9,7 @@
 	let importText = '';
 	let importing = false;
 	let searchQ = '';
+	let selectedTags: string[] = [];
 
 	let form = { name: '', description: '', tags: '', min_days: -1 };
 
@@ -19,11 +20,24 @@
 		recipes = await res.json();
 	}
 
-	$: filteredRecipes = recipes.filter(r =>
-		!searchQ || r.name.toLowerCase().includes(searchQ.toLowerCase()) ||
-		r.tags.toLowerCase().includes(searchQ.toLowerCase()) ||
-		r.description.toLowerCase().includes(searchQ.toLowerCase())
-	);
+	function toggleTag(tag: string) {
+		const t = tag.trim().toLowerCase();
+		if (selectedTags.includes(t)) {
+			selectedTags = selectedTags.filter(x => x !== t);
+		} else {
+			selectedTags = [...selectedTags, t];
+		}
+	}
+
+	$: filteredRecipes = recipes.filter(r => {
+		const matchesText = !searchQ ||
+			r.name.toLowerCase().includes(searchQ.toLowerCase()) ||
+			r.tags.toLowerCase().includes(searchQ.toLowerCase()) ||
+			r.description.toLowerCase().includes(searchQ.toLowerCase());
+		const recipeTags = r.tags.split(',').map(t => t.trim().toLowerCase());
+		const matchesTags = selectedTags.every(t => recipeTags.includes(t));
+		return matchesText && matchesTags;
+	});
 
 	function startEdit(r: Recipe) {
 		editingRecipe = r;
@@ -88,7 +102,20 @@
 		</div>
 	</div>
 
-	<input type="text" placeholder="Buscar recetas..." bind:value={searchQ} class="w-full mb-4 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-400" />
+	<input type="text" placeholder="Buscar recetas..." bind:value={searchQ} class="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-400" />
+	{#if selectedTags.length > 0}
+		<div class="flex flex-wrap gap-1 mb-4">
+			{#each selectedTags as tag}
+				<button on:click={() => toggleTag(tag)}
+					class="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-indigo-600 text-white rounded-full">
+					{tag}
+					<span class="font-bold">×</span>
+				</button>
+			{/each}
+		</div>
+	{:else}
+		<div class="mb-4"></div>
+	{/if}
 
 	{#if showImport}
 		<div class="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
@@ -137,7 +164,12 @@
 					{#if recipe.tags}
 						<div class="flex flex-wrap gap-1 mt-1">
 							{#each recipe.tags.split(',') as tag}
-								<span class="text-xs px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded">{tag.trim()}</span>
+								<button on:click={() => toggleTag(tag)}
+									class="text-xs px-1.5 py-0.5 rounded transition-colors {selectedTags.includes(tag.trim().toLowerCase())
+										? 'bg-indigo-600 text-white'
+										: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}">
+									{tag.trim()}
+								</button>
 							{/each}
 						</div>
 					{/if}
