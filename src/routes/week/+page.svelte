@@ -102,7 +102,6 @@
 		}, 200);
 	}
 
-	// Actualiza un slot localmente y recalcula violaciones — crea siempre referencias nuevas
 	function patchSlot(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipe: Recipe | null) {
 		if (!weekData) return;
 		const exists = weekData.slots.some(s =>
@@ -144,7 +143,6 @@
 		});
 	}
 
-	// Recalcula UNA receta en el servidor y actualiza solo ese slot
 	async function randomSlot(weekday: number, mealType: 'comida' | 'cena', slotIndex: number, isAcc: number) {
 		const key = slotKey(weekday, mealType, slotIndex, isAcc);
 		if (busySlots.has(key)) return;
@@ -225,32 +223,55 @@
 	}
 </script>
 
+<svelte:head>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</svelte:head>
+
 <svelte:window on:click={(e) => {
 	const target = e.target as HTMLElement;
 	if (!target.closest('.dropdown-container')) closeDropdown();
 }} />
 
-<div class="p-4 max-w-full">
-	<!-- Header -->
-	<div class="flex flex-wrap items-center gap-3 mb-4">
-		<button on:click={prevWeek} class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded text-sm">← Anterior</button>
-		<h1 class="text-xl font-bold text-gray-800">{weekKey}</h1>
-		<button on:click={nextWeek} class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded text-sm">Siguiente →</button>
+<div class="flex flex-col h-full bg-stone-50">
 
-		<div class="ml-auto flex gap-2 flex-wrap">
-			<button on:click={calculatePlan} disabled={calculating} class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm disabled:opacity-50">
-				{calculating ? 'Calculando...' : 'Calcular plan'}
+	<!-- Cabecera -->
+	<div class="bg-white border-b border-stone-200 px-4 py-3 shrink-0">
+		<div class="flex flex-wrap items-center gap-3">
+			<button on:click={prevWeek}
+				class="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-sm font-medium transition-colors">
+				← Anterior
 			</button>
-			<button on:click={clearPlan} class="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm">Limpiar</button>
-			<button on:click={copyPrevious} class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm">Copiar anterior</button>
+			<h1 class="text-xl font-bold text-gray-800" style="font-family: 'Playfair Display', serif">
+				{weekKey}
+			</h1>
+			<button on:click={nextWeek}
+				class="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-sm font-medium transition-colors">
+				Siguiente →
+			</button>
+
+			<div class="ml-auto flex gap-2 flex-wrap">
+				<button on:click={calculatePlan} disabled={calculating}
+					class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+					{calculating ? 'Calculando...' : 'Calcular plan'}
+				</button>
+				<button on:click={clearPlan}
+					class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-medium transition-colors">
+					Limpiar
+				</button>
+				<button on:click={copyPrevious}
+					class="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-sm font-medium transition-colors">
+					Copiar anterior
+				</button>
+			</div>
 		</div>
 	</div>
 
-	<!-- Rule violations banner -->
+	<!-- Banner de violaciones -->
 	{#if weekData?.violations && weekData.violations.length > 0}
-		<div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+		<div class="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-xl shrink-0">
 			<p class="text-sm font-medium text-red-800 mb-1">Reglas incumplidas:</p>
-			<ul class="list-disc list-inside space-y-1">
+			<ul class="list-disc list-inside space-y-0.5">
 				{#each weekData.violations as v}
 					<li class="text-sm text-red-700">{v.message}</li>
 				{/each}
@@ -258,212 +279,215 @@
 		</div>
 	{/if}
 
-	<!-- Week grid -->
-	{#if !weekData}
-		<div class="text-center py-12 text-gray-500">Cargando...</div>
-	{:else}
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
-			{#each [1,2,3,4,5,6,7] as weekday, i}
-				{@const date = weekDates[i]}
-				<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-					<!-- Day header -->
-					<div class="bg-indigo-50 px-3 py-2 border-b border-indigo-100">
-						<p class="font-semibold text-indigo-800 text-sm">{WEEKDAY_NAMES[i]}</p>
-						{#if date}
-							<p class="text-xs text-indigo-500">{date.getUTCDate()} {SHORT_MONTH_NAMES[date.getUTCMonth()]}</p>
-						{/if}
-					</div>
+	<!-- Grid semanal -->
+	<div class="flex-1 overflow-auto p-4">
+		{#if !weekData}
+			<div class="text-center py-12 text-stone-400">Cargando...</div>
+		{:else}
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
+				{#each [1,2,3,4,5,6,7] as weekday, i}
+					{@const date = weekDates[i]}
+					<div class="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
 
-					<!-- Comida & Cena -->
-					{#each ['comida', 'cena'] as mealType}
-						{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
-						<div class="px-2 py-2 {mealType === 'cena' ? 'border-t border-gray-100' : ''}">
-							<div class="flex items-center justify-between mb-1">
-								<span class="text-xs font-semibold text-gray-500 uppercase">{mealType === 'comida' ? '🍽️ Comida' : '🌙 Cena'}</span>
-								<div class="flex items-center gap-1">
-									<button
-										on:click={() => updateConfig(weekday, mealType, 'recipe_count', Math.max(1, cfg.recipe_count - 1))}
-										class="w-5 h-5 text-xs bg-gray-100 hover:bg-gray-200 rounded flex items-center justify-center"
-									>-</button>
-									<span class="text-xs text-gray-600 w-4 text-center">{cfg.recipe_count}</span>
-									<button
-										on:click={() => updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count + 1)}
-										class="w-5 h-5 text-xs bg-gray-100 hover:bg-gray-200 rounded flex items-center justify-center"
-									>+</button>
+						<!-- Cabecera del día -->
+						<div class="bg-indigo-50 px-3 py-2 border-b border-indigo-100">
+							<p class="font-semibold text-indigo-800 text-sm">{WEEKDAY_NAMES[i]}</p>
+							{#if date}
+								<p class="text-xs text-indigo-400">{date.getUTCDate()} {SHORT_MONTH_NAMES[date.getUTCMonth()]}</p>
+							{/if}
+						</div>
+
+						<!-- Comida & Cena -->
+						{#each ['comida', 'cena'] as mealType}
+							{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
+							<div class="px-2 py-2 {mealType === 'cena' ? 'border-t border-stone-100' : ''}">
+								<div class="flex items-center justify-between mb-1">
+									<span class="text-xs font-semibold text-stone-500 uppercase tracking-wide">{mealType === 'comida' ? '🍽️ Comida' : '🌙 Cena'}</span>
+									<div class="flex items-center gap-1">
+										<button
+											on:click={() => updateConfig(weekday, mealType, 'recipe_count', Math.max(1, cfg.recipe_count - 1))}
+											class="w-5 h-5 text-xs bg-stone-100 hover:bg-stone-200 rounded flex items-center justify-center text-stone-500 transition-colors"
+										>-</button>
+										<span class="text-xs text-stone-500 w-4 text-center">{cfg.recipe_count}</span>
+										<button
+											on:click={() => updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count + 1)}
+											class="w-5 h-5 text-xs bg-stone-100 hover:bg-stone-200 rounded flex items-center justify-center text-stone-500 transition-colors"
+										>+</button>
+									</div>
 								</div>
-							</div>
-							<div class="mb-1.5">
-								<input
-									type="text"
-									placeholder="tag requerido…"
-									list="all-tags-datalist"
-									value={cfg.required_tag ?? ''}
-									on:change={(e) => setRequiredTag(weekday, mealType, (e.target as HTMLInputElement).value)}
-									on:blur={(e) => setRequiredTag(weekday, mealType, (e.target as HTMLInputElement).value)}
-									on:keydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-									class="w-full text-xs px-1.5 py-0.5 border rounded outline-none {cfg.required_tag ? 'border-amber-300 bg-amber-50 text-amber-700 placeholder-amber-300' : 'border-gray-200 bg-gray-50 text-gray-500 placeholder-gray-300'}"
-								/>
-							</div>
+								<div class="mb-1.5">
+									<input
+										type="text"
+										placeholder="tag requerido…"
+										list="all-tags-datalist"
+										value={cfg.required_tag ?? ''}
+										on:change={(e) => setRequiredTag(weekday, mealType, (e.target as HTMLInputElement).value)}
+										on:blur={(e) => setRequiredTag(weekday, mealType, (e.target as HTMLInputElement).value)}
+										on:keydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+										class="w-full text-xs px-1.5 py-0.5 border rounded-md outline-none {cfg.required_tag ? 'border-amber-300 bg-amber-50 text-amber-700 placeholder-amber-300' : 'border-stone-200 bg-stone-50 text-stone-400 placeholder-stone-300'}"
+									/>
+								</div>
 
-							<!-- Recipe slots -->
-							{#each Array(cfg.recipe_count) as _, slotIdx}
-								{@const slot = getSlot(weekday, mealType, slotIdx, 0)}
-								{@const key = slotKey(weekday, mealType, slotIdx, 0)}
-								<div class="mb-2">
-									<div class="dropdown-container relative">
-										<div class="flex items-center gap-1">
-											<button
-												on:click|stopPropagation={() => openDropdown === key ? closeDropdown() : openSlotDropdown(weekday, mealType, slotIdx, 0)}
-												class="flex-1 text-left text-xs px-2 py-1.5 rounded border {slot?.recipe ? 'bg-indigo-50 border-indigo-200 text-indigo-800' : 'bg-gray-50 border-gray-200 text-gray-400'} truncate"
-											>
-												{slot?.recipe?.name ?? 'Sin receta'}
-											</button>
-											<button
-												on:click={() => randomSlot(weekday, mealType as 'comida'|'cena', slotIdx, 0)}
-												disabled={busySlots.has(slotKey(weekday, mealType, slotIdx, 0))}
-												class="text-xs px-1.5 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded disabled:opacity-50 disabled:cursor-wait"
-												title="Receta aleatoria"
-											>{busySlots.has(slotKey(weekday, mealType, slotIdx, 0)) ? '⏳' : '🔄'}</button>
-											{#if slot?.recipe}
+								<!-- Slots de receta -->
+								{#each Array(cfg.recipe_count) as _, slotIdx}
+									{@const slot = getSlot(weekday, mealType, slotIdx, 0)}
+									{@const key = slotKey(weekday, mealType, slotIdx, 0)}
+									<div class="mb-2">
+										<div class="dropdown-container relative">
+											<div class="flex items-center gap-1">
 												<button
-													on:click={() => removeSlot(weekday, mealType, slotIdx, 0)}
-													class="text-xs px-1.5 py-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded"
-													title="Quitar"
-												>✕</button>
+													on:click|stopPropagation={() => openDropdown === key ? closeDropdown() : openSlotDropdown(weekday, mealType, slotIdx, 0)}
+													class="flex-1 text-left text-xs px-2 py-1.5 rounded-lg border transition-colors truncate {slot?.recipe ? 'bg-indigo-50 border-indigo-200 text-indigo-800' : 'bg-stone-50 border-stone-200 text-stone-400'}"
+												>
+													{slot?.recipe?.name ?? 'Sin receta'}
+												</button>
+												<button
+													on:click={() => randomSlot(weekday, mealType as 'comida'|'cena', slotIdx, 0)}
+													disabled={busySlots.has(slotKey(weekday, mealType, slotIdx, 0))}
+													class="text-xs px-1.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-lg disabled:opacity-50 disabled:cursor-wait transition-colors"
+													title="Receta aleatoria"
+												>{busySlots.has(slotKey(weekday, mealType, slotIdx, 0)) ? '⏳' : '🔄'}</button>
+												{#if slot?.recipe}
+													<button
+														on:click={() => removeSlot(weekday, mealType, slotIdx, 0)}
+														class="text-xs px-1.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-colors"
+														title="Quitar"
+													>✕</button>
+												{/if}
+											</div>
+
+											<!-- Dropdown -->
+											{#if openDropdown === key}
+												<div class="absolute top-full left-0 z-50 w-72 bg-white border border-stone-200 rounded-xl shadow-xl mt-1 overflow-hidden">
+													<div class="p-2 border-b border-stone-100">
+														<input
+															type="text"
+															placeholder="Buscar receta..."
+															bind:value={searchQuery}
+															on:input={() => handleSearch(weekday, mealType, 0)}
+															class="w-full text-sm px-2 py-1.5 border border-stone-200 rounded-lg focus:outline-none focus:border-indigo-400"
+															autofocus
+														/>
+													</div>
+
+													{#if topRecipes.length > 0}
+														<div class="px-2 py-1.5 bg-amber-50 border-b border-amber-100">
+															<p class="text-xs font-semibold text-amber-700 mb-1">Top este día:</p>
+															{#each topRecipes as r}
+																<button
+																	on:click|stopPropagation={() => selectRecipe(weekday, mealType, slotIdx, 0, r.id)}
+																	class="block w-full text-left text-xs px-2 py-1 hover:bg-amber-100 rounded-lg text-amber-800 transition-colors"
+																>{r.name}</button>
+															{/each}
+														</div>
+													{/if}
+
+													<div class="max-h-48 overflow-y-auto">
+														{#if searchResults.length === 0}
+															<p class="text-xs text-stone-400 px-3 py-2">Sin resultados</p>
+														{:else}
+															{#each searchResults as r}
+																<button
+																	on:click|stopPropagation={() => selectRecipe(weekday, mealType, slotIdx, 0, r.id)}
+																	class="block w-full text-left px-3 py-1.5 hover:bg-stone-50 border-b border-stone-50 last:border-0 transition-colors"
+																>
+																	<p class="text-sm text-gray-800">{r.name}</p>
+																	{#if r.tags}
+																		<p class="text-xs text-stone-400">{r.tags}</p>
+																	{/if}
+																</button>
+															{/each}
+														{/if}
+													</div>
+												</div>
 											{/if}
 										</div>
 
-										<!-- Dropdown -->
-										{#if openDropdown === key}
-											<div class="absolute top-full left-0 z-50 w-72 bg-white border border-gray-200 rounded-lg shadow-xl mt-1 overflow-hidden">
-												<div class="p-2 border-b">
-													<input
-														type="text"
-														placeholder="Buscar receta..."
-														bind:value={searchQuery}
-														on:input={() => handleSearch(weekday, mealType, 0)}
-														class="w-full text-sm px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-indigo-400"
-														autofocus
-													/>
-												</div>
-
-												{#if topRecipes.length > 0}
-													<div class="px-2 py-1.5 bg-amber-50 border-b">
-														<p class="text-xs font-semibold text-amber-700 mb-1">Top este día:</p>
-														{#each topRecipes as r}
+										<!-- Acompañamientos por receta -->
+										{#if cfg.accompaniment_per_recipe > 0}
+											{#each Array(cfg.accompaniment_per_recipe) as _, aIdx}
+												{@const accSlotIdx = slotIdx * cfg.accompaniment_per_recipe + aIdx}
+												{@const accSlot = getSlot(weekday, mealType, accSlotIdx, 1)}
+												{@const accKey = slotKey(weekday, mealType, accSlotIdx, 1)}
+												<div class="mt-1 ml-3 dropdown-container relative">
+													<div class="flex items-center gap-1">
+														<button
+															on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, accSlotIdx, 1)}
+															class="flex-1 text-left text-xs px-2 py-1 rounded-lg border transition-colors truncate {accSlot?.recipe ? 'bg-green-50 border-green-200 text-green-800' : 'bg-stone-50 border-stone-200 text-stone-400'}"
+														>
+															🥗 {accSlot?.recipe?.name ?? 'Acomp.'}
+														</button>
+														{#if accSlot?.recipe}
 															<button
-																on:click|stopPropagation={() => selectRecipe(weekday, mealType, slotIdx, 0, r.id)}
-																class="block w-full text-left text-xs px-2 py-1 hover:bg-amber-100 rounded text-amber-800"
-															>{r.name}</button>
-														{/each}
+																on:click={() => removeSlot(weekday, mealType, accSlotIdx, 1)}
+																class="text-xs px-1 py-1 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-colors"
+															>✕</button>
+														{/if}
 													</div>
-												{/if}
 
-												<div class="max-h-48 overflow-y-auto">
-													{#if searchResults.length === 0}
-														<p class="text-xs text-gray-400 px-3 py-2">Sin resultados</p>
-													{:else}
-														{#each searchResults as r}
-															<button
-																on:click|stopPropagation={() => selectRecipe(weekday, mealType, slotIdx, 0, r.id)}
-																class="block w-full text-left px-3 py-1.5 hover:bg-gray-50 border-b border-gray-50 last:border-0"
-															>
-																<p class="text-sm text-gray-800">{r.name}</p>
-																{#if r.tags}
-																	<p class="text-xs text-gray-400">{r.tags}</p>
+													{#if openDropdown === accKey}
+														<div class="absolute top-full left-0 z-50 w-72 bg-white border border-stone-200 rounded-xl shadow-xl mt-1 overflow-hidden">
+															<div class="p-2 border-b border-stone-100">
+																<input
+																	type="text"
+																	placeholder="Buscar acompañamiento..."
+																	bind:value={searchQuery}
+																	on:input={() => handleSearch(weekday, mealType, 1)}
+																	class="w-full text-sm px-2 py-1.5 border border-stone-200 rounded-lg focus:outline-none focus:border-indigo-400"
+																	autofocus
+																/>
+															</div>
+															<div class="max-h-48 overflow-y-auto">
+																{#if searchResults.length === 0}
+																	<p class="text-xs text-stone-400 px-3 py-2">Sin resultados</p>
+																{:else}
+																	{#each searchResults as r}
+																		<button
+																			on:click|stopPropagation={() => selectRecipe(weekday, mealType, accSlotIdx, 1, r.id)}
+																			class="block w-full text-left px-3 py-1.5 hover:bg-stone-50 border-b border-stone-50 last:border-0 transition-colors"
+																		>
+																			<p class="text-sm text-gray-800">{r.name}</p>
+																			{#if r.tags}
+																				<p class="text-xs text-stone-400">{r.tags}</p>
+																			{/if}
+																		</button>
+																	{/each}
 																{/if}
-															</button>
-														{/each}
+															</div>
+														</div>
 													{/if}
 												</div>
-											</div>
+											{/each}
 										{/if}
 									</div>
+								{/each}
 
-									<!-- Accompaniments per recipe -->
-									{#if cfg.accompaniment_per_recipe > 0}
-										{#each Array(cfg.accompaniment_per_recipe) as _, aIdx}
-											{@const accSlotIdx = slotIdx * cfg.accompaniment_per_recipe + aIdx}
-											{@const accSlot = getSlot(weekday, mealType, accSlotIdx, 1)}
-											{@const accKey = slotKey(weekday, mealType, accSlotIdx, 1)}
-											<div class="mt-1 ml-3 dropdown-container relative">
+								<!-- Acompañamientos por franja -->
+								{#if cfg.accompaniment_per_slot > 0}
+									<div class="mt-1 pt-1 border-t border-stone-100">
+										{#each Array(cfg.accompaniment_per_slot) as _, aIdx}
+											{@const accSlot = getSlot(weekday, mealType, aIdx, 1)}
+											{@const accKey = slotKey(weekday, mealType, aIdx, 1) + '-slot'}
+											<div class="dropdown-container relative mb-1">
 												<div class="flex items-center gap-1">
 													<button
-														on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, accSlotIdx, 1)}
-														class="flex-1 text-left text-xs px-2 py-1 rounded border {accSlot?.recipe ? 'bg-green-50 border-green-200 text-green-800' : 'bg-gray-50 border-gray-200 text-gray-400'} truncate"
+														on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, aIdx, 1)}
+														class="flex-1 text-left text-xs px-2 py-1 rounded-lg border transition-colors truncate {accSlot?.recipe ? 'bg-green-50 border-green-200 text-green-800' : 'bg-stone-50 border-stone-200 text-stone-400'}"
 													>
-														🥗 {accSlot?.recipe?.name ?? 'Acomp.'}
+														🥗 {accSlot?.recipe?.name ?? 'Acomp. franja'}
 													</button>
-													{#if accSlot?.recipe}
-														<button
-															on:click={() => removeSlot(weekday, mealType, accSlotIdx, 1)}
-															class="text-xs px-1 py-1 bg-red-100 hover:bg-red-200 text-red-600 rounded"
-														>✕</button>
-													{/if}
 												</div>
-
-												{#if openDropdown === accKey}
-													<div class="absolute top-full left-0 z-50 w-72 bg-white border border-gray-200 rounded-lg shadow-xl mt-1 overflow-hidden">
-														<div class="p-2 border-b">
-															<input
-																type="text"
-																placeholder="Buscar acompañamiento..."
-																bind:value={searchQuery}
-																on:input={() => handleSearch(weekday, mealType, 1)}
-																class="w-full text-sm px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-indigo-400"
-																autofocus
-															/>
-														</div>
-														<div class="max-h-48 overflow-y-auto">
-															{#if searchResults.length === 0}
-																<p class="text-xs text-gray-400 px-3 py-2">Sin resultados</p>
-															{:else}
-																{#each searchResults as r}
-																	<button
-																		on:click|stopPropagation={() => selectRecipe(weekday, mealType, accSlotIdx, 1, r.id)}
-																		class="block w-full text-left px-3 py-1.5 hover:bg-gray-50 border-b border-gray-50 last:border-0"
-																	>
-																		<p class="text-sm text-gray-800">{r.name}</p>
-																		{#if r.tags}
-																			<p class="text-xs text-gray-400">{r.tags}</p>
-																		{/if}
-																	</button>
-																{/each}
-															{/if}
-														</div>
-													</div>
-												{/if}
 											</div>
 										{/each}
-									{/if}
-								</div>
-							{/each}
-
-							<!-- Accompaniments per slot -->
-							{#if cfg.accompaniment_per_slot > 0}
-								<div class="mt-1 pt-1 border-t border-gray-100">
-									{#each Array(cfg.accompaniment_per_slot) as _, aIdx}
-										{@const accSlot = getSlot(weekday, mealType, aIdx, 1)}
-										{@const accKey = slotKey(weekday, mealType, aIdx, 1) + '-slot'}
-										<div class="dropdown-container relative mb-1">
-											<div class="flex items-center gap-1">
-												<button
-													on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, aIdx, 1)}
-													class="flex-1 text-left text-xs px-2 py-1 rounded border {accSlot?.recipe ? 'bg-green-50 border-green-200 text-green-800' : 'bg-gray-50 border-gray-200 text-gray-400'} truncate"
-												>
-													🥗 {accSlot?.recipe?.name ?? 'Acomp. franja'}
-												</button>
-											</div>
-										</div>
-									{/each}
-								</div>
-							{/if}
-						</div>
-					{/each}
-				</div>
-			{/each}
-		</div>
-	{/if}
+									</div>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</div>
 </div>
 
 <datalist id="all-tags-datalist">

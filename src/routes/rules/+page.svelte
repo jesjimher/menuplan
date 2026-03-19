@@ -58,53 +58,99 @@
 	}
 </script>
 
-<div class="p-4 max-w-2xl mx-auto">
-	<div class="flex items-center justify-between mb-4">
-		<h1 class="text-2xl font-bold text-gray-800">Reglas</h1>
-		<button on:click={startNew} class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">+ Nueva regla</button>
+<svelte:head>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</svelte:head>
+
+<div class="min-h-full bg-stone-50">
+
+	<!-- Cabecera -->
+	<div class="bg-white border-b border-stone-200 px-6 pt-8 pb-6">
+		<div class="max-w-2xl mx-auto flex items-end justify-between gap-4">
+			<div>
+				<h1 class="text-4xl font-bold leading-none text-gray-900" style="font-family: 'Playfair Display', serif">
+					Reglas
+				</h1>
+				<p class="mt-1.5 text-sm text-stone-400">{rules.length} regla{rules.length !== 1 ? 's' : ''} definida{rules.length !== 1 ? 's' : ''}</p>
+			</div>
+			<button on:click={startNew}
+				class="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shrink-0">
+				+ Nueva regla
+			</button>
+		</div>
 	</div>
 
-	{#if showForm}
-		<div class="mb-4 p-4 bg-white border border-indigo-200 rounded-lg shadow-sm">
-			<h3 class="font-semibold text-gray-700 mb-3">{editingRule ? 'Editar regla' : 'Nueva regla'}</h3>
-			<div class="grid grid-cols-1 gap-3">
-				<div>
-					<label class="text-sm text-gray-600 font-medium">Tag</label>
-					<input type="text" placeholder="ej: pescado, carne, vegetariano" bind:value={form.tag} class="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-indigo-400" />
-				</div>
-				<div>
-					<label class="text-sm text-gray-600 font-medium">Condición</label>
-					<select bind:value={form.direction} class="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-indigo-400">
-						<option value="at_least">Al menos</option>
-						<option value="no_more_than">No más de</option>
-					</select>
-				</div>
-				<div>
-					<label class="text-sm text-gray-600 font-medium">Número de veces</label>
-					<input type="number" bind:value={form.times} min="1" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-indigo-400" />
-				</div>
-			</div>
-			<div class="flex gap-2 mt-3">
-				<button on:click={saveRule} disabled={!form.tag} class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm disabled:opacity-50">Guardar</button>
-				<button on:click={() => showForm = false} class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded text-sm">Cancelar</button>
-			</div>
-		</div>
-	{/if}
+	<div class="max-w-2xl mx-auto px-6 py-6">
 
-	<div class="space-y-2">
-		{#each rules as rule}
-			<div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
-				<div class="flex items-center gap-3">
-					<span class="text-2xl">{rule.direction === 'at_least' ? '✅' : '🚫'}</span>
-					<p class="text-sm font-medium text-gray-800">{ruleText(rule)}</p>
+		<!-- Formulario -->
+		{#if showForm}
+			<div class="mb-6 p-5 bg-white border border-indigo-100 rounded-xl shadow-sm">
+				<h3 class="font-semibold text-gray-800 mb-4">{editingRule ? 'Editar regla' : 'Nueva regla'}</h3>
+				<div class="grid gap-3">
+					<div>
+						<label class="block text-xs font-medium text-stone-500 uppercase tracking-wide mb-1">Tag</label>
+						<input type="text" placeholder="ej: pescado, carne, vegetariano" bind:value={form.tag}
+							class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 transition-all" />
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-stone-500 uppercase tracking-wide mb-1">Condición</label>
+						<select bind:value={form.direction}
+							class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 bg-white transition-all">
+							<option value="at_least">Al menos</option>
+							<option value="no_more_than">No más de</option>
+						</select>
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-stone-500 uppercase tracking-wide mb-1">Número de veces</label>
+						<input type="number" bind:value={form.times} min="1"
+							class="w-28 px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 transition-all" />
+					</div>
 				</div>
-				<div class="flex gap-1">
-					<button on:click={() => startEdit(rule)} class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded">Editar</button>
-					<button on:click={() => deleteRule(rule.id)} class="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-600 rounded">Borrar</button>
+				<div class="flex gap-2 mt-4">
+					<button on:click={saveRule} disabled={!form.tag}
+						class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+						Guardar
+					</button>
+					<button on:click={() => showForm = false}
+						class="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-sm transition-colors">
+						Cancelar
+					</button>
 				</div>
 			</div>
-		{:else}
-			<div class="text-center py-12 text-gray-400">No hay reglas definidas. Las reglas ayudan a equilibrar el plan semanal.</div>
-		{/each}
+		{/if}
+
+		<!-- Lista de reglas -->
+		<div class="space-y-2">
+			{#each rules as rule}
+				<div class="group flex items-center justify-between p-4 bg-white border border-stone-200 rounded-xl hover:border-stone-300 hover:shadow-sm transition-all duration-150">
+					<div class="flex items-center gap-3">
+						<span class="text-xl">{rule.direction === 'at_least' ? '✅' : '🚫'}</span>
+						<div>
+							<p class="text-sm font-medium text-gray-800">{ruleText(rule)}</p>
+							<span class="text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block
+								{rule.direction === 'at_least' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}">
+								{rule.direction === 'at_least' ? 'mínimo' : 'máximo'}
+							</span>
+						</div>
+					</div>
+					<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+						<button on:click={() => startEdit(rule)}
+							class="px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors">
+							Editar
+						</button>
+						<button on:click={() => deleteRule(rule.id)}
+							class="px-3 py-1.5 text-xs font-medium text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+							Borrar
+						</button>
+					</div>
+				</div>
+			{:else}
+				<div class="text-center py-16 text-stone-300">
+					<p class="text-4xl mb-3">📋</p>
+					<p class="text-sm">No hay reglas definidas. Las reglas ayudan a equilibrar el plan semanal.</p>
+				</div>
+			{/each}
+		</div>
 	</div>
 </div>

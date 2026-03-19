@@ -23,50 +23,78 @@
 	}
 </script>
 
-<div class="p-4 max-w-5xl mx-auto">
-	<h1 class="text-2xl font-bold text-gray-800 mb-4">Histórico</h1>
+<svelte:head>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</svelte:head>
 
-	<div class="flex gap-4">
-		<!-- Week list -->
-		<div class="w-48 shrink-0">
-			{#if history.length === 0}
-				<p class="text-sm text-gray-400">No hay semanas planificadas.</p>
-			{:else}
-				<div class="space-y-1">
-					{#each history as wk}
-						<button
-							on:click={() => selectWeek(wk)}
-							class="w-full text-left px-3 py-2 rounded text-sm {selectedWeek === wk ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:border-indigo-300'}"
-						>{wk}</button>
-					{/each}
-				</div>
-			{/if}
+<div class="min-h-full bg-stone-50">
+
+	<!-- Cabecera -->
+	<div class="bg-white border-b border-stone-200 px-6 pt-8 pb-6">
+		<div class="max-w-5xl mx-auto">
+			<h1 class="text-4xl font-bold leading-none text-gray-900" style="font-family: 'Playfair Display', serif">
+				Histórico
+			</h1>
+			<p class="mt-1.5 text-sm text-stone-400">{history.length} semana{history.length !== 1 ? 's' : ''} planificada{history.length !== 1 ? 's' : ''}</p>
 		</div>
+	</div>
 
-		<!-- Week detail -->
-		<div class="flex-1">
-			{#if weekData && selectedWeek}
-				<h2 class="text-lg font-semibold text-gray-700 mb-3">{selectedWeek}</h2>
-				<div class="grid grid-cols-2 md:grid-cols-7 gap-2">
-					{#each [1,2,3,4,5,6,7] as weekday, i}
-						<div class="bg-white border border-gray-200 rounded-lg p-2">
-							<p class="text-xs font-semibold text-gray-500 mb-1">{WEEKDAY_NAMES[i]}</p>
-							{#each ['comida', 'cena'] as mealType}
-								<div class="mb-2">
-									<p class="text-xs text-gray-400">{mealType}</p>
-									{#each getSlots(weekData, weekday, mealType) as slot}
-										{#if slot.recipe}
-											<p class="text-xs text-gray-700 font-medium truncate">{slot.recipe.name}</p>
-										{/if}
+	<div class="max-w-5xl mx-auto px-6 py-6">
+		<div class="flex gap-5">
+
+			<!-- Lista de semanas -->
+			<div class="w-44 shrink-0">
+				{#if history.length === 0}
+					<p class="text-sm text-stone-400 py-4">No hay semanas planificadas.</p>
+				{:else}
+					<div class="space-y-1">
+						{#each history as wk}
+							<button on:click={() => selectWeek(wk)}
+								class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors
+									{selectedWeek === wk
+										? 'bg-indigo-600 text-white'
+										: 'bg-white border border-stone-200 text-stone-600 hover:border-indigo-300 hover:text-indigo-600'}">
+								{wk}
+							</button>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<!-- Detalle de semana -->
+			<div class="flex-1 min-w-0">
+				{#if weekData && selectedWeek}
+					<h2 class="text-base font-semibold text-gray-700 mb-3">{selectedWeek}</h2>
+					<div class="grid grid-cols-2 md:grid-cols-7 gap-2">
+						{#each [1,2,3,4,5,6,7] as weekday, i}
+							<div class="bg-white border border-stone-200 rounded-xl overflow-hidden">
+								<div class="bg-indigo-50 px-2.5 py-2 border-b border-indigo-100">
+									<p class="text-xs font-semibold text-indigo-800">{WEEKDAY_NAMES[i]}</p>
+								</div>
+								<div class="p-2">
+									{#each ['comida', 'cena'] as mealType}
+										<div class="mb-2 last:mb-0">
+											<p class="text-xs font-medium text-stone-400 uppercase tracking-wide mb-1">{mealType}</p>
+											{#each getSlots(weekData, weekday, mealType) as slot}
+												{#if slot.recipe}
+													<p class="text-xs text-gray-700 font-medium truncate leading-snug">{slot.recipe.name}</p>
+												{/if}
+											{/each}
+										</div>
 									{/each}
 								</div>
-							{/each}
-						</div>
-					{/each}
-				</div>
-			{:else}
-				<div class="text-gray-400 text-center py-12">Selecciona una semana para ver el detalle.</div>
-			{/if}
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<div class="flex flex-col items-center justify-center h-48 text-stone-300">
+						<p class="text-4xl mb-3">📚</p>
+						<p class="text-sm">Selecciona una semana para ver el detalle.</p>
+					</div>
+				{/if}
+			</div>
+
 		</div>
 	</div>
 </div>
