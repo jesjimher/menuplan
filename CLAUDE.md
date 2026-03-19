@@ -24,6 +24,12 @@ Aplicación **SvelteKit** con `@sveltejs/adapter-node` para despliegue en Docker
 ### Capa de datos (`src/lib/db/index.ts`)
 Singleton de conexión SQLite. El schema está incrustado como constante de string (no se lee el fichero `.sql` en tiempo de ejecución — existe solo como referencia — para evitar problemas de bundling). La ruta de la BD por defecto es `./menuplan.db`, sobreescrita por la variable de entorno `DATABASE_PATH`.
 
+**Al modificar el schema de `recipes`:** regenerar `data/sample-recipes.sql` ejecutando:
+```bash
+/usr/bin/sqlite3 menuplan.db ".dump recipes" | grep "^INSERT INTO recipes" > /tmp/recipes_inserts.sql
+{ echo "-- Recetas de ejemplo para menuplan"; echo "-- Importar con: sqlite3 menuplan.db < data/sample-recipes.sql"; echo "-- O desde Node: better-sqlite3 exec(readFileSync('data/sample-recipes.sql', 'utf8'))"; echo ""; cat /tmp/recipes_inserts.sql; } > data/sample-recipes.sql
+```
+
 **Decisiones clave del schema:**
 - `week_plans.member_id` es nullable (NULL = para todos los miembros). La restricción UNIQUE usa un `CREATE UNIQUE INDEX` separado con `COALESCE(member_id, -1)` porque SQLite no admite expresiones en restricciones `UNIQUE()` inline.
 - Los tags se almacenan como strings separados por comas en todas partes (recetas, restricciones de miembros, etc.). Todas las comparaciones de tags hacen lowercase y trim de cada elemento.
