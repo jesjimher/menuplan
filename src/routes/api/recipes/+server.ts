@@ -1,10 +1,14 @@
 import { json } from '@sveltejs/kit';
-import { getAllRecipes, createRecipe, importPlantoeatRecipes, searchRecipes, getTopRecipesForSlot } from '$lib/server/recipes.js';
+import { getAllRecipes, createRecipe, importPlantoeatRecipes, searchRecipes, getTopRecipesForSlot, getAllTags } from '$lib/server/recipes.js';
 
 export async function GET({ url }) {
 	const q = url.searchParams.get('q');
 	const mealType = url.searchParams.get('mealType');
 	const weekday = url.searchParams.get('weekday');
+
+	if (url.searchParams.get('tags') === '1') {
+		return json(getAllTags());
+	}
 
 	if (q !== null || mealType) {
 		const recipes = searchRecipes(q || '', mealType || undefined);

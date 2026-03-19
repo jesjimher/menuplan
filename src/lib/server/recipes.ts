@@ -52,6 +52,16 @@ export function searchRecipes(q: string, mealType?: string): Recipe[] {
 	return db.prepare(query).all(...params) as Recipe[];
 }
 
+export function getAllTags(): string[] {
+	const db = getDb();
+	const rows = db.prepare("SELECT tags FROM recipes WHERE tags != ''").all() as { tags: string }[];
+	const tagSet = new Set<string>();
+	for (const row of rows) {
+		row.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean).forEach(t => tagSet.add(t));
+	}
+	return Array.from(tagSet).sort();
+}
+
 export function getTopRecipesForSlot(weekday: number, mealType: string, limit = 3): Recipe[] {
 	const db = getDb();
 	return db.prepare(`

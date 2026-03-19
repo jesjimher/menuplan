@@ -8,6 +8,7 @@
 	let weekData = $state<WeekData | null>(null);
 	let recipes = $state<Recipe[]>([]);
 	let rules = $state<Rule[]>([]);
+	let allTags = $state<string[]>([]);
 	let calculating = $state(false);
 	let busySlots = $state(new Set<string>());
 
@@ -21,7 +22,7 @@
 	let weekDates = $derived(getWeekDates(weekKey));
 
 	onMount(async () => {
-		await Promise.all([loadWeek(), loadRecipes(), loadRules()]);
+		await Promise.all([loadWeek(), loadRecipes(), loadRules(), loadTags()]);
 	});
 
 	async function loadWeek() {
@@ -37,6 +38,11 @@
 	async function loadRules() {
 		const res = await fetch('/api/rules');
 		rules = await res.json();
+	}
+
+	async function loadTags() {
+		const res = await fetch('/api/recipes?tags=1');
+		allTags = await res.json();
 	}
 
 	function prevWeek() {
@@ -290,7 +296,9 @@
 								<input
 									type="text"
 									placeholder="tag requerido…"
+									list="all-tags-datalist"
 									value={cfg.required_tag ?? ''}
+									on:change={(e) => setRequiredTag(weekday, mealType, (e.target as HTMLInputElement).value)}
 									on:blur={(e) => setRequiredTag(weekday, mealType, (e.target as HTMLInputElement).value)}
 									on:keydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
 									class="w-full text-xs px-1.5 py-0.5 border rounded outline-none {cfg.required_tag ? 'border-amber-300 bg-amber-50 text-amber-700 placeholder-amber-300' : 'border-gray-200 bg-gray-50 text-gray-500 placeholder-gray-300'}"
@@ -457,3 +465,9 @@
 		</div>
 	{/if}
 </div>
+
+<datalist id="all-tags-datalist">
+	{#each allTags as tag}
+		<option value={tag} />
+	{/each}
+</datalist>
