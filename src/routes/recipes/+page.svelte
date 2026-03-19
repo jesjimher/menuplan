@@ -13,6 +13,25 @@
 
 	let form = { name: '', description: '', tags: '', min_days: -1 };
 
+	let checkedIds = new Set<number>();
+	let bulkTag = '';
+	let bulkAdding = false;
+
+	$: allTags = [...new Set(
+		recipes.flatMap(r => r.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))
+	)].sort();
+
+	$: allVisibleSelected = filteredRecipes.length > 0 && filteredRecipes.every(r => checkedIds.has(r.id));
+
+	function toggleSelectAll() {
+		if (allVisibleSelected) {
+			filteredRecipes.forEach(r => checkedIds.delete(r.id));
+		} else {
+			filteredRecipes.forEach(r => checkedIds.add(r.id));
+		}
+		checkedIds = checkedIds;
+	}
+
 	onMount(loadRecipes);
 
 	async function loadRecipes() {
@@ -76,6 +95,30 @@
 		await loadRecipes();
 	}
 
+	async function applyBulkTag() {
+		const tag = bulkTag.trim().toLowerCase();
+		if (!tag || checkedIds.size === 0) return;
+		bulkAdding = true;
+		try {
+			await Promise.all([...checkedIds].map(id => {
+				const recipe = recipes.find(r => r.id === id)!;
+				const current = recipe.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+				if (current.includes(tag)) return Promise.resolve();
+				const newTags = [...current, tag].join(',');
+				return fetch(`/api/recipes/${id}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ ...recipe, tags: newTags })
+				});
+			}));
+			bulkTag = '';
+			checkedIds = new Set();
+			await loadRecipes();
+		} finally {
+			bulkAdding = false;
+		}
+	}
+
 	async function importRecipes() {
 		importing = true;
 		try {
@@ -117,6 +160,32 @@
 		<div class="mb-4"></div>
 	{/if}
 
+	{#if checkedIds.size > 0}
+		<div class="flex items-center gap-2 mb-3 p-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+			<span class="text-sm text-indigo-700 shrink-0">{checkedIds.size} seleccionada{checkedIds.size > 1 ? 's' : ''}</span>
+			<div class="relative flex-1">
+				<input
+					type="text"
+					list="tags-datalist"
+					bind:value={bulkTag}
+					placeholder="Tag a añadir..."
+					class="w-full px-3 py-1.5 border border-indigo-300 rounded text-sm focus:outline-none focus:border-indigo-500"
+				/>
+				<datalist id="tags-datalist">
+					{#each allTags as t}
+						<option value={t} />
+					{/each}
+				</datalist>
+			</div>
+			<button on:click={applyBulkTag} disabled={!bulkTag.trim() || bulkAdding}
+				class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm disabled:opacity-50 shrink-0">
+				{bulkAdding ? 'Añadiendo...' : 'Añadir tag'}
+			</button>
+			<button on:click={() => { checkedIds = new Set(); }}
+				class="px-2 py-1.5 text-sm text-gray-500 hover:text-gray-700 shrink-0">Cancelar</button>
+		</div>
+	{/if}
+
 	{#if showImport}
 		<div class="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
 			<h3 class="font-semibold text-gray-700 mb-2">Importar desde Plantoeat</h3>
@@ -153,9 +222,23 @@
 		</div>
 	{/if}
 
+	<div class="flex justify-end mb-1">
+		<button on:click={toggleSelectAll} class="text-xs text-indigo-500 hover:text-indigo-700">
+			{allVisibleSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
+		</button>
+	</div>
+
 	<div class="space-y-2">
 		{#each filteredRecipes as recipe}
 			<div class="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+				<input type="checkbox"
+					checked={checkedIds.has(recipe.id)}
+					on:change={() => {
+						if (checkedIds.has(recipe.id)) checkedIds.delete(recipe.id);
+						else checkedIds.add(recipe.id);
+						checkedIds = checkedIds;
+					}}
+					class="mt-1 shrink-0 accent-indigo-600" />
 				<div class="flex-1 min-w-0">
 					<p class="font-medium text-gray-800">{recipe.name}</p>
 					{#if recipe.description}
