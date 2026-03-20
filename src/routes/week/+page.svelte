@@ -239,14 +239,14 @@
 	<div class="bg-white border-b border-stone-200 px-4 py-3 shrink-0">
 		<div class="flex flex-wrap items-center gap-3">
 			<button on:click={prevWeek}
-				class="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-sm font-medium transition-colors">
+				class="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg text-sm font-medium transition-colors">
 				← Anterior
 			</button>
 			<h1 class="text-xl font-bold text-gray-800" style="font-family: 'Playfair Display', serif">
 				{weekKey}
 			</h1>
 			<button on:click={nextWeek}
-				class="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-sm font-medium transition-colors">
+				class="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg text-sm font-medium transition-colors">
 				Siguiente →
 			</button>
 
@@ -260,7 +260,7 @@
 					Limpiar
 				</button>
 				<button on:click={copyPrevious}
-					class="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-sm font-medium transition-colors">
+					class="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg text-sm font-medium transition-colors">
 					Copiar anterior
 				</button>
 			</div>
@@ -282,7 +282,7 @@
 	<!-- Grid semanal -->
 	<div class="flex-1 overflow-auto p-4">
 		{#if !weekData}
-			<div class="text-center py-12 text-stone-400">Cargando...</div>
+			<div class="text-center py-12 text-stone-700">Cargando...</div>
 		{:else}
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
 				{#each [1,2,3,4,5,6,7] as weekday, i}
@@ -302,16 +302,16 @@
 							{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
 							<div class="px-2 py-2 {mealType === 'cena' ? 'border-t border-stone-100' : ''}">
 								<div class="flex items-center justify-between mb-1">
-									<span class="text-xs font-semibold text-stone-500 uppercase tracking-wide">{mealType === 'comida' ? '🍽️ Comida' : '🌙 Cena'}</span>
+									<span class="text-xs font-semibold text-stone-800 uppercase tracking-wide">{mealType === 'comida' ? '🍽️ Comida' : '🌙 Cena'}</span>
 									<div class="flex items-center gap-1">
 										<button
 											on:click={() => updateConfig(weekday, mealType, 'recipe_count', Math.max(1, cfg.recipe_count - 1))}
-											class="w-5 h-5 text-xs bg-stone-100 hover:bg-stone-200 rounded flex items-center justify-center text-stone-500 transition-colors"
+											class="w-5 h-5 text-xs bg-stone-100 hover:bg-stone-200 rounded flex items-center justify-center text-stone-800 transition-colors"
 										>-</button>
-										<span class="text-xs text-stone-500 w-4 text-center">{cfg.recipe_count}</span>
+										<span class="text-xs text-stone-800 w-4 text-center">{cfg.recipe_count}</span>
 										<button
 											on:click={() => updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count + 1)}
-											class="w-5 h-5 text-xs bg-stone-100 hover:bg-stone-200 rounded flex items-center justify-center text-stone-500 transition-colors"
+											class="w-5 h-5 text-xs bg-stone-100 hover:bg-stone-200 rounded flex items-center justify-center text-stone-800 transition-colors"
 										>+</button>
 									</div>
 								</div>
@@ -324,7 +324,7 @@
 										on:change={(e) => setRequiredTag(weekday, mealType, (e.target as HTMLInputElement).value)}
 										on:blur={(e) => setRequiredTag(weekday, mealType, (e.target as HTMLInputElement).value)}
 										on:keydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-										class="w-full text-xs px-1.5 py-0.5 border rounded-md outline-none {cfg.required_tag ? 'border-amber-300 bg-amber-50 text-amber-700 placeholder-amber-300' : 'border-stone-200 bg-stone-50 text-stone-400 placeholder-stone-300'}"
+										class="w-full text-xs px-1.5 py-0.5 border rounded-md outline-none {cfg.required_tag ? 'border-amber-300 bg-amber-50 text-amber-700 placeholder-amber-300' : 'border-stone-200 bg-stone-50 text-stone-700 placeholder-stone-500'}"
 									/>
 								</div>
 
@@ -337,7 +337,7 @@
 											<div class="flex items-center gap-1">
 												<button
 													on:click|stopPropagation={() => openDropdown === key ? closeDropdown() : openSlotDropdown(weekday, mealType, slotIdx, 0)}
-													class="flex-1 text-left text-xs px-2 py-1.5 rounded-lg border transition-colors truncate {slot?.recipe ? 'bg-indigo-50 border-indigo-200 text-indigo-800' : 'bg-stone-50 border-stone-200 text-stone-400'}"
+													class="flex-1 text-left text-xs px-2 py-1.5 rounded-lg border transition-colors truncate {slot?.recipe ? 'bg-indigo-50 border-indigo-200 text-indigo-800' : 'bg-stone-50 border-stone-200 text-stone-700'}"
 												>
 													{slot?.recipe?.name ?? 'Sin receta'}
 												</button>
@@ -384,7 +384,7 @@
 
 													<div class="max-h-48 overflow-y-auto">
 														{#if searchResults.length === 0}
-															<p class="text-xs text-stone-400 px-3 py-2">Sin resultados</p>
+															<p class="text-xs text-stone-700 px-3 py-2">Sin resultados</p>
 														{:else}
 															{#each searchResults as r}
 																<button
@@ -393,7 +393,7 @@
 																>
 																	<p class="text-sm text-gray-800">{r.name}</p>
 																	{#if r.tags}
-																		<p class="text-xs text-stone-400">{r.tags}</p>
+																		<p class="text-xs text-stone-700">{r.tags}</p>
 																	{/if}
 																</button>
 															{/each}
@@ -413,7 +413,7 @@
 													<div class="flex items-center gap-1">
 														<button
 															on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, accSlotIdx, 1)}
-															class="flex-1 text-left text-xs px-2 py-1 rounded-lg border transition-colors truncate {accSlot?.recipe ? 'bg-green-50 border-green-200 text-green-800' : 'bg-stone-50 border-stone-200 text-stone-400'}"
+															class="flex-1 text-left text-xs px-2 py-1 rounded-lg border transition-colors truncate {accSlot?.recipe ? 'bg-green-50 border-green-200 text-green-800' : 'bg-stone-50 border-stone-200 text-stone-700'}"
 														>
 															🥗 {accSlot?.recipe?.name ?? 'Acomp.'}
 														</button>
@@ -439,7 +439,7 @@
 															</div>
 															<div class="max-h-48 overflow-y-auto">
 																{#if searchResults.length === 0}
-																	<p class="text-xs text-stone-400 px-3 py-2">Sin resultados</p>
+																	<p class="text-xs text-stone-700 px-3 py-2">Sin resultados</p>
 																{:else}
 																	{#each searchResults as r}
 																		<button
@@ -448,7 +448,7 @@
 																		>
 																			<p class="text-sm text-gray-800">{r.name}</p>
 																			{#if r.tags}
-																				<p class="text-xs text-stone-400">{r.tags}</p>
+																				<p class="text-xs text-stone-700">{r.tags}</p>
 																			{/if}
 																		</button>
 																	{/each}
@@ -472,7 +472,7 @@
 												<div class="flex items-center gap-1">
 													<button
 														on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, aIdx, 1)}
-														class="flex-1 text-left text-xs px-2 py-1 rounded-lg border transition-colors truncate {accSlot?.recipe ? 'bg-green-50 border-green-200 text-green-800' : 'bg-stone-50 border-stone-200 text-stone-400'}"
+														class="flex-1 text-left text-xs px-2 py-1 rounded-lg border transition-colors truncate {accSlot?.recipe ? 'bg-green-50 border-green-200 text-green-800' : 'bg-stone-50 border-stone-200 text-stone-700'}"
 													>
 														🥗 {accSlot?.recipe?.name ?? 'Acomp. franja'}
 													</button>

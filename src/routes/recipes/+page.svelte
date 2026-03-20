@@ -150,11 +150,11 @@
 				<h1 class="text-4xl font-bold leading-none text-gray-900" style="font-family: 'Playfair Display', serif">
 					Recetas
 				</h1>
-				<p class="mt-1.5 text-sm text-stone-400">{recipes.length} recetas en tu colección</p>
+				<p class="mt-1.5 text-sm text-stone-700">{recipes.length} recetas en tu colección</p>
 			</div>
 			<div class="flex gap-2 shrink-0">
 				<button on:click={() => showImport = !showImport}
-					class="px-4 py-2 text-sm font-medium text-stone-600 border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors">
+					class="px-4 py-2 text-sm font-medium text-stone-800 border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors">
 					Importar
 				</button>
 				<button on:click={startNew}
@@ -169,7 +169,7 @@
 
 		<!-- Buscador -->
 		<div class="relative mb-4">
-			<svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-700 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
 			</svg>
 			<input type="text" placeholder="Buscar por nombre, descripción o tag..."
@@ -209,7 +209,7 @@
 					{bulkAdding ? 'Añadiendo...' : 'Añadir tag'}
 				</button>
 				<button on:click={() => { checkedIds = new Set(); }}
-					class="text-sm text-stone-500 hover:text-stone-700 shrink-0 transition-colors">
+					class="text-sm text-stone-800 hover:text-stone-700 shrink-0 transition-colors">
 					Cancelar
 				</button>
 			</div>
@@ -247,10 +247,10 @@
 					<input type="text" placeholder="Tags (ej: comida,carne,rápido)" bind:value={form.tags}
 						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 transition-all" />
 					<div>
-						<label class="block text-xs font-medium text-stone-500 uppercase tracking-wide mb-1">
+						<label class="block text-xs font-medium text-stone-800 uppercase tracking-wide mb-1">
 							Días mínimos entre ocurrencias
 						</label>
-						<p class="text-xs text-stone-400 mb-1.5">-1 = usar valor global</p>
+						<p class="text-xs text-stone-700 mb-1.5">-1 = usar valor global</p>
 						<input type="number" bind:value={form.min_days} min="-1"
 							class="w-28 px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 transition-all" />
 					</div>
@@ -270,7 +270,7 @@
 
 		<!-- Cabecera de lista -->
 		<div class="flex items-center justify-between mb-3">
-			<p class="text-sm text-stone-400">
+			<p class="text-sm text-stone-700">
 				{filteredRecipes.length} resultado{filteredRecipes.length !== 1 ? 's' : ''}
 			</p>
 			<button on:click={toggleSelectAll}
@@ -294,7 +294,7 @@
 					<div class="flex-1 min-w-0">
 						<p class="font-semibold text-gray-800 leading-snug">{recipe.name}</p>
 						{#if recipe.description}
-							<p class="text-sm text-stone-400 mt-0.5 line-clamp-2 leading-relaxed">{recipe.description}</p>
+							<p class="text-sm text-stone-700 mt-0.5 line-clamp-2 leading-relaxed">{recipe.description}</p>
 						{/if}
 						{#if recipe.tags}
 							<div class="flex flex-wrap gap-1 mt-2">
@@ -302,19 +302,19 @@
 									<button on:click={() => toggleTag(tag)}
 										class="text-xs px-2 py-0.5 rounded-full font-medium transition-colors {selectedTags.includes(tag.trim().toLowerCase())
 											? 'bg-indigo-600 text-white'
-											: 'bg-stone-100 text-stone-500 hover:bg-stone-200'}">
+											: 'bg-stone-100 text-stone-800 hover:bg-stone-200'}">
 										{tag.trim()}
 									</button>
 								{/each}
 							</div>
 						{/if}
 						{#if recipe.min_days !== -1}
-							<p class="text-xs text-stone-300 mt-1.5">Mín. {recipe.min_days} días entre ocurrencias</p>
+							<p class="text-xs text-stone-700 mt-1.5">Mín. {recipe.min_days} días entre ocurrencias</p>
 						{/if}
 					</div>
 					<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
 						<button on:click={() => startEdit(recipe)}
-							class="px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors">
+							class="px-3 py-1.5 text-xs font-medium text-stone-800 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors">
 							Editar
 						</button>
 						<button on:click={() => deleteRecipe(recipe.id)}
@@ -324,7 +324,7 @@
 					</div>
 				</div>
 			{:else}
-				<div class="text-center py-16 text-stone-300">
+				<div class="text-center py-16 text-stone-700">
 					<p class="text-4xl mb-3">🍳</p>
 					<p class="text-sm">
 						{searchQ || selectedTags.length ? 'Sin resultados para esta búsqueda.' : 'No hay recetas. Añade una nueva o importa desde Plantoeat.'}

@@ -33,7 +33,7 @@
 		<!-- Logo -->
 		<div class="flex items-center justify-between h-16 px-5 border-b border-stone-100 shrink-0">
 			<span class="text-xl font-bold text-gray-900" style="font-family: 'Playfair Display', serif">MenuPlan</span>
-			<button class="lg:hidden text-stone-400 hover:text-stone-600" on:click={() => sidebarOpen = false}>✕</button>
+			<button class="lg:hidden text-stone-700 hover:text-stone-800" on:click={() => sidebarOpen = false}>✕</button>
 		</div>
 
 		<!-- Navegación -->
@@ -44,7 +44,7 @@
 					class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
 						{currentPath.startsWith(item.href)
 							? 'bg-indigo-50 text-indigo-700'
-							: 'text-stone-500 hover:text-stone-800 hover:bg-stone-50'}"
+							: 'text-stone-800 hover:text-stone-800 hover:bg-stone-50'}"
 					on:click={() => sidebarOpen = false}
 				>
 					<span class="text-base leading-none">{item.icon}</span>
@@ -61,7 +61,7 @@
 	<div class="flex-1 flex flex-col min-w-0 overflow-hidden">
 		<!-- Top bar (móvil) -->
 		<header class="flex items-center h-16 px-4 bg-white border-b border-stone-200 lg:hidden shrink-0">
-			<button class="text-stone-400 hover:text-stone-700" on:click={() => sidebarOpen = true}>
+			<button class="text-stone-700 hover:text-stone-700" on:click={() => sidebarOpen = true}>
 				<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 				</svg>

@@ -72,7 +72,7 @@
 				<h1 class="text-4xl font-bold leading-none text-gray-900" style="font-family: 'Playfair Display', serif">
 					Reglas
 				</h1>
-				<p class="mt-1.5 text-sm text-stone-400">{rules.length} regla{rules.length !== 1 ? 's' : ''} definida{rules.length !== 1 ? 's' : ''}</p>
+				<p class="mt-1.5 text-sm text-stone-700">{rules.length} regla{rules.length !== 1 ? 's' : ''} definida{rules.length !== 1 ? 's' : ''}</p>
 			</div>
 			<button on:click={startNew}
 				class="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shrink-0">
@@ -89,12 +89,12 @@
 				<h3 class="font-semibold text-gray-800 mb-4">{editingRule ? 'Editar regla' : 'Nueva regla'}</h3>
 				<div class="grid gap-3">
 					<div>
-						<label class="block text-xs font-medium text-stone-500 uppercase tracking-wide mb-1">Tag</label>
+						<label class="block text-xs font-medium text-stone-800 uppercase tracking-wide mb-1">Tag</label>
 						<input type="text" placeholder="ej: pescado, carne, vegetariano" bind:value={form.tag}
 							class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 transition-all" />
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-stone-500 uppercase tracking-wide mb-1">Condición</label>
+						<label class="block text-xs font-medium text-stone-800 uppercase tracking-wide mb-1">Condición</label>
 						<select bind:value={form.direction}
 							class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 bg-white transition-all">
 							<option value="at_least">Al menos</option>
@@ -102,7 +102,7 @@
 						</select>
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-stone-500 uppercase tracking-wide mb-1">Número de veces</label>
+						<label class="block text-xs font-medium text-stone-800 uppercase tracking-wide mb-1">Número de veces</label>
 						<input type="number" bind:value={form.times} min="1"
 							class="w-28 px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 transition-all" />
 					</div>
@@ -136,7 +136,7 @@
 					</div>
 					<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
 						<button on:click={() => startEdit(rule)}
-							class="px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors">
+							class="px-3 py-1.5 text-xs font-medium text-stone-800 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors">
 							Editar
 						</button>
 						<button on:click={() => deleteRule(rule.id)}
@@ -146,7 +146,7 @@
 					</div>
 				</div>
 			{:else}
-				<div class="text-center py-16 text-stone-300">
+				<div class="text-center py-16 text-stone-700">
 					<p class="text-4xl mb-3">📋</p>
 					<p class="text-sm">No hay reglas definidas. Las reglas ayudan a equilibrar el plan semanal.</p>
 				</div>

@@ -36,7 +36,7 @@
 			<h1 class="text-4xl font-bold leading-none text-gray-900" style="font-family: 'Playfair Display', serif">
 				Histórico
 			</h1>
-			<p class="mt-1.5 text-sm text-stone-400">{history.length} semana{history.length !== 1 ? 's' : ''} planificada{history.length !== 1 ? 's' : ''}</p>
+			<p class="mt-1.5 text-sm text-stone-700">{history.length} semana{history.length !== 1 ? 's' : ''} planificada{history.length !== 1 ? 's' : ''}</p>
 		</div>
 	</div>
 
@@ -46,7 +46,7 @@
 			<!-- Lista de semanas -->
 			<div class="w-44 shrink-0">
 				{#if history.length === 0}
-					<p class="text-sm text-stone-400 py-4">No hay semanas planificadas.</p>
+					<p class="text-sm text-stone-700 py-4">No hay semanas planificadas.</p>
 				{:else}
 					<div class="space-y-1">
 						{#each history as wk}
@@ -54,7 +54,7 @@
 								class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors
 									{selectedWeek === wk
 										? 'bg-indigo-600 text-white'
-										: 'bg-white border border-stone-200 text-stone-600 hover:border-indigo-300 hover:text-indigo-600'}">
+										: 'bg-white border border-stone-200 text-stone-800 hover:border-indigo-300 hover:text-indigo-600'}">
 								{wk}
 							</button>
 						{/each}
@@ -75,7 +75,7 @@
 								<div class="p-2">
 									{#each ['comida', 'cena'] as mealType}
 										<div class="mb-2 last:mb-0">
-											<p class="text-xs font-medium text-stone-400 uppercase tracking-wide mb-1">{mealType}</p>
+											<p class="text-xs font-medium text-stone-700 uppercase tracking-wide mb-1">{mealType}</p>
 											{#each getSlots(weekData, weekday, mealType) as slot}
 												{#if slot.recipe}
 													<p class="text-xs text-gray-700 font-medium truncate leading-snug">{slot.recipe.name}</p>
@@ -88,7 +88,7 @@
 						{/each}
 					</div>
 				{:else}
-					<div class="flex flex-col items-center justify-center h-48 text-stone-300">
+					<div class="flex flex-col items-center justify-center h-48 text-stone-700">
 						<p class="text-4xl mb-3">📚</p>
 						<p class="text-sm">Selecciona una semana para ver el detalle.</p>
 					</div>
