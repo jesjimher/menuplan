@@ -3,6 +3,7 @@
 	import type { WeekData, Recipe, Rule } from '$lib/types/index.js';
 	import { checkRules } from '$lib/utils/ruleChecker.js';
 	import { getWeekKey, getPreviousWeekKey, getWeekDates, WEEKDAY_NAMES, SHORT_MONTH_NAMES } from '$lib/utils/dates.js';
+	import TagInput from '$lib/components/TagInput.svelte';
 
 	let weekKey = $state(getWeekKey());
 	let weekData = $state<WeekData | null>(null);
@@ -316,15 +317,13 @@
 									</div>
 								</div>
 								<div class="mb-1.5">
-									<input
-										type="text"
-										placeholder="tag requerido…"
-										list="all-tags-datalist"
+									<TagInput
 										value={cfg.required_tag ?? ''}
-										on:change={(e) => setRequiredTag(weekday, mealType, (e.target as HTMLInputElement).value)}
-										on:blur={(e) => setRequiredTag(weekday, mealType, (e.target as HTMLInputElement).value)}
-										on:keydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+										tags={allTags}
+										placeholder="tag requerido…"
 										class="w-full text-xs px-1.5 py-0.5 border rounded-md outline-none {cfg.required_tag ? 'border-amber-300 bg-amber-50 text-amber-700 placeholder-amber-300' : 'border-stone-200 bg-stone-50 text-stone-700 placeholder-stone-500'}"
+										on:change={(e) => setRequiredTag(weekday, mealType, e.detail)}
+										on:keydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
 									/>
 								</div>
 
@@ -490,8 +489,3 @@
 	</div>
 </div>
 
-<datalist id="all-tags-datalist">
-	{#each allTags as tag}
-		<option value={tag} />
-	{/each}
-</datalist>

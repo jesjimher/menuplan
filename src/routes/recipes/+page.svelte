@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Recipe } from '$lib/types/index.js';
+	import TagInput from '$lib/components/TagInput.svelte';
 
 	let recipes: Recipe[] = [];
 	let showForm = false;
@@ -197,12 +198,12 @@
 					{checkedIds.size} seleccionada{checkedIds.size > 1 ? 's' : ''}
 				</span>
 				<div class="relative flex-1">
-					<input type="text" list="tags-datalist" bind:value={bulkTag}
+					<TagInput
+						bind:value={bulkTag}
+						tags={allTags}
 						placeholder="Tag a añadir..."
-						class="w-full px-3 py-1.5 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
-					<datalist id="tags-datalist">
-						{#each allTags as t}<option value={t} />{/each}
-					</datalist>
+						class="w-full px-3 py-1.5 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+					/>
 				</div>
 				<button on:click={applyBulkTag} disabled={!bulkTag.trim() || bulkAdding}
 					class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors">
