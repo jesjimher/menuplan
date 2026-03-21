@@ -484,20 +484,18 @@
 														{#if topRecipes.length > 0}
 															<div class="px-2 py-1.5 border-b"
 																style="background: {isComida ? '#d6e6f2' : '#f0deba'}; border-color: {isComida ? '#b8d0e8' : '#e0c08a'};">
-																<p class="text-xs font-semibold mb-1"
-																	style="color: {isComida ? '#1e3d5c' : '#6a3008'};">Top este día:</p>
+																<p class="text-xs font-semibold mb-1 text-stone-900">Top este día:</p>
 																{#each topRecipes as r}
 																	<button
 																		on:click|stopPropagation={() => selectRecipe(weekday, mealType, slotIdx, 0, r.id)}
-																		class="block w-full text-left text-xs px-2 py-1 rounded-lg transition-opacity hover:opacity-70"
-																		style="color: {isComida ? '#0e2840' : '#3a1800'};"
+																		class="block w-full text-left text-xs px-2 py-1 rounded-lg transition-opacity hover:opacity-70 text-stone-900"
 																	>{r.name}</button>
 																{/each}
 															</div>
 														{/if}
 														<div class="max-h-64 overflow-y-auto">
 															{#if searchResults.length === 0}
-																<p class="text-xs text-stone-600 px-3 py-3">Sin resultados</p>
+																<p class="text-xs text-stone-900 px-3 py-3">Sin resultados</p>
 															{:else}
 																{#each searchResults as r}
 																	<button
@@ -506,7 +504,7 @@
 																	>
 																		<p class="text-sm text-stone-900">{r.name}</p>
 																		{#if r.tags}
-																			<p class="text-xs text-stone-600 mt-0.5">{r.tags}</p>
+																			<p class="text-xs text-stone-900 mt-0.5">{r.tags}</p>
 																		{/if}
 																	</button>
 																{/each}
@@ -563,7 +561,7 @@
 																</div>
 																<div class="max-h-64 overflow-y-auto">
 																	{#if searchResults.length === 0}
-																		<p class="text-xs text-stone-600 px-3 py-3">Sin resultados</p>
+																		<p class="text-xs text-stone-900 px-3 py-3">Sin resultados</p>
 																	{:else}
 																		{#each searchResults as r}
 																			<button
@@ -572,7 +570,7 @@
 																			>
 																				<p class="text-sm text-stone-900">{r.name}</p>
 																				{#if r.tags}
-																					<p class="text-xs text-stone-600 mt-0.5">{r.tags}</p>
+																					<p class="text-xs text-stone-900 mt-0.5">{r.tags}</p>
 																				{/if}
 																			</button>
 																		{/each}
