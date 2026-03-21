@@ -184,6 +184,26 @@
 		}
 	}
 
+	async function recalculatePlan() {
+		if (!confirm('¿Limpiar todo el plan y recalcular desde cero?')) return;
+		calculating = true;
+		try {
+			await fetch('/api/week/clear', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey })
+			});
+			const res = await fetch('/api/week/calculate', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey })
+			});
+			weekData = await res.json();
+		} finally {
+			calculating = false;
+		}
+	}
+
 	async function clearPlan() {
 		if (!confirm('¿Limpiar todo el plan de esta semana?')) return;
 		await fetch('/api/week/clear', {
@@ -288,11 +308,15 @@
 			<div class="ml-auto flex gap-1.5 flex-wrap items-center">
 				<button on:click={calculatePlan} disabled={calculating}
 					class="px-4 py-1.5 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-colors">
-					{calculating ? 'Calculando…' : 'Calcular plan'}
+					{calculating ? 'Calculando…' : 'Completar huecos'}
+				</button>
+				<button on:click={recalculatePlan} disabled={calculating}
+					class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-colors">
+					{calculating ? 'Calculando…' : 'Recalcular plan completo'}
 				</button>
 				<button on:click={copyPrevious}
 					class="px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-lg transition-colors">
-					Copiar anterior
+					Copiar semana anterior
 				</button>
 				<button on:click={clearPlan}
 					class="px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors">
