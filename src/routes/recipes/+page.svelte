@@ -137,29 +137,24 @@
 	}
 </script>
 
-<svelte:head>
-	<link rel="preconnect" href="https://fonts.googleapis.com">
-	<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-</svelte:head>
-
-<div class="min-h-full bg-stone-50">
+<div class="min-h-full" style="background: #f0ebe3; font-family: 'DM Sans', sans-serif;">
 
 	<!-- Cabecera -->
 	<div class="bg-white border-b border-stone-200 px-6 pt-8 pb-6">
 		<div class="max-w-4xl mx-auto flex items-end justify-between gap-4">
 			<div>
-				<h1 class="text-4xl font-bold leading-none text-gray-900" style="font-family: 'Playfair Display', serif">
+				<h1 class="text-4xl font-bold leading-none text-stone-900" style="font-family: 'Lora', serif">
 					Recetas
 				</h1>
-				<p class="mt-1.5 text-sm text-stone-700">{recipes.length} recetas en tu colección</p>
+				<p class="mt-1.5 text-sm text-stone-600">{recipes.length} recetas en tu colección</p>
 			</div>
 			<div class="flex gap-2 shrink-0">
 				<button on:click={() => showImport = !showImport}
-					class="px-4 py-2 text-sm font-medium text-stone-800 border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors">
+					class="px-4 py-2 text-sm font-medium text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors">
 					Importar
 				</button>
 				<button on:click={startNew}
-					class="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
+					class="px-4 py-2 text-sm font-medium bg-stone-800 hover:bg-stone-900 text-white rounded-lg transition-colors">
 					+ Nueva receta
 				</button>
 			</div>
@@ -170,12 +165,12 @@
 
 		<!-- Buscador -->
 		<div class="relative mb-4">
-			<svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-700 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
 			</svg>
 			<input type="text" placeholder="Buscar por nombre, descripción o tag..."
 				bind:value={searchQ}
-				class="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm shadow-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all" />
+				class="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm shadow-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all" />
 		</div>
 
 		<!-- Tags activos -->
@@ -183,7 +178,7 @@
 			<div class="flex flex-wrap gap-1.5 mb-4">
 				{#each selectedTags as tag}
 					<button on:click={() => toggleTag(tag)}
-						class="inline-flex items-center gap-1 text-xs px-3 py-1 bg-indigo-600 text-white rounded-full font-medium hover:bg-indigo-700 transition-colors">
+						class="inline-flex items-center gap-1 text-xs px-3 py-1 bg-stone-800 text-white rounded-full font-medium hover:bg-stone-900 transition-colors">
 						{tag}
 						<span class="opacity-70">×</span>
 					</button>
@@ -193,8 +188,8 @@
 
 		<!-- Barra de acción masiva -->
 		{#if checkedIds.size > 0}
-			<div class="flex items-center gap-3 mb-4 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl">
-				<span class="text-sm font-medium text-indigo-700 shrink-0">
+			<div class="flex items-center gap-3 mb-4 px-4 py-3 bg-white border border-stone-200 rounded-xl shadow-sm">
+				<span class="text-sm font-medium text-stone-800 shrink-0">
 					{checkedIds.size} seleccionada{checkedIds.size > 1 ? 's' : ''}
 				</span>
 				<div class="relative flex-1">
@@ -202,15 +197,15 @@
 						bind:value={bulkTag}
 						tags={allTags}
 						placeholder="Tag a añadir..."
-						class="w-full px-3 py-1.5 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+						class="w-full px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400"
 					/>
 				</div>
 				<button on:click={applyBulkTag} disabled={!bulkTag.trim() || bulkAdding}
-					class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors">
+					class="px-3 py-1.5 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors">
 					{bulkAdding ? 'Añadiendo...' : 'Añadir tag'}
 				</button>
 				<button on:click={() => { checkedIds = new Set(); }}
-					class="text-sm text-stone-800 hover:text-stone-700 shrink-0 transition-colors">
+					class="text-sm text-stone-600 hover:text-stone-800 shrink-0 transition-colors">
 					Cancelar
 				</button>
 			</div>
@@ -218,14 +213,14 @@
 
 		<!-- Panel de importación -->
 		{#if showImport}
-			<div class="mb-6 p-5 bg-white border border-stone-200 rounded-xl shadow-sm">
-				<h3 class="font-semibold text-gray-800 mb-3">Importar desde Plantoeat</h3>
+			<div class="mb-6 p-5 bg-white border border-stone-200 rounded-2xl shadow-sm">
+				<h3 class="font-semibold text-stone-900 mb-3" style="font-family: 'Lora', serif">Importar desde Plantoeat</h3>
 				<textarea bind:value={importText}
 					placeholder="Pega aquí el texto exportado de Plantoeat..."
-					class="w-full h-40 px-3 py-2.5 border border-stone-200 rounded-lg text-sm font-mono resize-none focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 transition-all"></textarea>
+					class="w-full h-40 px-3 py-2.5 border border-stone-200 rounded-lg text-sm font-mono resize-none focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all"></textarea>
 				<div class="flex gap-2 mt-3">
 					<button on:click={importRecipes} disabled={importing || !importText}
-						class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+						class="px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
 						{importing ? 'Importando...' : 'Importar'}
 					</button>
 					<button on:click={() => showImport = false}
@@ -238,27 +233,27 @@
 
 		<!-- Formulario de receta -->
 		{#if showForm}
-			<div class="mb-6 p-5 bg-white border border-indigo-100 rounded-xl shadow-sm">
-				<h3 class="font-semibold text-gray-800 mb-4">{editingRecipe ? 'Editar receta' : 'Nueva receta'}</h3>
+			<div class="mb-6 p-5 bg-white border border-stone-200 rounded-2xl shadow-sm">
+				<h3 class="font-semibold text-stone-900 mb-4" style="font-family: 'Lora', serif">{editingRecipe ? 'Editar receta' : 'Nueva receta'}</h3>
 				<div class="grid gap-3">
 					<input type="text" placeholder="Nombre *" bind:value={form.name}
-						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 transition-all" />
+						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all" />
 					<textarea placeholder="Descripción" bind:value={form.description}
-						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm h-20 resize-none focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 transition-all"></textarea>
+						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm h-20 resize-none focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all"></textarea>
 					<input type="text" placeholder="Tags (ej: comida,carne,rápido)" bind:value={form.tags}
-						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 transition-all" />
+						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all" />
 					<div>
-						<label class="block text-xs font-medium text-stone-800 uppercase tracking-wide mb-1">
+						<label class="block text-xs font-medium text-stone-700 uppercase tracking-wide mb-1">
 							Días mínimos entre ocurrencias
 						</label>
-						<p class="text-xs text-stone-700 mb-1.5">-1 = usar valor global</p>
+						<p class="text-xs text-stone-500 mb-1.5">-1 = usar valor global</p>
 						<input type="number" bind:value={form.min_days} min="-1"
-							class="w-28 px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 transition-all" />
+							class="w-28 px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 transition-all" />
 					</div>
 				</div>
 				<div class="flex gap-2 mt-4">
 					<button on:click={saveRecipe} disabled={!form.name}
-						class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+						class="px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
 						Guardar
 					</button>
 					<button on:click={() => showForm = false}
@@ -271,11 +266,11 @@
 
 		<!-- Cabecera de lista -->
 		<div class="flex items-center justify-between mb-3">
-			<p class="text-sm text-stone-700">
+			<p class="text-sm text-stone-600">
 				{filteredRecipes.length} resultado{filteredRecipes.length !== 1 ? 's' : ''}
 			</p>
 			<button on:click={toggleSelectAll}
-				class="text-xs font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+				class="text-xs font-medium text-stone-600 hover:text-stone-900 transition-colors">
 				{allVisibleSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
 			</button>
 		</div>
@@ -283,7 +278,7 @@
 		<!-- Lista de recetas -->
 		<div class="space-y-2">
 			{#each filteredRecipes as recipe}
-				<div class="group flex items-start gap-3 p-4 bg-white border border-stone-200 rounded-xl hover:border-stone-300 hover:shadow-sm transition-all duration-150">
+				<div class="group flex items-start gap-3 p-4 bg-white border border-stone-200 rounded-2xl hover:border-stone-300 hover:shadow-sm transition-all duration-150">
 					<input type="checkbox"
 						checked={checkedIds.has(recipe.id)}
 						on:change={() => {
@@ -291,41 +286,41 @@
 							else checkedIds.add(recipe.id);
 							checkedIds = checkedIds;
 						}}
-						class="mt-0.5 w-4 h-4 shrink-0 accent-indigo-600" />
+						class="mt-0.5 w-4 h-4 shrink-0 accent-stone-800" />
 					<div class="flex-1 min-w-0">
-						<p class="font-semibold text-gray-800 leading-snug">{recipe.name}</p>
+						<p class="font-semibold text-stone-900 leading-snug" style="font-family: 'Lora', serif">{recipe.name}</p>
 						{#if recipe.description}
-							<p class="text-sm text-stone-700 mt-0.5 line-clamp-2 leading-relaxed">{recipe.description}</p>
+							<p class="text-sm text-stone-600 mt-0.5 line-clamp-2 leading-relaxed">{recipe.description}</p>
 						{/if}
 						{#if recipe.tags}
 							<div class="flex flex-wrap gap-1 mt-2">
 								{#each recipe.tags.split(',') as tag}
 									<button on:click={() => toggleTag(tag)}
 										class="text-xs px-2 py-0.5 rounded-full font-medium transition-colors {selectedTags.includes(tag.trim().toLowerCase())
-											? 'bg-indigo-600 text-white'
-											: 'bg-stone-100 text-stone-800 hover:bg-stone-200'}">
+											? 'bg-stone-800 text-white'
+											: 'bg-stone-100 text-stone-700 hover:bg-stone-200'}">
 										{tag.trim()}
 									</button>
 								{/each}
 							</div>
 						{/if}
 						{#if recipe.min_days !== -1}
-							<p class="text-xs text-stone-700 mt-1.5">Mín. {recipe.min_days} días entre ocurrencias</p>
+							<p class="text-xs text-stone-500 mt-1.5">Mín. {recipe.min_days} días entre ocurrencias</p>
 						{/if}
 					</div>
 					<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
 						<button on:click={() => startEdit(recipe)}
-							class="px-3 py-1.5 text-xs font-medium text-stone-800 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors">
+							class="px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100 rounded-lg transition-colors">
 							Editar
 						</button>
 						<button on:click={() => deleteRecipe(recipe.id)}
-							class="px-3 py-1.5 text-xs font-medium text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+							class="px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors">
 							Borrar
 						</button>
 					</div>
 				</div>
 			{:else}
-				<div class="text-center py-16 text-stone-700">
+				<div class="text-center py-16 text-stone-500">
 					<p class="text-4xl mb-3">🍳</p>
 					<p class="text-sm">
 						{searchQ || selectedTags.length ? 'Sin resultados para esta búsqueda.' : 'No hay recetas. Añade una nueva o importa desde Plantoeat.'}
