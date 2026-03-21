@@ -228,6 +228,34 @@
 	function closeDropdown() {
 		openDropdown = null;
 	}
+
+	function fixedDropdown(node: HTMLElement) {
+		const container = node.closest('.dropdown-container') as HTMLElement;
+		const trigger = container?.querySelector('button') as HTMLElement;
+
+		function reposition() {
+			if (!trigger) return;
+			const rect = trigger.getBoundingClientRect();
+			node.style.top = `${rect.bottom + 4}px`;
+			const nodeWidth = node.offsetWidth || 288;
+			let left = rect.left;
+			if (left + nodeWidth > window.innerWidth) {
+				left = Math.max(8, window.innerWidth - nodeWidth - 8);
+			}
+			node.style.left = `${left}px`;
+		}
+
+		requestAnimationFrame(reposition);
+		window.addEventListener('scroll', reposition, true);
+		window.addEventListener('resize', reposition);
+
+		return {
+			destroy() {
+				window.removeEventListener('scroll', reposition, true);
+				window.removeEventListener('resize', reposition);
+			}
+		};
+	}
 </script>
 
 <svelte:head>
@@ -442,7 +470,7 @@
 
 												<!-- Dropdown búsqueda receta -->
 												{#if openDropdown === key}
-													<div class="absolute top-full left-0 z-50 w-72 bg-white border border-stone-200 rounded-xl shadow-xl mt-1 overflow-hidden">
+													<div class="fixed z-[9999] w-72 bg-white border border-stone-200 rounded-xl shadow-xl overflow-hidden" use:fixedDropdown>
 														<div class="p-2 border-b border-stone-100">
 															<input
 																type="text"
@@ -522,7 +550,7 @@
 														</div>
 
 														{#if openDropdown === accKey}
-															<div class="absolute top-full left-0 z-50 w-72 bg-white border border-stone-200 rounded-xl shadow-xl mt-1 overflow-hidden">
+															<div class="fixed z-[9999] w-72 bg-white border border-stone-200 rounded-xl shadow-xl overflow-hidden" use:fixedDropdown>
 																<div class="p-2 border-b border-stone-100">
 																	<input
 																		type="text"
