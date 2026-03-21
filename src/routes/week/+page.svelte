@@ -14,6 +14,10 @@
 	let busySlots = $state(new Set<string>());
 	let editingTagKey = $state<string | null>(null);
 
+	function focusOnMount(node: HTMLInputElement) {
+		node.focus();
+	}
+
 	// Recipe search state per slot
 	let openDropdown = $state<string | null>(null);
 	let searchQuery = $state('');
@@ -506,10 +510,10 @@
 																bind:value={searchQuery}
 																on:input={() => handleSearch(weekday, mealType, 0)}
 																class="w-full text-sm px-2.5 py-1.5 border border-stone-300 rounded-lg focus:outline-none focus:border-stone-500 text-stone-900 placeholder-stone-500"
-																autofocus
+																use:focusOnMount
 															/>
 														</div>
-														{#if topRecipes.length > 0}
+														{#if topRecipes.length > 0 && !searchQuery}
 															<div class="px-2 py-1.5 border-b"
 																style="background: {isComida ? '#d6e6f2' : '#f0deba'}; border-color: {isComida ? '#b8d0e8' : '#e0c08a'};">
 																<p class="text-xs font-semibold mb-1 text-stone-900">Top este día:</p>

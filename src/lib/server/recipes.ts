@@ -38,14 +38,14 @@ export function searchRecipes(q: string, mealType?: string): Recipe[] {
 	const params: string[] = [];
 
 	if (q) {
-		query += ' AND (name LIKE ? OR description LIKE ? OR tags LIKE ?)';
+		query += ' AND (name LIKE ? OR tags LIKE ?)';
 		const like = `%${q}%`;
-		params.push(like, like, like);
+		params.push(like, like);
 	}
 
 	if (mealType) {
-		query += ' AND (tags LIKE ? OR tags LIKE ? OR tags LIKE ?)';
-		params.push(mealType, `${mealType},%`, `%,${mealType}`);
+		query += " AND (',' || REPLACE(LOWER(tags), ', ', ',') || ',' LIKE '%,' || LOWER(?) || ',%')";
+		params.push(mealType);
 	}
 
 	query += ' ORDER BY name ASC LIMIT 50';

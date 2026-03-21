@@ -61,8 +61,8 @@
 	$: filteredRecipes = recipes.filter(r => {
 		const matchesText = !searchQ ||
 			r.name.toLowerCase().includes(searchQ.toLowerCase()) ||
-			r.tags.toLowerCase().includes(searchQ.toLowerCase()) ||
-			r.description.toLowerCase().includes(searchQ.toLowerCase());
+			r.tags.toLowerCase().includes(searchQ.toLowerCase());
+
 		const recipeTags = r.tags.split(',').map(t => t.trim().toLowerCase());
 		const matchesTags = selectedTags.every(t => recipeTags.includes(t));
 		return matchesText && matchesTags;
