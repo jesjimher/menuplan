@@ -12,6 +12,41 @@
 		if (autofocus) node.focus();
 	}
 
+	function smartPosition(node: HTMLElement) {
+		node.style.position = 'fixed';
+		node.style.width = '';
+		node.style.left = '';
+		node.style.top = '';
+
+		function reposition() {
+			const input = node.closest('.taginput-wrap')?.querySelector('input');
+			if (!input) return;
+			const rect = input.getBoundingClientRect();
+			const listHeight = node.offsetHeight || 200;
+			const spaceBelow = window.innerHeight - rect.bottom;
+
+			node.style.width = rect.width + 'px';
+			node.style.left = rect.left + 'px';
+
+			if (spaceBelow < listHeight + 8 && rect.top > spaceBelow) {
+				node.style.top = (rect.top - listHeight - 2) + 'px';
+				node.style.bottom = '';
+			} else {
+				node.style.top = (rect.bottom + 2) + 'px';
+				node.style.bottom = '';
+			}
+		}
+		requestAnimationFrame(reposition);
+		window.addEventListener('scroll', reposition, true);
+		window.addEventListener('resize', reposition);
+		return {
+			destroy() {
+				window.removeEventListener('scroll', reposition, true);
+				window.removeEventListener('resize', reposition);
+			}
+		};
+	}
+
 	const dispatch = createEventDispatcher<{ change: string }>();
 
 	let open = false;
@@ -33,7 +68,7 @@
 	}
 </script>
 
-<div class="relative">
+<div class="taginput-wrap relative">
 	<input
 		use:focusOnMount
 		bind:value
@@ -46,7 +81,7 @@
 		on:keydown
 	/>
 	{#if open && displayed.length > 0}
-		<ul class="absolute z-50 top-full left-0 right-0 mt-0.5 bg-white border border-stone-200 rounded-lg shadow-lg overflow-hidden text-sm">
+		<ul use:smartPosition class="z-[9999] bg-white border border-stone-200 rounded-lg shadow-lg overflow-hidden text-sm">
 			{#each displayed as tag}
 				<li>
 					<button
