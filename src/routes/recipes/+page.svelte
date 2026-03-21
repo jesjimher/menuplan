@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { Recipe } from '$lib/types/index.js';
 	import TagInput from '$lib/components/TagInput.svelte';
+	import MultiTagInput from '$lib/components/MultiTagInput.svelte';
 
 	let recipes: Recipe[] = [];
 	let showForm = false;
@@ -240,8 +241,8 @@
 						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all" />
 					<textarea placeholder="Descripción" bind:value={form.description}
 						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm h-20 resize-none focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all"></textarea>
-					<input type="text" placeholder="Tags (ej: comida,carne,rápido)" bind:value={form.tags}
-						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all" />
+					<MultiTagInput bind:value={form.tags} tags={allTags} placeholder="Tags (ej: comida,carne,rápido)"
+						class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all" />
 					<div>
 						<label class="block text-xs font-medium text-stone-700 uppercase tracking-wide mb-1">
 							Días mínimos entre ocurrencias

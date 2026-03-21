@@ -1,17 +1,26 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Member } from '$lib/types/index.js';
+	import MultiTagInput from '$lib/components/MultiTagInput.svelte';
 
 	let members: Member[] = [];
+	let allTags: string[] = [];
 	let showForm = false;
 	let editingMember: Member | null = null;
 	let form = { name: '', cannot_eat: '', likes: '', dislikes: '' };
 
-	onMount(loadMembers);
+	onMount(async () => {
+		await Promise.all([loadMembers(), loadTags()]);
+	});
 
 	async function loadMembers() {
 		const res = await fetch('/api/members');
 		members = await res.json();
+	}
+
+	async function loadTags() {
+		const res = await fetch('/api/recipes?tags=1');
+		allTags = await res.json();
 	}
 
 	function startEdit(m: Member) {
@@ -85,17 +94,17 @@
 						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all" />
 					<div>
 						<label class="block text-xs font-medium text-stone-700 uppercase tracking-wide mb-1">No puede comer</label>
-						<input type="text" placeholder="ej: gluten,lactosa,marisco" bind:value={form.cannot_eat}
+						<MultiTagInput bind:value={form.cannot_eat} tags={allTags} placeholder="ej: gluten,lactosa,marisco"
 							class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-red-300 focus:ring-2 focus:ring-red-50 transition-all" />
 					</div>
 					<div>
 						<label class="block text-xs font-medium text-stone-700 uppercase tracking-wide mb-1">Le gusta</label>
-						<input type="text" placeholder="ej: pasta,pollo" bind:value={form.likes}
+						<MultiTagInput bind:value={form.likes} tags={allTags} placeholder="ej: pasta,pollo"
 							class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-green-300 focus:ring-2 focus:ring-green-50 transition-all" />
 					</div>
 					<div>
 						<label class="block text-xs font-medium text-stone-700 uppercase tracking-wide mb-1">No le gusta</label>
-						<input type="text" placeholder="ej: verduras,pescado" bind:value={form.dislikes}
+						<MultiTagInput bind:value={form.dislikes} tags={allTags} placeholder="ej: verduras,pescado"
 							class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-50 transition-all" />
 					</div>
 				</div>

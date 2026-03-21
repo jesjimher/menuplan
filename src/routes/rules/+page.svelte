@@ -1,17 +1,26 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Rule } from '$lib/types/index.js';
+	import TagInput from '$lib/components/TagInput.svelte';
 
 	let rules: Rule[] = [];
+	let allTags: string[] = [];
 	let showForm = false;
 	let editingRule: Rule | null = null;
 	let form = { tag: '', direction: 'at_least' as 'at_least' | 'no_more_than', times: 1 };
 
-	onMount(loadRules);
+	onMount(async () => {
+		await Promise.all([loadRules(), loadTags()]);
+	});
 
 	async function loadRules() {
 		const res = await fetch('/api/rules');
 		rules = await res.json();
+	}
+
+	async function loadTags() {
+		const res = await fetch('/api/recipes?tags=1');
+		allTags = await res.json();
 	}
 
 	function startEdit(r: Rule) {
@@ -85,7 +94,7 @@
 				<div class="grid gap-3">
 					<div>
 						<label class="block text-xs font-medium text-stone-700 uppercase tracking-wide mb-1">Tag</label>
-						<input type="text" placeholder="ej: pescado, carne, vegetariano" bind:value={form.tag}
+						<TagInput bind:value={form.tag} tags={allTags} placeholder="ej: pescado, carne, vegetariano"
 							class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all" />
 					</div>
 					<div>
