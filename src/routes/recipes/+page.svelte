@@ -34,7 +34,15 @@
 		checkedIds = checkedIds;
 	}
 
-	onMount(loadRecipes);
+	onMount(async () => {
+		await loadRecipes();
+		const params = new URLSearchParams(window.location.search);
+		const editId = params.get('edit');
+		if (editId) {
+			const r = recipes.find(r => r.id === parseInt(editId));
+			if (r) startEdit(r);
+		}
+	});
 
 	async function loadRecipes() {
 		const res = await fetch('/api/recipes');

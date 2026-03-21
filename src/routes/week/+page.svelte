@@ -481,6 +481,12 @@
 															title="Receta aleatoria"
 														>{busySlots.has(slotKey(weekday, mealType, slotIdx, 0)) ? '⏳' : '↻'}</button>
 														{#if slot?.recipe}
+															<a
+																href="/recipes?edit={slot.recipe.id}"
+																on:click|stopPropagation
+																class="w-6 h-6 flex items-center justify-center rounded-lg bg-white shadow-sm border border-stone-300 text-stone-500 hover:text-stone-900 hover:border-stone-400 transition-colors text-sm"
+																title="Editar receta"
+															>✎</a>
 															<button
 																on:click|stopPropagation={() => removeSlot(weekday, mealType, slotIdx, 0)}
 																class="w-6 h-6 flex items-center justify-center rounded-lg bg-white shadow-sm border border-stone-300 text-stone-500 hover:text-red-600 hover:border-red-300 transition-colors text-sm"
