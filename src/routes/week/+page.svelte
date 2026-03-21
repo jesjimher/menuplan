@@ -495,7 +495,7 @@
 																{/each}
 															</div>
 														{/if}
-														<div class="max-h-52 overflow-y-auto">
+														<div class="max-h-64 overflow-y-auto">
 															{#if searchResults.length === 0}
 																<p class="text-xs text-stone-600 px-3 py-3">Sin resultados</p>
 															{:else}
@@ -561,7 +561,7 @@
 																		autofocus
 																	/>
 																</div>
-																<div class="max-h-52 overflow-y-auto">
+																<div class="max-h-64 overflow-y-auto">
 																	{#if searchResults.length === 0}
 																		<p class="text-xs text-stone-600 px-3 py-3">Sin resultados</p>
 																	{:else}
