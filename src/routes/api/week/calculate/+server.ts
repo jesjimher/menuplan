@@ -26,7 +26,7 @@ export async function POST({ request }) {
 				);
 
 				if (!existing || !existing.recipe) {
-					slotsToFill.push({ weekday, meal_type: mealType, slot_index: slotIdx, is_accompaniment: 0, member_id: null, required_tag: mealConfig.required_tag });
+					slotsToFill.push({ weekday, meal_type: mealType, slot_index: slotIdx, is_accompaniment: 0, member_id: null, required_tag: mealConfig.required_tags[slotIdx] ?? null });
 				}
 
 				// Side dishes per recipe

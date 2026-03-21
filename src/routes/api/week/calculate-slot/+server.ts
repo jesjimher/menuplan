@@ -7,13 +7,15 @@ export async function POST({ request }) {
 	const { weekKey, weekday, meal_type, slot_index, is_accompaniment } = body;
 
 	const weekData = getWeekData(weekKey);
+	const mealCfg = weekData.configs[weekday]?.[meal_type as 'comida' | 'cena'];
 
 	const slot = {
 		weekday,
 		meal_type: meal_type as 'comida' | 'cena',
 		slot_index,
 		is_accompaniment: is_accompaniment ?? 0,
-		member_id: null
+		member_id: null,
+		required_tag: (is_accompaniment ?? 0) === 0 ? (mealCfg?.required_tags[slot_index] ?? null) : null
 	};
 
 	calculatePlan(weekKey, [slot], weekData.slots);

@@ -1,13 +1,16 @@
 import { json } from '@sveltejs/kit';
-import { updateDayConfig } from '$lib/server/weekplan.js';
+import { updateDayConfig, updateSlotRequiredTag } from '$lib/server/weekplan.js';
 
 export async function POST({ request }) {
 	const body = await request.json();
-	updateDayConfig(body.weekKey, body.weekday, body.meal_type, {
-		recipe_count: body.recipe_count,
-		accompaniment_per_recipe: body.accompaniment_per_recipe,
-		accompaniment_per_slot: body.accompaniment_per_slot,
-		...('required_tag' in body ? { required_tag: body.required_tag || null } : {})
-	});
+	if ('slot_index' in body && 'required_tag' in body) {
+		updateSlotRequiredTag(body.weekKey, body.weekday, body.meal_type, body.slot_index, body.required_tag || null);
+	} else {
+		updateDayConfig(body.weekKey, body.weekday, body.meal_type, {
+			recipe_count: body.recipe_count,
+			accompaniment_per_recipe: body.accompaniment_per_recipe,
+			accompaniment_per_slot: body.accompaniment_per_slot,
+		});
+	}
 	return json({ ok: true });
 }

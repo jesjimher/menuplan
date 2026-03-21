@@ -4,6 +4,17 @@ import { getAllRules } from './rules.js';
 import { checkRules } from '$lib/utils/ruleChecker.js';
 import { getOptions } from './options.js';
 
+function parseRequiredTags(raw: string | null): (string | null)[] {
+	if (!raw) return [];
+	try {
+		const parsed = JSON.parse(raw);
+		if (Array.isArray(parsed)) return parsed;
+		return [typeof parsed === 'string' ? parsed : null];
+	} catch {
+		return [raw]; // legacy: plain string → primer slot
+	}
+}
+
 export function getWeekData(weekKey: string): WeekData {
 	const db = getDb();
 
@@ -47,8 +58,8 @@ export function getWeekData(weekKey: string): WeekData {
 	const configs: Record<number, DayConfig> = {};
 	for (let d = 1; d <= 7; d++) {
 		configs[d] = {
-			comida: { recipe_count: options.meals_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tag: null },
-			cena: { recipe_count: options.dinners_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tag: null }
+			comida: { recipe_count: options.meals_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tags: [] },
+			cena: { recipe_count: options.dinners_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tags: [] }
 		};
 	}
 
@@ -58,7 +69,7 @@ export function getWeekData(weekKey: string): WeekData {
 			recipe_count: cfg.recipe_count,
 			accompaniment_per_recipe: cfg.accompaniment_per_recipe,
 			accompaniment_per_slot: cfg.accompaniment_per_slot,
-			required_tag: cfg.required_tag ?? null
+			required_tags: parseRequiredTags(cfg.required_tag)
 		};
 	}
 
@@ -89,12 +100,12 @@ export function removeRecipe(weekKey: string, weekday: number, mealType: string,
 export function clearWeek(weekKey: string): void {
 	const db = getDb();
 	db.prepare('DELETE FROM week_plans WHERE week_key = ?').run(weekKey);
-	db.prepare('DELETE FROM week_day_config WHERE week_key = ?').run(weekKey);
 }
 
 export function copyPreviousWeek(weekKey: string, previousWeekKey: string): void {
 	const db = getDb();
 	clearWeek(weekKey);
+	db.prepare('DELETE FROM week_day_config WHERE week_key = ?').run(weekKey);
 
 	const plans = db.prepare('SELECT * FROM week_plans WHERE week_key = ?').all(previousWeekKey) as WeekPlan[];
 	const insertPlan = db.prepare(`
@@ -121,6 +132,34 @@ export function getHistory(): string[] {
 	const db = getDb();
 	const rows = db.prepare('SELECT DISTINCT week_key FROM week_plans ORDER BY week_key DESC').all() as { week_key: string }[];
 	return rows.map(r => r.week_key);
+}
+
+export function updateSlotRequiredTag(weekKey: string, weekday: number, mealType: string, slotIndex: number, tag: string | null): void {
+	const db = getDb();
+	const options = getOptions();
+
+	const existing = db.prepare(
+		'SELECT * FROM week_day_config WHERE week_key = ? AND weekday = ? AND meal_type = ?'
+	).get(weekKey, weekday, mealType) as WeekDayConfig | undefined;
+
+	const tags = existing ? parseRequiredTags(existing.required_tag) : [];
+	while (tags.length <= slotIndex) tags.push(null);
+	tags[slotIndex] = tag;
+	// Eliminar nulls del final
+	while (tags.length > 0 && tags[tags.length - 1] === null) tags.pop();
+
+	const serialized = tags.length === 0 ? null : JSON.stringify(tags);
+
+	if (existing) {
+		db.prepare('UPDATE week_day_config SET required_tag = ? WHERE week_key = ? AND weekday = ? AND meal_type = ?')
+			.run(serialized, weekKey, weekday, mealType);
+	} else {
+		const defaultCount = mealType === 'comida' ? options.meals_per_day : options.dinners_per_day;
+		db.prepare(`
+			INSERT INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`).run(weekKey, weekday, mealType, defaultCount, options.side_dishes_per_recipe, options.side_dishes_per_slot, serialized);
+	}
 }
 
 export function updateDayConfig(weekKey: string, weekday: number, mealType: string, config: Partial<WeekDayConfig>): void {
