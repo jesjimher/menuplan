@@ -4,8 +4,13 @@
 	export let value: string = '';
 	export let tags: string[] = [];
 	export let placeholder: string = '';
+	export let autofocus: boolean = false;
 	let cls = '';
 	export { cls as class };
+
+	function focusOnMount(node: HTMLInputElement) {
+		if (autofocus) node.focus();
+	}
 
 	const dispatch = createEventDispatcher<{ change: string }>();
 
@@ -30,6 +35,7 @@
 
 <div class="relative">
 	<input
+		use:focusOnMount
 		bind:value
 		type="text"
 		{placeholder}

@@ -512,6 +512,7 @@
 											{#if editingTagKey === slotTagEditKey}
 												<div class="mt-1">
 													<TagInput
+														autofocus
 														value={slotTag ?? ''}
 														tags={allTags}
 														placeholder="tag requerido…"
