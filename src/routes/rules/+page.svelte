@@ -53,8 +53,8 @@
 
 	function ruleText(r: Rule) {
 		return r.direction === 'at_least'
-			? `Al menos ${r.times} vez${r.times > 1 ? 'ces' : ''} "${r.tag}" por semana`
-			: `No más de ${r.times} vez${r.times > 1 ? 'ces' : ''} "${r.tag}" por semana`;
+			? `Al menos ${r.times} ${r.times > 1 ? 'veces' : 'vez'} "${r.tag}" por semana`
+			: `No más de ${r.times} ${r.times > 1 ? 'veces' : 'vez'} "${r.tag}" por semana`;
 	}
 </script>
 
