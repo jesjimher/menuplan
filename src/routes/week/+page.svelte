@@ -434,12 +434,12 @@
 												<div class="relative group/slot">
 													<button
 														on:click|stopPropagation={() => openDropdown === key ? closeDropdown() : openSlotDropdown(weekday, mealType, slotIdx, 0)}
-														class="w-full text-left text-xs transition-colors min-h-[2rem] pr-14 flex items-start {slot?.recipe ? 'px-1 py-1.5' : 'px-2.5 py-2 rounded-xl'}"
+														class="w-full text-left text-xs transition-colors min-h-[2rem] flex items-start {slot?.recipe ? 'px-1 py-1.5' : 'px-2.5 py-2 rounded-xl'}"
 														style="{slot?.recipe
 															? `color: var(--text);`
 															: `background: var(--surface); border: 2px dashed #b5a898; color: var(--text-muted);`}"
 													>
-														<span class="line-clamp-2 leading-snug {slot?.recipe ? 'font-medium' : 'italic'}">
+														<span class="leading-snug {slot?.recipe ? 'font-medium' : 'italic'}">
 															{slot?.recipe?.name ?? 'Sin receta'}
 														</span>
 													</button>
