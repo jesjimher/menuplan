@@ -29,7 +29,7 @@
 		<!-- Logo -->
 		<div class="flex items-center justify-between h-16 px-5 shrink-0"
 			style="border-bottom: 1px solid var(--border);">
-			<span class="text-xl font-bold" style="font-family: 'Lora', serif; color: var(--text);">MenuPlan</span>
+			<span class="text-xl font-bold" style="font-family: 'Merriweather', serif; color: var(--text);">MenuPlan</span>
 			<button class="lg:hidden" style="color: var(--text-secondary);" on:click={() => sidebarOpen = false}>
 				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
 			</button>
@@ -67,7 +67,7 @@
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 				</svg>
 			</button>
-			<span class="ml-3 text-lg font-bold" style="font-family: 'Lora', serif; color: var(--text);">MenuPlan</span>
+			<span class="ml-3 text-lg font-bold" style="font-family: 'Merriweather', serif; color: var(--text);">MenuPlan</span>
 		</header>
 
 		<main class="flex-1 overflow-auto">

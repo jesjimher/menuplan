@@ -28,7 +28,7 @@
 	<!-- Cabecera -->
 	<div class="px-6 pt-8 pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
 		<div class="max-w-5xl mx-auto">
-			<h1 class="text-4xl font-bold leading-none" style="font-family: 'Lora', serif; color: var(--text);">
+			<h1 class="text-4xl font-bold leading-none" style="font-family: 'Merriweather', serif; color: var(--text);">
 				Histórico
 			</h1>
 			<p class="mt-1.5 text-sm" style="color: var(--text-secondary);">{history.length} semana{history.length !== 1 ? 's' : ''} planificada{history.length !== 1 ? 's' : ''}</p>
@@ -62,7 +62,7 @@
 			<!-- Detalle de semana -->
 			<div class="flex-1 min-w-0">
 				{#if weekData && selectedWeek}
-					<h2 class="text-lg font-semibold mb-3" style="font-family: 'Lora', serif; color: var(--text);">{selectedWeek}</h2>
+					<h2 class="text-lg font-semibold mb-3" style="font-family: 'Merriweather', serif; color: var(--text);">{selectedWeek}</h2>
 					<div class="grid grid-cols-2 md:grid-cols-7 gap-2">
 						{#each [1,2,3,4,5,6,7] as weekday, i}
 							{@const isWeekend = weekday >= 6}
@@ -77,7 +77,7 @@
 											<p class="text-xs font-medium uppercase tracking-wide mb-1" style="color: {isComida ? 'var(--comida-accent)' : 'var(--cena-accent)'};">{mealType}</p>
 											{#each getSlots(weekData, weekday, mealType) as slot}
 												{#if slot.recipe}
-													<p class="text-xs font-medium leading-snug line-clamp-2" style="color: var(--text); font-family: 'Lora', serif;">{slot.recipe.name}</p>
+													<p class="text-xs font-medium leading-snug line-clamp-2" style="color: var(--text); font-family: 'Merriweather', serif;">{slot.recipe.name}</p>
 												{/if}
 											{/each}
 										</div>
