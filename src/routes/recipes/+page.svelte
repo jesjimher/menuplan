@@ -152,7 +152,7 @@
 	<div class="px-6 pt-8 pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
 		<div class="max-w-4xl mx-auto flex items-end justify-between gap-4">
 			<div>
-				<h1 class="text-4xl font-bold leading-none" style="font-family: 'Merriweather', serif; color: var(--text);">
+				<h1 class="text-4xl font-bold leading-none" style="font-family: 'Lora', serif; color: var(--text);">
 					Recetas
 				</h1>
 				<p class="mt-1.5 text-sm" style="color: var(--text-secondary);">{recipes.length} recetas en tu colección</p>
@@ -234,7 +234,7 @@
 		<!-- Panel de importación -->
 		{#if showImport}
 			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
-				<h3 class="text-lg font-semibold mb-3" style="font-family: 'Merriweather', serif; color: var(--text);">Importar desde Plantoeat</h3>
+				<h3 class="text-lg font-semibold mb-3" style="font-family: 'Lora', serif; color: var(--text);">Importar desde Plantoeat</h3>
 				<textarea bind:value={importText}
 					placeholder="Pega aquí el texto exportado de Plantoeat..."
 					class="w-full h-40 px-3 py-2.5 rounded-lg text-sm font-mono resize-none focus:outline-none transition-all"
@@ -257,7 +257,7 @@
 		<!-- Formulario de receta -->
 		{#if showForm}
 			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
-				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Merriweather', serif; color: var(--text);">{editingRecipe ? 'Editar receta' : 'Nueva receta'}</h3>
+				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Lora', serif; color: var(--text);">{editingRecipe ? 'Editar receta' : 'Nueva receta'}</h3>
 				<div class="grid gap-3">
 					<input type="text" placeholder="Nombre *" bind:value={form.name}
 						class="px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
@@ -318,7 +318,7 @@
 						}}
 						class="mt-0.5 w-4 h-4 shrink-0" style="accent-color: var(--primary);" />
 					<div class="flex-1 min-w-0">
-						<p class="font-semibold leading-snug" style="font-family: 'Merriweather', serif; color: var(--text);">{recipe.name}</p>
+						<p class="text-lg font-semibold leading-snug" style="font-family: 'Lora', serif; color: var(--text);">{recipe.name}</p>
 						{#if recipe.description}
 							<p class="text-sm mt-0.5 line-clamp-2 leading-relaxed" style="color: var(--text-secondary);">{recipe.description}</p>
 						{/if}

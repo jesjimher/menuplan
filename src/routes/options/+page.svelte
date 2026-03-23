@@ -32,7 +32,7 @@
 	<!-- Cabecera -->
 	<div class="px-6 pt-8 pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
 		<div class="max-w-lg mx-auto">
-			<h1 class="text-4xl font-bold leading-none" style="font-family: 'Merriweather', serif; color: var(--text);">
+			<h1 class="text-4xl font-bold leading-none" style="font-family: 'Lora', serif; color: var(--text);">
 				Opciones
 			</h1>
 			<p class="mt-1.5 text-sm" style="color: var(--text-secondary);">Configuración global del planificador</p>

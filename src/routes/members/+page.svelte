@@ -71,7 +71,7 @@
 	<div class="px-6 pt-8 pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
 		<div class="max-w-2xl mx-auto flex items-end justify-between gap-4">
 			<div>
-				<h1 class="text-4xl font-bold leading-none" style="font-family: 'Merriweather', serif; color: var(--text);">
+				<h1 class="text-4xl font-bold leading-none" style="font-family: 'Lora', serif; color: var(--text);">
 					Miembros
 				</h1>
 				<p class="mt-1.5 text-sm" style="color: var(--text-secondary);">{members.length} miembro{members.length !== 1 ? 's' : ''} en tu familia</p>
@@ -91,7 +91,7 @@
 		<!-- Formulario -->
 		{#if showForm}
 			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
-				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Merriweather', serif; color: var(--text);">{editingMember ? 'Editar miembro' : 'Nuevo miembro'}</h3>
+				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Lora', serif; color: var(--text);">{editingMember ? 'Editar miembro' : 'Nuevo miembro'}</h3>
 				<div class="grid gap-3">
 					<input type="text" placeholder="Nombre *" bind:value={form.name}
 						class="px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
@@ -133,7 +133,7 @@
 				<div class="group p-5 rounded-2xl transition-all duration-150"
 					style="background: var(--surface); border: 1px solid var(--border);">
 					<div class="flex items-start justify-between gap-3">
-						<h3 class="font-semibold text-lg leading-snug" style="font-family: 'Merriweather', serif; color: var(--text);">{member.name}</h3>
+						<h3 class="font-semibold text-lg leading-snug" style="font-family: 'Lora', serif; color: var(--text);">{member.name}</h3>
 						<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
 							<button on:click={() => startEdit(member)}
 								class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"

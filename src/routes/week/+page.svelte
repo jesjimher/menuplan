@@ -296,7 +296,7 @@
 				<span class="sm:hidden">&larr;</span>
 				<span class="hidden sm:inline">&larr; Anterior</span>
 			</button>
-			<h1 class="text-lg sm:text-xl font-semibold tracking-tight" style="font-family: 'Merriweather', serif; color: var(--text);">
+			<h1 class="text-lg sm:text-xl font-semibold tracking-tight" style="font-family: 'Lora', serif; color: var(--text);">
 				<span class="sm:hidden">{weekKey}</span>
 				<span class="hidden sm:inline">Semana {weekKey}</span>
 			</h1>
@@ -385,7 +385,7 @@
 						<!-- Cabecera del día -->
 						<div class="px-3 py-2.5 shrink-0 lg:rounded-t-2xl lg:overflow-hidden lg:border lg:border-b-0"
 							style="background: {isWeekend ? 'var(--weekend-bg)' : 'var(--day-bg)'}; border-color: var(--border); grid-column: {i+1}; grid-row: 1;">
-							<p class="font-semibold text-base" style="font-family: 'Merriweather', serif; color: var(--day-text);">{WEEKDAY_NAMES[i]}</p>
+							<p class="font-semibold text-base" style="font-family: 'Lora', serif; color: var(--day-text);">{WEEKDAY_NAMES[i]}</p>
 							{#if date}
 								<p class="text-xs" style="color: {isWeekend ? 'var(--weekend-date)' : 'var(--day-date)'};">{date.getUTCDate()} {SHORT_MONTH_NAMES[date.getUTCMonth()]}</p>
 							{/if}

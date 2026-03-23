@@ -73,7 +73,7 @@
 	<div class="px-6 pt-8 pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
 		<div class="max-w-2xl mx-auto flex items-end justify-between gap-4">
 			<div>
-				<h1 class="text-4xl font-bold leading-none" style="font-family: 'Merriweather', serif; color: var(--text);">
+				<h1 class="text-4xl font-bold leading-none" style="font-family: 'Lora', serif; color: var(--text);">
 					Reglas
 				</h1>
 				<p class="mt-1.5 text-sm" style="color: var(--text-secondary);">{rules.length} regla{rules.length !== 1 ? 's' : ''} definida{rules.length !== 1 ? 's' : ''}</p>
@@ -93,7 +93,7 @@
 		<!-- Formulario -->
 		{#if showForm}
 			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
-				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Merriweather', serif; color: var(--text);">{editingRule ? 'Editar regla' : 'Nueva regla'}</h3>
+				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Lora', serif; color: var(--text);">{editingRule ? 'Editar regla' : 'Nueva regla'}</h3>
 				<div class="grid gap-3">
 					<div>
 						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">Tag</label>
