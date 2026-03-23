@@ -54,6 +54,10 @@
   --nav-active: #3d322a;
 }
 
+html {
+  font-size: 125%;
+}
+
 * {
   box-sizing: border-box;
 }
