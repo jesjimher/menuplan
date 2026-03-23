@@ -603,14 +603,24 @@
 												<div class="relative group/slot">
 													<button
 														on:click|stopPropagation={() => openDropdown === key ? closeDropdown() : openSlotDropdown(weekday, mealType, slotIdx, 0)}
-														class="w-full text-left text-xs transition-colors min-h-[2rem] flex items-start {slot?.recipe ? 'px-1 py-1.5' : 'px-2.5 py-2 rounded-xl'}"
+														class="w-full text-left text-xs transition-colors {slot?.recipe?.image_type ? 'relative overflow-hidden rounded-xl min-h-[72px]' : slot?.recipe ? 'px-1 py-1 min-h-[2rem] flex items-center' : 'px-2.5 py-2 rounded-xl min-h-[2rem] flex items-center'}"
 														style="{slot?.recipe
-															? `color: var(--text);`
+															? (slot.recipe.image_type ? '' : `color: var(--text);`)
 															: `background: var(--surface); border: 2px dashed #b5a898; color: var(--text-muted);`}"
 													>
-														<span class="leading-snug {slot?.recipe ? 'font-medium' : 'italic'}">
-															{slot?.recipe?.name ?? 'Sin receta'}
-														</span>
+														{#if slot?.recipe?.image_type}
+															<img src="/api/recipes/{slot.recipe.id}/image" alt=""
+																class="absolute inset-0 w-full h-full object-cover"
+																on:error={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
+															<span class="absolute bottom-0 left-0 right-0 px-2 py-1.5 font-semibold leading-tight"
+																style="background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0) 100%); color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+																{slot.recipe.name}
+															</span>
+														{:else}
+															<span class="leading-snug {slot?.recipe ? 'font-medium' : 'italic'}">
+																{slot?.recipe?.name ?? 'Sin receta'}
+															</span>
+														{/if}
 													</button>
 													<div class="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover/slot:opacity-100 transition-opacity">
 														{#if editingTagKey !== slotTagEditKey}

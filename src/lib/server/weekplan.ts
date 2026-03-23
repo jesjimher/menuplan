@@ -26,7 +26,7 @@ export function getWeekData(weekKey: string): WeekData {
 	const db = getDb();
 
 	const plans = db.prepare(`
-		SELECT wp.*, r.id as r_id, r.name, r.description, r.tags, r.min_days, r.created_at,
+		SELECT wp.*, r.id as r_id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at,
 		       m.id as m_id, m.name as m_name, m.cannot_eat, m.likes, m.dislikes
 		FROM week_plans wp
 		LEFT JOIN recipes r ON r.id = wp.recipe_id
@@ -46,6 +46,7 @@ export function getWeekData(weekKey: string): WeekData {
 			description: p.description,
 			tags: p.tags,
 			min_days: p.min_days,
+			image_type: p.image_type ?? null,
 			created_at: p.created_at
 		} : null,
 		member: p.member_id ? {

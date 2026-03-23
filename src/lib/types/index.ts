@@ -4,6 +4,7 @@ export interface Recipe {
 	description: string;
 	tags: string;
 	min_days: number;
+	image_type: string | null;
 	created_at: string;
 }
 

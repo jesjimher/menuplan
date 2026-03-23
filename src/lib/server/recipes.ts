@@ -1,14 +1,33 @@
 import { getDb } from '$lib/db/index.js';
 import type { Recipe } from '$lib/types/index.js';
 
+const RECIPE_COLS = 'id, name, description, tags, min_days, image_type, created_at';
+
 export function getAllRecipes(): Recipe[] {
 	const db = getDb();
-	return db.prepare('SELECT * FROM recipes ORDER BY name ASC').all() as Recipe[];
+	return db.prepare(`SELECT ${RECIPE_COLS} FROM recipes ORDER BY name ASC`).all() as Recipe[];
 }
 
 export function getRecipeById(id: number): Recipe | undefined {
 	const db = getDb();
-	return db.prepare('SELECT * FROM recipes WHERE id = ?').get(id) as Recipe | undefined;
+	return db.prepare(`SELECT ${RECIPE_COLS} FROM recipes WHERE id = ?`).get(id) as Recipe | undefined;
+}
+
+export function getRecipeImageData(id: number): { data: Buffer; type: string } | null {
+	const db = getDb();
+	const row = db.prepare('SELECT image_data, image_type FROM recipes WHERE id = ?').get(id) as { image_data: Buffer | null; image_type: string | null } | undefined;
+	if (!row?.image_data || !row.image_type) return null;
+	return { data: row.image_data, type: row.image_type };
+}
+
+export function setRecipeImage(id: number, data: Buffer, type: string): void {
+	const db = getDb();
+	db.prepare('UPDATE recipes SET image_data = ?, image_type = ? WHERE id = ?').run(data, type, id);
+}
+
+export function clearRecipeImage(id: number): void {
+	const db = getDb();
+	db.prepare('UPDATE recipes SET image_data = NULL, image_type = NULL WHERE id = ?').run(id);
 }
 
 export function createRecipe(data: Omit<Recipe, 'id' | 'created_at'>): Recipe {

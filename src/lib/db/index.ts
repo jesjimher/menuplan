@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS recipes (
     description TEXT    NOT NULL DEFAULT '',
     tags        TEXT    NOT NULL DEFAULT '',
     min_days    INTEGER NOT NULL DEFAULT -1,
+    image_data  BLOB    DEFAULT NULL,
+    image_type  TEXT    DEFAULT NULL,
     created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -79,6 +81,8 @@ export function getDb(): Database.Database {
 		try { db.exec("ALTER TABLE week_day_config ADD COLUMN required_tag TEXT DEFAULT NULL"); } catch { /* already exists */ }
 		try { db.exec("ALTER TABLE week_day_config ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0"); } catch { /* already exists */ }
 		try { db.exec("ALTER TABLE week_day_config ADD COLUMN disabled_comment TEXT DEFAULT NULL"); } catch { /* already exists */ }
+		try { db.exec("ALTER TABLE recipes ADD COLUMN image_data BLOB DEFAULT NULL"); } catch { /* already exists */ }
+		try { db.exec("ALTER TABLE recipes ADD COLUMN image_type TEXT DEFAULT NULL"); } catch { /* already exists */ }
 	}
 	return db;
 }
