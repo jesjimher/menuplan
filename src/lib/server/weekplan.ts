@@ -65,8 +65,8 @@ export function getWeekData(weekKey: string): WeekData {
 	const configs: Record<number, DayConfig> = {};
 	for (let d = 1; d <= 7; d++) {
 		configs[d] = {
-			comida: { recipe_count: options.meals_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tags: [] },
-			cena: { recipe_count: options.dinners_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tags: [] }
+			comida: { recipe_count: options.meals_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tags: [], disabled: false, disabled_comment: null },
+			cena: { recipe_count: options.dinners_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tags: [], disabled: false, disabled_comment: null }
 		};
 	}
 
@@ -76,7 +76,9 @@ export function getWeekData(weekKey: string): WeekData {
 			recipe_count: cfg.recipe_count,
 			accompaniment_per_recipe: cfg.accompaniment_per_recipe,
 			accompaniment_per_slot: cfg.accompaniment_per_slot,
-			required_tags: parseRequiredTags(cfg.required_tag)
+			required_tags: parseRequiredTags(cfg.required_tag),
+			disabled: !!cfg.disabled,
+			disabled_comment: cfg.disabled_comment ?? null
 		};
 	}
 
@@ -126,12 +128,12 @@ export function copyPreviousWeek(weekKey: string, previousWeekKey: string): void
 
 	const configs = db.prepare('SELECT * FROM week_day_config WHERE week_key = ?').all(previousWeekKey) as WeekDayConfig[];
 	const insertConfig = db.prepare(`
-		INSERT OR IGNORE INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT OR IGNORE INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, disabled, disabled_comment)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`);
 
 	for (const cfg of configs) {
-		insertConfig.run(weekKey, cfg.weekday, cfg.meal_type, cfg.recipe_count, cfg.accompaniment_per_recipe, cfg.accompaniment_per_slot, cfg.required_tag ?? null);
+		insertConfig.run(weekKey, cfg.weekday, cfg.meal_type, cfg.recipe_count, cfg.accompaniment_per_recipe, cfg.accompaniment_per_slot, cfg.required_tag ?? null, cfg.disabled ?? 0, cfg.disabled_comment ?? null);
 	}
 }
 
@@ -183,26 +185,32 @@ export function updateDayConfig(weekKey: string, weekday: number, mealType: stri
 				recipe_count = ?,
 				accompaniment_per_recipe = ?,
 				accompaniment_per_slot = ?,
-				required_tag = ?
+				required_tag = ?,
+				disabled = ?,
+				disabled_comment = ?
 			WHERE week_key = ? AND weekday = ? AND meal_type = ?
 		`).run(
 			config.recipe_count ?? existing.recipe_count,
 			config.accompaniment_per_recipe ?? existing.accompaniment_per_recipe,
 			config.accompaniment_per_slot ?? existing.accompaniment_per_slot,
 			'required_tag' in config ? config.required_tag ?? null : existing.required_tag ?? null,
+			'disabled' in config ? (config.disabled ? 1 : 0) : existing.disabled,
+			'disabled_comment' in config ? config.disabled_comment ?? null : existing.disabled_comment ?? null,
 			weekKey, weekday, mealType
 		);
 	} else {
 		const defaultRecipeCount = mealType === 'comida' ? options.meals_per_day : options.dinners_per_day;
 		db.prepare(`
-			INSERT INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, disabled, disabled_comment)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`).run(
 			weekKey, weekday, mealType,
 			config.recipe_count ?? defaultRecipeCount,
 			config.accompaniment_per_recipe ?? options.side_dishes_per_recipe,
 			config.accompaniment_per_slot ?? options.side_dishes_per_slot,
-			config.required_tag ?? null
+			config.required_tag ?? null,
+			config.disabled ? 1 : 0,
+			config.disabled_comment ?? null
 		);
 	}
 }

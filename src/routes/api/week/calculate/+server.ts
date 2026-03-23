@@ -17,6 +17,7 @@ export async function POST({ request }) {
 
 		for (const mealType of ['comida', 'cena'] as const) {
 			const mealConfig = config[mealType];
+			if (mealConfig.disabled) continue;
 
 			for (let slotIdx = 0; slotIdx < mealConfig.recipe_count; slotIdx++) {
 				// Check if this main slot is already filled

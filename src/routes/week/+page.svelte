@@ -234,6 +234,104 @@
 		await loadWeek();
 	}
 
+	async function toggleDisableMeal(weekday: number, mealType: string) {
+		if (!weekData) return;
+		const cfg = weekData.configs[weekday]?.[mealType as 'comida' | 'cena'];
+		const nowDisabled = !cfg?.disabled;
+		weekData = {
+			...weekData,
+			configs: {
+				...weekData.configs,
+				[weekday]: {
+					...weekData.configs[weekday],
+					[mealType]: { ...cfg, disabled: nowDisabled, disabled_comment: nowDisabled ? (cfg?.disabled_comment ?? '') : null }
+				}
+			}
+		};
+		await fetch('/api/week/config', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, disabled: nowDisabled, disabled_comment: nowDisabled ? (cfg?.disabled_comment ?? '') : null })
+		});
+	}
+
+	async function setDisabledComment(weekday: number, mealType: string, comment: string) {
+		if (!weekData) return;
+		const cfg = weekData.configs[weekday]?.[mealType as 'comida' | 'cena'];
+		weekData = {
+			...weekData,
+			configs: {
+				...weekData.configs,
+				[weekday]: {
+					...weekData.configs[weekday],
+					[mealType]: { ...cfg, disabled_comment: comment }
+				}
+			}
+		};
+		fetch('/api/week/config', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, disabled: true, disabled_comment: comment })
+		});
+	}
+
+	async function disableDay(weekday: number) {
+		if (!weekData) return;
+		const comidaCfg = weekData.configs[weekday]?.comida;
+		const cenaCfg = weekData.configs[weekday]?.cena;
+		const alreadyDisabled = comidaCfg?.disabled && cenaCfg?.disabled;
+		const nowDisabled = !alreadyDisabled;
+		const sharedComment = nowDisabled ? (comidaCfg?.disabled_comment ?? cenaCfg?.disabled_comment ?? '') : null;
+		weekData = {
+			...weekData,
+			configs: {
+				...weekData.configs,
+				[weekday]: {
+					comida: { ...comidaCfg, disabled: nowDisabled, disabled_comment: sharedComment },
+					cena: { ...cenaCfg, disabled: nowDisabled, disabled_comment: sharedComment }
+				}
+			}
+		};
+		await Promise.all([
+			fetch('/api/week/config', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey, weekday, meal_type: 'comida', disabled: nowDisabled, disabled_comment: sharedComment })
+			}),
+			fetch('/api/week/config', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey, weekday, meal_type: 'cena', disabled: nowDisabled, disabled_comment: sharedComment })
+			})
+		]);
+	}
+
+	async function setDayComment(weekday: number, comment: string) {
+		if (!weekData) return;
+		const comidaCfg = weekData.configs[weekday]?.comida;
+		const cenaCfg = weekData.configs[weekday]?.cena;
+		weekData = {
+			...weekData,
+			configs: {
+				...weekData.configs,
+				[weekday]: {
+					comida: { ...comidaCfg, disabled_comment: comment },
+					cena: { ...cenaCfg, disabled_comment: comment }
+				}
+			}
+		};
+		fetch('/api/week/config', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ weekKey, weekday, meal_type: 'comida', disabled: true, disabled_comment: comment })
+		});
+		fetch('/api/week/config', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ weekKey, weekday, meal_type: 'cena', disabled: true, disabled_comment: comment })
+		});
+	}
+
 	function getSlotTags(weekday: number, mealType: string, slotIdx: number): string[] {
 		return weekData?.configs[weekday]?.[mealType as 'comida' | 'cena']?.required_tags[slotIdx] ?? [];
 	}
@@ -394,6 +492,9 @@
 				{#each [1,2,3,4,5,6,7] as weekday, i}
 					{@const date = weekDates[i]}
 					{@const isWeekend = i >= 5}
+					{@const dayComidaCfg = weekData?.configs[weekday]?.comida}
+					{@const dayCenaCfg = weekData?.configs[weekday]?.cena}
+					{@const dayFullyDisabled = dayComidaCfg?.disabled && dayCenaCfg?.disabled}
 
 					<div class="rounded-2xl overflow-hidden flex flex-col lg:contents"
 						style="background: var(--surface); border: 1px solid var(--border);">
@@ -401,13 +502,41 @@
 						<!-- Cabecera del día -->
 						<div class="px-3 py-2.5 shrink-0 lg:rounded-t-2xl lg:overflow-hidden lg:border lg:border-b-0"
 							style="background: {isWeekend ? 'var(--weekend-bg)' : 'var(--day-bg)'}; border-color: var(--border); grid-column: {i+1}; grid-row: 1;">
-							<p class="font-semibold text-base" style="font-family: 'Lora', serif; color: var(--day-text);">{WEEKDAY_NAMES[i]}</p>
-							{#if date}
-								<p class="text-xs" style="color: {isWeekend ? 'var(--weekend-date)' : 'var(--day-date)'};">{date.getUTCDate()} {SHORT_MONTH_NAMES[date.getUTCMonth()]}</p>
-							{/if}
+							<div class="flex items-start justify-between gap-1">
+								<div>
+									<p class="font-semibold text-base" style="font-family: 'Lora', serif; color: var(--day-text);">{WEEKDAY_NAMES[i]}</p>
+									{#if date}
+										<p class="text-xs" style="color: {isWeekend ? 'var(--weekend-date)' : 'var(--day-date)'};">{date.getUTCDate()} {SHORT_MONTH_NAMES[date.getUTCMonth()]}</p>
+									{/if}
+								</div>
+								<button
+									on:click={() => disableDay(weekday)}
+									title={dayFullyDisabled ? 'Planificar este día' : 'No planificar este día'}
+									class="mt-0.5 w-5 h-5 flex items-center justify-center rounded transition-opacity hover:opacity-70 shrink-0"
+									style="color: {dayFullyDisabled ? 'var(--error)' : 'var(--text-muted)'};"
+								>
+									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+								</button>
+							</div>
 						</div>
 
 						<!-- Comida y Cena -->
+						{#if dayFullyDisabled}
+							<!-- Día completo sin planificar: un único bloque con comentario -->
+							<div class="flex-1 flex flex-col lg:flex-none lg:rounded-b-2xl lg:overflow-hidden lg:border lg:border-t-0"
+								style="background: var(--surface); border-color: var(--border); grid-column: {i+1}; grid-row: 2 / 4;">
+								<div class="px-2.5 py-3 flex-1">
+									<input
+										type="text"
+										placeholder="Motivo (ej. Vacaciones en París)..."
+										value={dayComidaCfg?.disabled_comment ?? ''}
+										on:change={(e) => setDayComment(weekday, (e.target as HTMLInputElement).value)}
+										class="w-full text-xs px-2.5 py-2 rounded-xl italic focus:outline-none"
+										style="background: var(--surface); border: 2px dashed var(--border-hover); color: var(--text-muted);"
+										/>
+								</div>
+							</div>
+						{:else}
 						{#each ['comida', 'cena'] as mealType, j}
 							{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
 							{@const isComida = mealType === 'comida'}
@@ -419,22 +548,46 @@
 								<div class="flex items-center gap-1 px-3 py-2"
 									style="background: {isComida ? 'var(--comida-header)' : 'var(--cena-header)'};">
 									<span class="flex-1 text-xs font-semibold uppercase tracking-wider"
-										style="color: var(--text);">
+										style="color: {cfg.disabled ? 'var(--text-muted)' : 'var(--text)'}; {cfg.disabled ? 'text-decoration: line-through;' : ''}">
 										{isComida ? 'Comida' : 'Cena'}
 									</span>
+									{#if !cfg.disabled}
+										<button
+											on:click={() => updateConfig(weekday, mealType, 'recipe_count', Math.max(1, cfg.recipe_count - 1))}
+											class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
+											style="color: var(--text-secondary);"
+										>&minus;</button>
+										<span class="text-xs w-4 text-center tabular-nums"
+											style="color: var(--text-secondary);">{cfg.recipe_count}</span>
+										<button
+											on:click={() => updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count + 1)}
+											class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
+											style="color: var(--text-secondary);"
+										>+</button>
+									{/if}
 									<button
-										on:click={() => updateConfig(weekday, mealType, 'recipe_count', Math.max(1, cfg.recipe_count - 1))}
-										class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
-										style="color: var(--text-secondary);"
-									>&minus;</button>
-									<span class="text-xs w-4 text-center tabular-nums"
-										style="color: var(--text-secondary);">{cfg.recipe_count}</span>
-									<button
-										on:click={() => updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count + 1)}
-										class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
-										style="color: var(--text-secondary);"
-									>+</button>
+										on:click={() => toggleDisableMeal(weekday, mealType)}
+										title={cfg.disabled ? 'Planificar' : 'No planificar'}
+										class="w-5 h-5 flex items-center justify-center rounded transition-opacity hover:opacity-70"
+										style="color: {cfg.disabled ? 'var(--error)' : 'var(--text-muted)'};"
+									>
+										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+									</button>
 								</div>
+
+								{#if cfg.disabled}
+									<!-- Comida desactivada: mostrar campo de comentario -->
+									<div class="px-2.5 pb-2.5 pt-1.5 flex-1">
+										<input
+											type="text"
+											placeholder="Motivo (ej. Cenamos fuera)..."
+											value={cfg.disabled_comment ?? ''}
+											on:change={(e) => setDisabledComment(weekday, mealType, (e.target as HTMLInputElement).value)}
+											class="w-full text-xs px-2.5 py-2 rounded-xl italic focus:outline-none"
+											style="background: var(--surface); border: 2px dashed var(--border-hover); color: var(--text-muted);"
+										/>
+									</div>
+								{:else}
 
 								<!-- Slots -->
 								<div class="px-2.5 pb-2.5 pt-1 space-y-1.5 flex-1">
@@ -673,8 +826,10 @@
 										</div>
 									{/if}
 								</div>
+							{/if}
 							</div>
 						{/each}
+						{/if}
 					</div>
 				{/each}
 			</div>

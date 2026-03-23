@@ -42,6 +42,8 @@ export interface WeekDayConfig {
 	accompaniment_per_recipe: number;
 	accompaniment_per_slot: number;
 	required_tag: string | null;
+	disabled: number;
+	disabled_comment: string | null;
 }
 
 export interface Options {
@@ -66,6 +68,8 @@ export interface MealConfig {
 	accompaniment_per_recipe: number;
 	accompaniment_per_slot: number;
 	required_tags: string[][];
+	disabled: boolean;
+	disabled_comment: string | null;
 }
 
 export interface DayConfig {

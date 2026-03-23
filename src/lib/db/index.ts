@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS week_day_config (
     accompaniment_per_recipe   INTEGER NOT NULL DEFAULT 1,
     accompaniment_per_slot     INTEGER NOT NULL DEFAULT 0,
     required_tag               TEXT    DEFAULT NULL,
+    disabled                   INTEGER NOT NULL DEFAULT 0,
+    disabled_comment           TEXT    DEFAULT NULL,
     UNIQUE(week_key, weekday, meal_type)
 );
 
@@ -75,6 +77,8 @@ export function getDb(): Database.Database {
 		db.exec(SCHEMA);
 		// Migrations for existing databases
 		try { db.exec("ALTER TABLE week_day_config ADD COLUMN required_tag TEXT DEFAULT NULL"); } catch { /* already exists */ }
+		try { db.exec("ALTER TABLE week_day_config ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0"); } catch { /* already exists */ }
+		try { db.exec("ALTER TABLE week_day_config ADD COLUMN disabled_comment TEXT DEFAULT NULL"); } catch { /* already exists */ }
 	}
 	return db;
 }
