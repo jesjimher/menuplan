@@ -278,67 +278,76 @@
 	}
 </script>
 
-<svelte:head>
-	<link rel="preconnect" href="https://fonts.googleapis.com">
-	<link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
-</svelte:head>
-
 <svelte:window on:click={(e) => {
 	const target = e.target as HTMLElement;
 	if (!target.closest('.dropdown-container')) closeDropdown();
 }} />
 
-<div class="flex flex-col h-full" style="background: #f0ebe3; font-family: 'DM Sans', sans-serif;">
+<div class="flex flex-col h-full" style="background: var(--bg);">
 
 	<!-- Cabecera -->
-	<header class="bg-white border-b border-stone-200 px-3 sm:px-5 py-2 sm:py-3 shrink-0">
+	<header class="px-3 sm:px-5 py-2.5 sm:py-3 shrink-0" style="background: var(--surface); border-bottom: 1px solid var(--border);">
 		<div class="flex flex-wrap items-center gap-1 sm:gap-2">
 			<button on:click={prevWeek}
-				class="px-2 sm:px-3 py-1.5 text-sm font-medium text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors">
-				<span class="sm:hidden">←</span>
-				<span class="hidden sm:inline">← Anterior</span>
+				class="px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+				style="color: var(--text-secondary);"
+				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+				on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
+				<span class="sm:hidden">&larr;</span>
+				<span class="hidden sm:inline">&larr; Anterior</span>
 			</button>
-			<h1 class="text-base sm:text-lg font-semibold text-stone-900 tracking-tight" style="font-family: 'Lora', serif;">
+			<h1 class="text-lg sm:text-xl font-semibold tracking-tight" style="font-family: 'Lora', serif; color: var(--text);">
 				<span class="sm:hidden">{weekKey}</span>
 				<span class="hidden sm:inline">Semana {weekKey}</span>
 			</h1>
 			<button on:click={nextWeek}
-				class="px-2 sm:px-3 py-1.5 text-sm font-medium text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors">
-				<span class="sm:hidden">→</span>
-				<span class="hidden sm:inline">Siguiente →</span>
+				class="px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+				style="color: var(--text-secondary);"
+				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+				on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
+				<span class="sm:hidden">&rarr;</span>
+				<span class="hidden sm:inline">Siguiente &rarr;</span>
 			</button>
 
 			<div class="ml-auto flex gap-1 sm:gap-1.5 flex-wrap items-center">
 				<button on:click={calculatePlan} disabled={calculating}
-					class="px-2 sm:px-4 py-1.5 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
+					class="px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
+					style="background: var(--primary); color: white;"
+					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--primary-hover)'}
+					on:mouseleave={(e) => e.currentTarget.style.background = 'var(--primary)'}
 					title="Completar huecos">
 					{#if calculating}
-						<span class="sm:hidden">⏳</span>
-						<span class="hidden sm:inline">Calculando…</span>
+						<span class="sm:hidden">...</span>
+						<span class="hidden sm:inline">Calculando...</span>
 					{:else}
 						<svg class="sm:hidden w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
 						<span class="hidden sm:inline">Completar huecos</span>
 					{/if}
 				</button>
 				<button on:click={recalculatePlan} disabled={calculating}
-					class="px-2 sm:px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
+					class="px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
+					style="background: var(--comida-accent); color: white;"
 					title="Recalcular plan completo">
 					{#if calculating}
-						<span class="sm:hidden">⏳</span>
-						<span class="hidden sm:inline">Calculando…</span>
+						<span class="sm:hidden">...</span>
+						<span class="hidden sm:inline">Calculando...</span>
 					{:else}
 						<svg class="sm:hidden w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-						<span class="hidden sm:inline">Recalcular plan completo</span>
+						<span class="hidden sm:inline">Recalcular</span>
 					{/if}
 				</button>
 				<button on:click={copyPrevious}
-					class="px-2 sm:px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+					class="px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+					style="color: var(--text-secondary);"
+					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+					on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
 					title="Copiar semana anterior">
 					<svg class="sm:hidden w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-					<span class="hidden sm:inline">Copiar semana anterior</span>
+					<span class="hidden sm:inline">Copiar anterior</span>
 				</button>
 				<button on:click={clearPlan}
-					class="px-2 sm:px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+					class="px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+					style="color: var(--error);"
 					title="Limpiar">
 					<svg class="sm:hidden w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
 					<span class="hidden sm:inline">Limpiar</span>
@@ -348,82 +357,68 @@
 	</header>
 
 	<!-- Banner de violaciones -->
-	<div class="mx-5 mt-3 px-4 h-10 flex items-center rounded-xl shrink-0 overflow-hidden {weekData?.violations && weekData.violations.length > 0 ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}">
+	<div class="mx-3 sm:mx-5 mt-3 px-4 h-10 flex items-center rounded-xl shrink-0 overflow-hidden"
+		style="{weekData?.violations && weekData.violations.length > 0
+			? `background: var(--error-bg); border: 1px solid var(--error-border);`
+			: `background: var(--success-bg); border: 1px solid var(--success-border);`}">
 		{#if weekData?.violations && weekData.violations.length > 0}
-			<span class="text-xs font-semibold text-red-700 uppercase tracking-wide mr-3 shrink-0">Reglas incumplidas:</span>
-			<span class="text-sm text-red-700 truncate">{weekData.violations.map(v => v.message).join(' · ')}</span>
+			<span class="text-xs font-semibold uppercase tracking-wide mr-3 shrink-0" style="color: var(--error);">Reglas incumplidas:</span>
+			<span class="text-sm truncate" style="color: var(--error);">{weekData.violations.map(v => v.message).join(' · ')}</span>
 		{:else}
-			<span class="text-sm text-green-700">Se cumplen todas las reglas</span>
+			<span class="text-sm" style="color: var(--success);">Se cumplen todas las reglas</span>
 		{/if}
 	</div>
 
 	<!-- Grid semanal -->
-	<div class="flex-1 overflow-auto p-4">
+	<div class="flex-1 overflow-auto p-3 sm:p-4">
 		{#if !weekData}
-			<div class="text-center py-16 text-stone-500 text-sm">Cargando…</div>
+			<div class="text-center py-16 text-sm" style="color: var(--text-muted);">Cargando...</div>
 		{:else}
-			<!--
-				Móvil/tablet: grid de tarjetas (gap-2.5 en todas direcciones).
-				Desktop lg: gap-x-2.5 entre columnas, gap-y-0 entre las 3 filas de cada columna.
-
-				Cada wrapper de día usa lg:contents → sus 3 hijos (header, comida, cena) se
-				convierten en items directos del grid. Con grid-column/grid-row explícitos,
-				cada celda queda en su columna (i+1) y fila (1, 2 o 3), garantizando que
-				todas las cenas del grid queden alineadas horizontalmente.
-
-				En móvil/tablet, grid-column y grid-row en hijos de flex son ignorados.
-			-->
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5 lg:gap-y-0">
 				{#each [1,2,3,4,5,6,7] as weekday, i}
 					{@const date = weekDates[i]}
 					{@const isWeekend = i >= 5}
-					{@const cardBorder = isWeekend ? 'rgba(100,20,20,0.16)' : 'rgba(0,0,0,0.07)'}
-					{@const headerBg = isWeekend ? '#7c2828' : '#1c1814'}
-					{@const headerDateColor = isWeekend ? '#d8a090' : '#a09080'}
 
-					<!-- Móvil: tarjeta flex-col. Desktop lg: display:contents (transparente) -->
-					<div class="bg-white rounded-2xl overflow-hidden shadow-sm border flex flex-col lg:contents"
-						style="border-color: {cardBorder};">
+					<div class="rounded-2xl overflow-hidden flex flex-col lg:contents"
+						style="background: var(--surface); border: 1px solid var(--border);">
 
-						<!-- Fila 1 en lg: cabecera del día -->
+						<!-- Cabecera del día -->
 						<div class="px-3 py-2.5 shrink-0 lg:rounded-t-2xl lg:overflow-hidden lg:border lg:border-b-0"
-							style="background: {headerBg}; border-color: {cardBorder}; grid-column: {i+1}; grid-row: 1;">
-							<p class="font-semibold text-white text-sm" style="font-family: 'Lora', serif;">{WEEKDAY_NAMES[i]}</p>
+							style="background: {isWeekend ? 'var(--weekend-bg)' : 'var(--day-bg)'}; border-color: var(--border); grid-column: {i+1}; grid-row: 1;">
+							<p class="font-semibold text-base" style="font-family: 'Lora', serif; color: var(--day-text);">{WEEKDAY_NAMES[i]}</p>
 							{#if date}
-								<p class="text-xs" style="color: {headerDateColor};">{date.getUTCDate()} {SHORT_MONTH_NAMES[date.getUTCMonth()]}</p>
+								<p class="text-xs" style="color: {isWeekend ? 'var(--weekend-date)' : 'var(--day-date)'};">{date.getUTCDate()} {SHORT_MONTH_NAMES[date.getUTCMonth()]}</p>
 							{/if}
 						</div>
 
-						<!-- Filas 2 y 3 en lg: comida (j=0 → row 2) y cena (j=1 → row 3) -->
+						<!-- Comida y Cena -->
 						{#each ['comida', 'cena'] as mealType, j}
 							{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
 							{@const isComida = mealType === 'comida'}
 
 							<div class="flex-1 flex flex-col lg:flex-none {isComida ? 'lg:border-l lg:border-r' : 'lg:rounded-b-2xl lg:overflow-hidden lg:border lg:border-t-0'}"
-								style="background: {isComida ? '#edf3f8' : '#fdf4e6'}; border-color: {cardBorder}; {isComida ? 'border-bottom: 1px solid #c8dce8;' : ''} grid-column: {i+1}; grid-row: {j+2};">
+								style="background: {isComida ? 'var(--comida-bg)' : 'var(--cena-bg)'}; border-color: var(--border); {isComida ? `border-bottom: 1px solid var(--border);` : ''} grid-column: {i+1}; grid-row: {j+2};">
 
 								<!-- Encabezado de franja -->
 								<div class="flex items-center gap-1 px-3 py-2"
-									style="background: {isComida ? '#d6e6f2' : '#f0deba'};">
+									style="background: {isComida ? 'var(--comida-header)' : 'var(--cena-header)'};">
 									<span class="flex-1 text-xs font-semibold uppercase tracking-wider"
-										style="color: {isComida ? '#1e3d5c' : '#6a3008'};">
-										{isComida ? '☀ Comida' : '☾ Cena'}
+										style="color: var(--text);">
+										{isComida ? 'Comida' : 'Cena'}
 									</span>
-									<!-- Contador -->
 									<button
 										on:click={() => updateConfig(weekday, mealType, 'recipe_count', Math.max(1, cfg.recipe_count - 1))}
 										class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
-										style="color: {isComida ? '#2a5070' : '#7a3808'};"
-									>−</button>
+										style="color: var(--text-secondary);"
+									>&minus;</button>
 									<span class="text-xs w-4 text-center tabular-nums"
-										style="color: {isComida ? '#2a5070' : '#7a3808'};">{cfg.recipe_count}</span>
+										style="color: var(--text-secondary);">{cfg.recipe_count}</span>
 									<button
 										on:click={() => updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count + 1)}
 										class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
-										style="color: {isComida ? '#2a5070' : '#7a3808'};"
+										style="color: var(--text-secondary);"
 									>+</button>
 								</div>
-
 
 								<!-- Slots -->
 								<div class="px-2.5 pb-2.5 pt-1 space-y-1.5 flex-1">
@@ -439,17 +434,10 @@
 												<div class="relative group/slot">
 													<button
 														on:click|stopPropagation={() => openDropdown === key ? closeDropdown() : openSlotDropdown(weekday, mealType, slotIdx, 0)}
-														class="w-full text-left px-2.5 py-2 rounded-xl text-xs border transition-colors min-h-[2.75rem] pr-14 flex items-start"
-														style="{slot?.recipe
-															? (isComida
-																? 'background:#bdd8ee; border-color:#5a9dc0; color:#0e2840;'
-																: 'background:#f0d090; border-color:#c88030; color:#3a1800;')
-															: (isComida
-																? 'background:transparent; border-style:dashed; border-color:#7aaabf; color:#2a5878;'
-																: 'background:transparent; border-style:dashed; border-color:#c89040; color:#7a4408;')}"
+														class="w-full text-left px-1 py-1.5 text-xs transition-colors min-h-[2rem] pr-14 flex items-start"
+														style="color: {slot?.recipe ? 'var(--text)' : 'var(--text-muted)'};"
 													>
-														<span class="line-clamp-2 leading-snug {slot?.recipe ? 'font-semibold' : 'italic'}"
-															style="{slot?.recipe ? 'font-family: Lora, serif;' : ''}">
+														<span class="line-clamp-2 leading-snug {slot?.recipe ? 'font-medium' : 'italic'}">
 															{slot?.recipe?.name ?? 'Sin receta'}
 														</span>
 													</button>
@@ -457,69 +445,80 @@
 														{#if !slotTag && editingTagKey !== slotTagEditKey}
 															<button
 																on:click|stopPropagation={() => editingTagKey = slotTagEditKey}
-																class="w-6 h-6 flex items-center justify-center rounded-lg bg-white shadow-sm border border-stone-300 text-stone-600 hover:text-stone-900 hover:border-stone-400 transition-colors"
+																class="w-6 h-6 flex items-center justify-center rounded-lg shadow-sm transition-colors"
+																style="background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary);"
 																title="Añadir tag requerido"
 															><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg></button>
 														{/if}
 														<button
 															on:click|stopPropagation={() => randomSlot(weekday, mealType as 'comida'|'cena', slotIdx, 0)}
 															disabled={busySlots.has(slotKey(weekday, mealType, slotIdx, 0))}
-															class="w-6 h-6 flex items-center justify-center rounded-lg bg-white shadow-sm border border-stone-300 text-stone-600 hover:text-stone-900 hover:border-stone-400 disabled:opacity-40 disabled:cursor-wait transition-colors text-sm"
+															class="w-6 h-6 flex items-center justify-center rounded-lg shadow-sm disabled:opacity-40 disabled:cursor-wait transition-colors text-sm"
+															style="background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary);"
 															title="Receta aleatoria"
-														>{busySlots.has(slotKey(weekday, mealType, slotIdx, 0)) ? '⏳' : '↻'}</button>
+														>{busySlots.has(slotKey(weekday, mealType, slotIdx, 0)) ? '...' : '↻'}</button>
 														{#if slot?.recipe}
 															<a
 																href="/recipes?edit={slot.recipe.id}"
 																on:click|stopPropagation
-																class="w-6 h-6 flex items-center justify-center rounded-lg bg-white shadow-sm border border-stone-300 text-stone-500 hover:text-stone-900 hover:border-stone-400 transition-colors text-sm"
+																class="w-6 h-6 flex items-center justify-center rounded-lg shadow-sm transition-colors text-sm"
+																style="background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary);"
 																title="Editar receta"
-															>✎</a>
+															>
+																<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+															</a>
 															<button
 																on:click|stopPropagation={() => removeSlot(weekday, mealType, slotIdx, 0)}
-																class="w-6 h-6 flex items-center justify-center rounded-lg bg-white shadow-sm border border-stone-300 text-stone-500 hover:text-red-600 hover:border-red-300 transition-colors text-sm"
+																class="w-6 h-6 flex items-center justify-center rounded-lg shadow-sm transition-colors text-sm"
+																style="background: var(--surface); border: 1px solid var(--border); color: var(--error);"
 																title="Quitar"
-															>×</button>
+															>&times;</button>
 														{/if}
 													</div>
 												</div>
 
 												<!-- Dropdown búsqueda receta -->
 												{#if openDropdown === key}
-													<div class="fixed z-[9999] w-72 bg-white border border-stone-200 rounded-xl shadow-xl overflow-hidden" use:fixedDropdown>
-														<div class="p-2 border-b border-stone-100">
+													<div class="fixed z-[9999] w-72 rounded-xl shadow-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);" use:fixedDropdown>
+														<div class="p-2" style="border-bottom: 1px solid var(--border);">
 															<input
 																type="text"
 																placeholder="Buscar receta..."
 																bind:value={searchQuery}
 																on:input={() => handleSearch(weekday, mealType, 0)}
-																class="w-full text-sm px-2.5 py-1.5 border border-stone-300 rounded-lg focus:outline-none focus:border-stone-500 text-stone-900 placeholder-stone-500"
+																class="w-full text-sm px-2.5 py-1.5 rounded-lg focus:outline-none"
+																style="border: 1px solid var(--border); color: var(--text);"
 																use:focusOnMount
 															/>
 														</div>
 														{#if topRecipes.length > 0 && !searchQuery}
-															<div class="px-2 py-1.5 border-b"
-																style="background: {isComida ? '#d6e6f2' : '#f0deba'}; border-color: {isComida ? '#b8d0e8' : '#e0c08a'};">
-																<p class="text-xs font-semibold mb-1 text-stone-900">Top este día:</p>
+															<div class="px-2 py-1.5"
+																style="background: {isComida ? 'var(--comida-header)' : 'var(--cena-header)'}; border-bottom: 1px solid var(--border);">
+																<p class="text-xs font-semibold mb-1" style="color: var(--text);">Top este día:</p>
 																{#each topRecipes as r}
 																	<button
 																		on:click|stopPropagation={() => selectRecipe(weekday, mealType, slotIdx, 0, r.id)}
-																		class="block w-full text-left text-xs px-2 py-1 rounded-lg transition-opacity hover:opacity-70 text-stone-900"
+																		class="block w-full text-left text-xs px-2 py-1 rounded-lg transition-opacity hover:opacity-70"
+																		style="color: var(--text);"
 																	>{r.name}</button>
 																{/each}
 															</div>
 														{/if}
 														<div class="max-h-64 overflow-y-auto">
 															{#if searchResults.length === 0}
-																<p class="text-xs text-stone-900 px-3 py-3">Sin resultados</p>
+																<p class="text-xs px-3 py-3" style="color: var(--text-muted);">Sin resultados</p>
 															{:else}
 																{#each searchResults as r}
 																	<button
 																		on:click|stopPropagation={() => selectRecipe(weekday, mealType, slotIdx, 0, r.id)}
-																		class="block w-full text-left px-3 py-2 hover:bg-stone-50 border-b border-stone-100 last:border-0 transition-colors"
+																		class="block w-full text-left px-3 py-2 transition-colors"
+																		style="border-bottom: 1px solid var(--border); color: var(--text);"
+																		on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+																		on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
 																	>
-																		<p class="text-sm text-stone-900">{r.name}</p>
+																		<p class="text-sm" style="color: var(--text);">{r.name}</p>
 																		{#if r.tags}
-																			<p class="text-xs text-stone-900 mt-0.5">{r.tags}</p>
+																			<p class="text-xs mt-0.5" style="color: var(--text-secondary);">{r.tags}</p>
 																		{/if}
 																	</button>
 																{/each}
@@ -536,30 +535,33 @@
 														autofocus
 														value={slotTag ?? ''}
 														tags={allTags}
-														placeholder="tag requerido…"
-														class="w-full text-xs px-2 py-1 border border-stone-400 rounded-lg outline-none bg-white text-stone-900 placeholder-stone-500 focus:border-stone-600"
+														placeholder="tag requerido..."
+														class="w-full text-xs px-2 py-1 rounded-lg outline-none"
 														on:change={(e) => setRequiredTag(weekday, mealType, slotIdx, e.detail)}
 														on:keydown={(e) => {
 															if (e.key === 'Escape') editingTagKey = null;
 															if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
 														}}
+														--tag-border="var(--border-hover)"
 													/>
 												</div>
 											{:else if slotTag}
 												<div class="mt-1">
 													<span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-														style="background: {isComida ? '#a8cce4' : '#e8b860'}; color: {isComida ? '#102840' : '#4a2000'};">
-														🏷 {slotTag}
+														style="background: {isComida ? 'var(--comida-slot-filled)' : 'var(--cena-slot-filled)'}; color: var(--text);">
+														{slotTag}
 														<button
 															on:click|stopPropagation={() => { editingTagKey = slotTagEditKey; }}
 															class="hover:opacity-60 transition-opacity"
 															title="Editar"
-														>✎</button>
+														>
+															<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+														</button>
 														<button
 															on:click|stopPropagation={() => setRequiredTag(weekday, mealType, slotIdx, '')}
 															class="hover:opacity-60 transition-opacity font-bold"
 															title="Quitar"
-														>×</button>
+														>&times;</button>
 													</span>
 												</div>
 											{/if}
@@ -574,53 +576,52 @@
 														<div class="relative group/acc">
 															<button
 																on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, accSlotIdx, 1)}
-																class="w-full text-left px-2.5 py-1.5 rounded-xl text-xs border transition-colors pr-8"
-																style="{accSlot?.recipe
-																	? (isComida
-																		? 'background:#cde3f3; border-color:#7ab5d4; color:#182e44;'
-																		: 'background:#f5e0b0; border-color:#d4a050; color:#3a2000;')
-																	: (isComida
-																		? 'background:transparent; border-style:dashed; border-color:#7aaabf; color:#2a5878;'
-																		: 'background:transparent; border-style:dashed; border-color:#c89040; color:#7a4408;')}"
+																class="w-full text-left px-1 py-1 text-xs transition-colors pr-8"
+																style="color: {accSlot?.recipe ? 'var(--text-secondary)' : 'var(--text-muted)'};"
 															>
-																<span class="leading-snug {accSlot?.recipe ? '' : 'italic'}">
-																	{accSlot?.recipe?.name ?? '+ acompañamiento'}
+																<span class="leading-snug {accSlot?.recipe ? '' : 'italic'}" style="font-size: 0.7rem;">
+																	{accSlot?.recipe?.name ?? '+ acomp.'}
 																</span>
 															</button>
 															{#if accSlot?.recipe}
 																<div class="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/acc:opacity-100 transition-opacity">
 																	<button
 																		on:click|stopPropagation={() => removeSlot(weekday, mealType, accSlotIdx, 1)}
-																		class="w-5 h-5 flex items-center justify-center rounded-lg bg-white shadow-sm border border-stone-300 text-stone-500 hover:text-red-600 hover:border-red-300 transition-colors text-xs"
-																	>×</button>
+																		class="w-5 h-5 flex items-center justify-center rounded-lg shadow-sm transition-colors text-xs"
+																		style="background: var(--surface); border: 1px solid var(--border); color: var(--error);"
+																	>&times;</button>
 																</div>
 															{/if}
 														</div>
 
 														{#if openDropdown === accKey}
-															<div class="fixed z-[9999] w-72 bg-white border border-stone-200 rounded-xl shadow-xl overflow-hidden" use:fixedDropdown>
-																<div class="p-2 border-b border-stone-100">
+															<div class="fixed z-[9999] w-72 rounded-xl shadow-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);" use:fixedDropdown>
+																<div class="p-2" style="border-bottom: 1px solid var(--border);">
 																	<input
 																		type="text"
-																		placeholder="Buscar acompañamiento..."
+																		placeholder="Buscar acomp..."
 																		bind:value={searchQuery}
 																		on:input={() => handleSearch(weekday, mealType, 1)}
-																		class="w-full text-sm px-2.5 py-1.5 border border-stone-300 rounded-lg focus:outline-none focus:border-stone-500 text-stone-900 placeholder-stone-500"
+																		class="w-full text-sm px-2.5 py-1.5 rounded-lg focus:outline-none"
+																		style="border: 1px solid var(--border); color: var(--text);"
 																		use:focusOnMount
 																	/>
 																</div>
 																<div class="max-h-64 overflow-y-auto">
 																	{#if searchResults.length === 0}
-																		<p class="text-xs text-stone-900 px-3 py-3">Sin resultados</p>
+																		<p class="text-xs px-3 py-3" style="color: var(--text-muted);">Sin resultados</p>
 																	{:else}
 																		{#each searchResults as r}
 																			<button
 																				on:click|stopPropagation={() => selectRecipe(weekday, mealType, accSlotIdx, 1, r.id)}
-																				class="block w-full text-left px-3 py-2 hover:bg-stone-50 border-b border-stone-100 last:border-0 transition-colors"
+																				class="block w-full text-left px-3 py-2 transition-colors"
+																				style="border-bottom: 1px solid var(--border); color: var(--text);"
+																				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+																				on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
 																			>
-																				<p class="text-sm text-stone-900">{r.name}</p>
+																				<p class="text-sm" style="color: var(--text);">{r.name}</p>
 																				{#if r.tags}
-																					<p class="text-xs text-stone-900 mt-0.5">{r.tags}</p>
+																					<p class="text-xs mt-0.5" style="color: var(--text-secondary);">{r.tags}</p>
 																				{/if}
 																			</button>
 																		{/each}
@@ -636,24 +637,18 @@
 
 									<!-- Acompañamientos por franja -->
 									{#if cfg.accompaniment_per_slot > 0}
-										<div class="pt-1 border-t space-y-1"
-											style="border-color: {isComida ? '#a8c8e0' : '#d0a048'};">
+										<div class="pt-1 space-y-1"
+											style="border-top: 1px solid var(--border);">
 											{#each Array(cfg.accompaniment_per_slot) as _, aIdx}
 												{@const accSlot = getSlot(weekday, mealType, aIdx, 1)}
 												{@const accKey = slotKey(weekday, mealType, aIdx, 1) + '-slot'}
 												<div class="dropdown-container relative">
 													<button
 														on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, aIdx, 1)}
-														class="w-full text-left px-2.5 py-1.5 rounded-xl text-xs border transition-colors"
-														style="{accSlot?.recipe
-															? (isComida
-																? 'background:#cde3f3; border-color:#7ab5d4; color:#182e44;'
-																: 'background:#f5e0b0; border-color:#d4a050; color:#3a2000;')
-															: (isComida
-																? 'background:transparent; border-style:dashed; border-color:#7aaabf; color:#2a5878;'
-																: 'background:transparent; border-style:dashed; border-color:#c89040; color:#7a4408;')}"
+														class="w-full text-left px-1 py-1 text-xs transition-colors"
+														style="color: {accSlot?.recipe ? 'var(--text-secondary)' : 'var(--text-muted)'};"
 													>
-														<span class="{accSlot?.recipe ? '' : 'italic'}">
+														<span class="{accSlot?.recipe ? '' : 'italic'}" style="font-size: 0.7rem;">
 															{accSlot?.recipe?.name ?? '+ acomp. franja'}
 														</span>
 													</button>

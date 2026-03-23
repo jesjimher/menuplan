@@ -1,9 +1,57 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Lora:wght@500;600;700&display=swap');
 
 :root {
-  --color-primary: #4f46e5;
-  --color-primary-dark: #4338ca;
+  /* Base */
+  --bg: #faf6f1;
+  --surface: #ffffff;
+  --surface-warm: #f3ede6;
+
+  /* Text — always high contrast */
+  --text: #1c1917;
+  --text-secondary: #3d322a;
+  --text-muted: #5c4f43;
+
+  /* Primary accent — warm terracotta */
+  --primary: #b85c38;
+  --primary-hover: #a04e2e;
+  --primary-light: #fceee7;
+
+  /* Borders */
+  --border: #e4dbd2;
+  --border-hover: #d1c6bb;
+
+  /* Comida — warm gold */
+  --comida-bg: #fef8f0;
+  --comida-header: #f0dfca;
+  --comida-accent: #c4913a;
+  --comida-slot-filled: #f5e4cb;
+  --comida-slot-border: #d4a458;
+
+  /* Cena — warm rose */
+  --cena-bg: #fdf4f1;
+  --cena-header: #f0d8d0;
+  --cena-accent: #b87868;
+  --cena-slot-filled: #f3d8ce;
+  --cena-slot-border: #c8907e;
+
+  /* Day headers */
+  --day-bg: #3d322a;
+  --day-text: #ffffff;
+  --day-date: #c4b8a8;
+  --weekend-bg: #5a2e28;
+  --weekend-date: #d8b8a8;
+
+  /* Status */
+  --success: #2d6a3e;
+  --success-bg: #eef7f0;
+  --success-border: #c0dcc8;
+  --error: #b83a3a;
+  --error-bg: #fdf0f0;
+  --error-border: #e0c4c4;
+
+  /* Nav */
+  --nav-active: #3d322a;
 }
 
 * {
@@ -11,5 +59,7 @@
 }
 
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
 }

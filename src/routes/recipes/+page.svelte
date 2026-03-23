@@ -146,24 +146,30 @@
 	}
 </script>
 
-<div class="min-h-full" style="background: #f0ebe3; font-family: 'DM Sans', sans-serif;">
+<div class="min-h-full" style="background: var(--bg);">
 
 	<!-- Cabecera -->
-	<div class="bg-white border-b border-stone-200 px-6 pt-8 pb-6">
+	<div class="px-6 pt-8 pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
 		<div class="max-w-4xl mx-auto flex items-end justify-between gap-4">
 			<div>
-				<h1 class="text-4xl font-bold leading-none text-stone-900" style="font-family: 'Lora', serif">
+				<h1 class="text-4xl font-bold leading-none" style="font-family: 'Lora', serif; color: var(--text);">
 					Recetas
 				</h1>
-				<p class="mt-1.5 text-sm text-stone-600">{recipes.length} recetas en tu colección</p>
+				<p class="mt-1.5 text-sm" style="color: var(--text-secondary);">{recipes.length} recetas en tu colección</p>
 			</div>
 			<div class="flex gap-2 shrink-0">
 				<button on:click={() => showImport = !showImport}
-					class="px-4 py-2 text-sm font-medium text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors">
+					class="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+					style="color: var(--text); border: 1px solid var(--border);"
+					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+					on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
 					Importar
 				</button>
 				<button on:click={startNew}
-					class="px-4 py-2 text-sm font-medium bg-stone-800 hover:bg-stone-900 text-white rounded-lg transition-colors">
+					class="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+					style="background: var(--primary); color: white;"
+					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--primary-hover)'}
+					on:mouseleave={(e) => e.currentTarget.style.background = 'var(--primary)'}>
 					+ Nueva receta
 				</button>
 			</div>
@@ -174,12 +180,13 @@
 
 		<!-- Buscador -->
 		<div class="relative mb-4">
-			<svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
 			</svg>
 			<input type="text" placeholder="Buscar por nombre, descripción o tag..."
 				bind:value={searchQ}
-				class="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm shadow-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all" />
+				class="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm shadow-sm focus:outline-none transition-all"
+				style="background: var(--surface); border: 1px solid var(--border); color: var(--text);" />
 		</div>
 
 		<!-- Tags activos -->
@@ -187,9 +194,10 @@
 			<div class="flex flex-wrap gap-1.5 mb-4">
 				{#each selectedTags as tag}
 					<button on:click={() => toggleTag(tag)}
-						class="inline-flex items-center gap-1 text-xs px-3 py-1 bg-stone-800 text-white rounded-full font-medium hover:bg-stone-900 transition-colors">
+						class="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full font-medium transition-colors"
+						style="background: var(--nav-active); color: white;">
 						{tag}
-						<span class="opacity-70">×</span>
+						<span class="opacity-70">&times;</span>
 					</button>
 				{/each}
 			</div>
@@ -197,8 +205,9 @@
 
 		<!-- Barra de acción masiva -->
 		{#if checkedIds.size > 0}
-			<div class="flex items-center gap-3 mb-4 px-4 py-3 bg-white border border-stone-200 rounded-xl shadow-sm">
-				<span class="text-sm font-medium text-stone-800 shrink-0">
+			<div class="flex items-center gap-3 mb-4 px-4 py-3 rounded-xl shadow-sm"
+				style="background: var(--surface); border: 1px solid var(--border);">
+				<span class="text-sm font-medium shrink-0" style="color: var(--text);">
 					{checkedIds.size} seleccionada{checkedIds.size > 1 ? 's' : ''}
 				</span>
 				<div class="relative flex-1">
@@ -206,15 +215,17 @@
 						bind:value={bulkTag}
 						tags={allTags}
 						placeholder="Tag a añadir..."
-						class="w-full px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400"
+						class="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none"
 					/>
 				</div>
 				<button on:click={applyBulkTag} disabled={!bulkTag.trim() || bulkAdding}
-					class="px-3 py-1.5 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors">
+					class="px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors"
+					style="background: var(--primary); color: white;">
 					{bulkAdding ? 'Añadiendo...' : 'Añadir tag'}
 				</button>
 				<button on:click={() => { checkedIds = new Set(); }}
-					class="text-sm text-stone-600 hover:text-stone-800 shrink-0 transition-colors">
+					class="text-sm shrink-0 transition-colors"
+					style="color: var(--text-secondary);">
 					Cancelar
 				</button>
 			</div>
@@ -222,18 +233,21 @@
 
 		<!-- Panel de importación -->
 		{#if showImport}
-			<div class="mb-6 p-5 bg-white border border-stone-200 rounded-2xl shadow-sm">
-				<h3 class="font-semibold text-stone-900 mb-3" style="font-family: 'Lora', serif">Importar desde Plantoeat</h3>
+			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
+				<h3 class="text-lg font-semibold mb-3" style="font-family: 'Lora', serif; color: var(--text);">Importar desde Plantoeat</h3>
 				<textarea bind:value={importText}
 					placeholder="Pega aquí el texto exportado de Plantoeat..."
-					class="w-full h-40 px-3 py-2.5 border border-stone-200 rounded-lg text-sm font-mono resize-none focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all"></textarea>
+					class="w-full h-40 px-3 py-2.5 rounded-lg text-sm font-mono resize-none focus:outline-none transition-all"
+					style="border: 1px solid var(--border); color: var(--text);"></textarea>
 				<div class="flex gap-2 mt-3">
 					<button on:click={importRecipes} disabled={importing || !importText}
-						class="px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+						class="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+						style="background: var(--primary); color: white;">
 						{importing ? 'Importando...' : 'Importar'}
 					</button>
 					<button on:click={() => showImport = false}
-						class="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-sm transition-colors">
+						class="px-4 py-2 rounded-lg text-sm transition-colors"
+						style="background: var(--surface-warm); color: var(--text);">
 						Cancelar
 					</button>
 				</div>
@@ -242,31 +256,36 @@
 
 		<!-- Formulario de receta -->
 		{#if showForm}
-			<div class="mb-6 p-5 bg-white border border-stone-200 rounded-2xl shadow-sm">
-				<h3 class="font-semibold text-stone-900 mb-4" style="font-family: 'Lora', serif">{editingRecipe ? 'Editar receta' : 'Nueva receta'}</h3>
+			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
+				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Lora', serif; color: var(--text);">{editingRecipe ? 'Editar receta' : 'Nueva receta'}</h3>
 				<div class="grid gap-3">
 					<input type="text" placeholder="Nombre *" bind:value={form.name}
-						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all" />
+						class="px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
+						style="border: 1px solid var(--border); color: var(--text);" />
 					<textarea placeholder="Descripción" bind:value={form.description}
-						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm h-20 resize-none focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all"></textarea>
+						class="px-3 py-2.5 rounded-lg text-sm h-20 resize-none focus:outline-none transition-all"
+						style="border: 1px solid var(--border); color: var(--text);"></textarea>
 					<MultiTagInput bind:value={form.tags} tags={allTags} placeholder="Tags (ej: comida,carne,rápido)"
-						class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all" />
+						class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all" />
 					<div>
-						<label class="block text-xs font-medium text-stone-700 uppercase tracking-wide mb-1">
+						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">
 							Días mínimos entre ocurrencias
 						</label>
-						<p class="text-xs text-stone-500 mb-1.5">-1 = usar valor global</p>
+						<p class="text-xs mb-1.5" style="color: var(--text-muted);">-1 = usar valor global</p>
 						<input type="number" bind:value={form.min_days} min="-1"
-							class="w-28 px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 transition-all" />
+							class="w-28 px-3 py-2 rounded-lg text-sm focus:outline-none transition-all"
+							style="border: 1px solid var(--border); color: var(--text);" />
 					</div>
 				</div>
 				<div class="flex gap-2 mt-4">
 					<button on:click={saveRecipe} disabled={!form.name}
-						class="px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+						class="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+						style="background: var(--primary); color: white;">
 						Guardar
 					</button>
 					<button on:click={() => showForm = false}
-						class="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-sm transition-colors">
+						class="px-4 py-2 rounded-lg text-sm transition-colors"
+						style="background: var(--surface-warm); color: var(--text);">
 						Cancelar
 					</button>
 				</div>
@@ -275,11 +294,12 @@
 
 		<!-- Cabecera de lista -->
 		<div class="flex items-center justify-between mb-3">
-			<p class="text-sm text-stone-600">
+			<p class="text-sm" style="color: var(--text-secondary);">
 				{filteredRecipes.length} resultado{filteredRecipes.length !== 1 ? 's' : ''}
 			</p>
 			<button on:click={toggleSelectAll}
-				class="text-xs font-medium text-stone-600 hover:text-stone-900 transition-colors">
+				class="text-xs font-medium transition-colors"
+				style="color: var(--text-secondary);">
 				{allVisibleSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
 			</button>
 		</div>
@@ -287,7 +307,8 @@
 		<!-- Lista de recetas -->
 		<div class="space-y-2">
 			{#each filteredRecipes as recipe}
-				<div class="group flex items-start gap-3 p-4 bg-white border border-stone-200 rounded-2xl hover:border-stone-300 hover:shadow-sm transition-all duration-150">
+				<div class="group flex items-start gap-3 p-4 rounded-2xl transition-all duration-150"
+					style="background: var(--surface); border: 1px solid var(--border);">
 					<input type="checkbox"
 						checked={checkedIds.has(recipe.id)}
 						on:change={() => {
@@ -295,42 +316,46 @@
 							else checkedIds.add(recipe.id);
 							checkedIds = checkedIds;
 						}}
-						class="mt-0.5 w-4 h-4 shrink-0 accent-stone-800" />
+						class="mt-0.5 w-4 h-4 shrink-0" style="accent-color: var(--primary);" />
 					<div class="flex-1 min-w-0">
-						<p class="font-semibold text-stone-900 leading-snug" style="font-family: 'Lora', serif">{recipe.name}</p>
+						<p class="font-semibold leading-snug" style="font-family: 'Lora', serif; color: var(--text);">{recipe.name}</p>
 						{#if recipe.description}
-							<p class="text-sm text-stone-600 mt-0.5 line-clamp-2 leading-relaxed">{recipe.description}</p>
+							<p class="text-sm mt-0.5 line-clamp-2 leading-relaxed" style="color: var(--text-secondary);">{recipe.description}</p>
 						{/if}
 						{#if recipe.tags}
 							<div class="flex flex-wrap gap-1 mt-2">
 								{#each recipe.tags.split(',') as tag}
 									<button on:click={() => toggleTag(tag)}
-										class="text-xs px-2 py-0.5 rounded-full font-medium transition-colors {selectedTags.includes(tag.trim().toLowerCase())
-											? 'bg-stone-800 text-white'
-											: 'bg-stone-100 text-stone-700 hover:bg-stone-200'}">
+										class="text-xs px-2 py-0.5 rounded-full font-medium transition-colors"
+										style="{selectedTags.includes(tag.trim().toLowerCase())
+											? 'background: var(--nav-active); color: white;'
+											: 'background: var(--surface-warm); color: var(--text);'}">
 										{tag.trim()}
 									</button>
 								{/each}
 							</div>
 						{/if}
 						{#if recipe.min_days !== -1}
-							<p class="text-xs text-stone-500 mt-1.5">Mín. {recipe.min_days} días entre ocurrencias</p>
+							<p class="text-xs mt-1.5" style="color: var(--text-muted);">Mín. {recipe.min_days} días entre ocurrencias</p>
 						{/if}
 					</div>
 					<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
 						<button on:click={() => startEdit(recipe)}
-							class="px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100 rounded-lg transition-colors">
+							class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+							style="color: var(--text-secondary);"
+							on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+							on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
 							Editar
 						</button>
 						<button on:click={() => deleteRecipe(recipe.id)}
-							class="px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+							class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+							style="color: var(--error);">
 							Borrar
 						</button>
 					</div>
 				</div>
 			{:else}
-				<div class="text-center py-16 text-stone-500">
-					<p class="text-4xl mb-3">🍳</p>
+				<div class="text-center py-16" style="color: var(--text-muted);">
 					<p class="text-sm">
 						{searchQ || selectedTags.length ? 'Sin resultados para esta búsqueda.' : 'No hay recetas. Añade una nueva o importa desde Plantoeat.'}
 					</p>

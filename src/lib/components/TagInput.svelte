@@ -81,18 +81,22 @@
 		on:keydown
 	/>
 	{#if open && displayed.length > 0}
-		<ul use:smartPosition class="z-[9999] bg-white border border-stone-200 rounded-lg shadow-lg overflow-hidden text-sm">
+		<ul use:smartPosition class="z-[9999] rounded-lg shadow-lg overflow-hidden text-sm"
+			style="background: var(--surface); border: 1px solid var(--border);">
 			{#each displayed as tag}
 				<li>
 					<button
 						type="button"
-						class="w-full text-left px-3 py-1.5 hover:bg-stone-100 text-stone-800 truncate"
+						class="w-full text-left px-3 py-1.5 truncate"
+						style="color: var(--text);"
 						on:mousedown|preventDefault={() => select(tag)}
+						on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+						on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
 					>{tag}</button>
 				</li>
 			{/each}
 			{#if total > 10}
-				<li class="px-3 py-1.5 text-stone-400 text-xs italic">… y {total - 10} más</li>
+				<li class="px-3 py-1.5 text-xs italic" style="color: var(--text-muted);">... y {total - 10} más</li>
 			{/if}
 		</ul>
 	{/if}

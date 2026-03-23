@@ -65,19 +65,22 @@
 	}
 </script>
 
-<div class="min-h-full" style="background: #f0ebe3; font-family: 'DM Sans', sans-serif;">
+<div class="min-h-full" style="background: var(--bg);">
 
 	<!-- Cabecera -->
-	<div class="bg-white border-b border-stone-200 px-6 pt-8 pb-6">
+	<div class="px-6 pt-8 pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
 		<div class="max-w-2xl mx-auto flex items-end justify-between gap-4">
 			<div>
-				<h1 class="text-4xl font-bold leading-none text-stone-900" style="font-family: 'Lora', serif">
+				<h1 class="text-4xl font-bold leading-none" style="font-family: 'Lora', serif; color: var(--text);">
 					Miembros
 				</h1>
-				<p class="mt-1.5 text-sm text-stone-600">{members.length} miembro{members.length !== 1 ? 's' : ''} en tu familia</p>
+				<p class="mt-1.5 text-sm" style="color: var(--text-secondary);">{members.length} miembro{members.length !== 1 ? 's' : ''} en tu familia</p>
 			</div>
 			<button on:click={startNew}
-				class="px-4 py-2 text-sm font-medium bg-stone-800 hover:bg-stone-900 text-white rounded-lg transition-colors shrink-0">
+				class="px-4 py-2 text-sm font-medium rounded-lg transition-colors shrink-0"
+				style="background: var(--primary); color: white;"
+				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--primary-hover)'}
+				on:mouseleave={(e) => e.currentTarget.style.background = 'var(--primary)'}>
 				+ Nuevo miembro
 			</button>
 		</div>
@@ -87,34 +90,37 @@
 
 		<!-- Formulario -->
 		{#if showForm}
-			<div class="mb-6 p-5 bg-white border border-stone-200 rounded-2xl shadow-sm">
-				<h3 class="font-semibold text-stone-900 mb-4" style="font-family: 'Lora', serif">{editingMember ? 'Editar miembro' : 'Nuevo miembro'}</h3>
+			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
+				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Lora', serif; color: var(--text);">{editingMember ? 'Editar miembro' : 'Nuevo miembro'}</h3>
 				<div class="grid gap-3">
 					<input type="text" placeholder="Nombre *" bind:value={form.name}
-						class="px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-50 transition-all" />
+						class="px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
+						style="border: 1px solid var(--border); color: var(--text);" />
 					<div>
-						<label class="block text-xs font-medium text-stone-700 uppercase tracking-wide mb-1">No puede comer</label>
+						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">No puede comer</label>
 						<MultiTagInput bind:value={form.cannot_eat} tags={allTags} placeholder="ej: gluten,lactosa,marisco"
-							class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-red-300 focus:ring-2 focus:ring-red-50 transition-all" />
+							class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all" />
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-stone-700 uppercase tracking-wide mb-1">Le gusta</label>
+						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">Le gusta</label>
 						<MultiTagInput bind:value={form.likes} tags={allTags} placeholder="ej: pasta,pollo"
-							class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-green-300 focus:ring-2 focus:ring-green-50 transition-all" />
+							class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all" />
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-stone-700 uppercase tracking-wide mb-1">No le gusta</label>
+						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">No le gusta</label>
 						<MultiTagInput bind:value={form.dislikes} tags={allTags} placeholder="ej: verduras,pescado"
-							class="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-50 transition-all" />
+							class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all" />
 					</div>
 				</div>
 				<div class="flex gap-2 mt-4">
 					<button on:click={saveMember} disabled={!form.name}
-						class="px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+						class="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+						style="background: var(--primary); color: white;">
 						Guardar
 					</button>
 					<button on:click={() => showForm = false}
-						class="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-sm transition-colors">
+						class="px-4 py-2 rounded-lg text-sm transition-colors"
+						style="background: var(--surface-warm); color: var(--text);">
 						Cancelar
 					</button>
 				</div>
@@ -124,16 +130,21 @@
 		<!-- Lista de miembros -->
 		<div class="space-y-3">
 			{#each members as member}
-				<div class="group p-5 bg-white border border-stone-200 rounded-2xl hover:border-stone-300 hover:shadow-sm transition-all duration-150">
+				<div class="group p-5 rounded-2xl transition-all duration-150"
+					style="background: var(--surface); border: 1px solid var(--border);">
 					<div class="flex items-start justify-between gap-3">
-						<h3 class="font-semibold text-stone-900 text-base leading-snug" style="font-family: 'Lora', serif">{member.name}</h3>
+						<h3 class="font-semibold text-lg leading-snug" style="font-family: 'Lora', serif; color: var(--text);">{member.name}</h3>
 						<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
 							<button on:click={() => startEdit(member)}
-								class="px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100 rounded-lg transition-colors">
+								class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+								style="color: var(--text-secondary);"
+								on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+								on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
 								Editar
 							</button>
 							<button on:click={() => deleteMember(member.id)}
-								class="px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+								class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+								style="color: var(--error);">
 								Borrar
 							</button>
 						</div>
@@ -141,10 +152,10 @@
 
 					{#if member.cannot_eat}
 						<div class="mt-3">
-							<p class="text-xs font-medium text-stone-700 uppercase tracking-wide mb-1.5">🚫 No puede comer</p>
+							<p class="text-xs font-medium uppercase tracking-wide mb-1.5" style="color: var(--text-secondary);">No puede comer</p>
 							<div class="flex flex-wrap gap-1">
 								{#each parseTags(member.cannot_eat) as tag}
-									<span class="text-xs px-2 py-0.5 bg-red-50 text-red-600 rounded-full font-medium">{tag}</span>
+									<span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background: var(--error-bg); color: var(--error);">{tag}</span>
 								{/each}
 							</div>
 						</div>
@@ -152,10 +163,10 @@
 
 					{#if member.likes}
 						<div class="mt-3">
-							<p class="text-xs font-medium text-stone-700 uppercase tracking-wide mb-1.5">👍 Le gusta</p>
+							<p class="text-xs font-medium uppercase tracking-wide mb-1.5" style="color: var(--text-secondary);">Le gusta</p>
 							<div class="flex flex-wrap gap-1">
 								{#each parseTags(member.likes) as tag}
-									<span class="text-xs px-2 py-0.5 bg-green-50 text-green-700 rounded-full font-medium">{tag}</span>
+									<span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background: var(--success-bg); color: var(--success);">{tag}</span>
 								{/each}
 							</div>
 						</div>
@@ -163,22 +174,21 @@
 
 					{#if member.dislikes}
 						<div class="mt-3">
-							<p class="text-xs font-medium text-stone-700 uppercase tracking-wide mb-1.5">👎 No le gusta</p>
+							<p class="text-xs font-medium uppercase tracking-wide mb-1.5" style="color: var(--text-secondary);">No le gusta</p>
 							<div class="flex flex-wrap gap-1">
 								{#each parseTags(member.dislikes) as tag}
-									<span class="text-xs px-2 py-0.5 bg-orange-50 text-orange-600 rounded-full font-medium">{tag}</span>
+									<span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background: var(--comida-header); color: var(--text);">{tag}</span>
 								{/each}
 							</div>
 						</div>
 					{/if}
 
 					{#if !member.cannot_eat && !member.likes && !member.dislikes}
-						<p class="mt-2 text-sm text-stone-500">Sin restricciones ni preferencias</p>
+						<p class="mt-2 text-sm" style="color: var(--text-muted);">Sin restricciones ni preferencias</p>
 					{/if}
 				</div>
 			{:else}
-				<div class="text-center py-16 text-stone-500">
-					<p class="text-4xl mb-3">👥</p>
+				<div class="text-center py-16" style="color: var(--text-muted);">
 					<p class="text-sm">No hay miembros. Añade los miembros de tu familia.</p>
 				</div>
 			{/each}
