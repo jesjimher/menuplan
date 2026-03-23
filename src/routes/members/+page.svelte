@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Member } from '$lib/types/index.js';
-	import MultiTagInput from '$lib/components/MultiTagInput.svelte';
+	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
 
 	let members: Member[] = [];
 	let allTags: string[] = [];
@@ -98,18 +98,15 @@
 						style="border: 1px solid var(--border); color: var(--text);" />
 					<div>
 						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">No puede comer</label>
-						<MultiTagInput bind:value={form.cannot_eat} tags={allTags} placeholder="ej: gluten,lactosa,marisco"
-							class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all" />
+						<TagBadgeInput bind:value={form.cannot_eat} tags={allTags} placeholder="ej: gluten,lactosa,marisco" />
 					</div>
 					<div>
 						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">Le gusta</label>
-						<MultiTagInput bind:value={form.likes} tags={allTags} placeholder="ej: pasta,pollo"
-							class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all" />
+						<TagBadgeInput bind:value={form.likes} tags={allTags} placeholder="ej: pasta,pollo" />
 					</div>
 					<div>
 						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">No le gusta</label>
-						<MultiTagInput bind:value={form.dislikes} tags={allTags} placeholder="ej: verduras,pescado"
-							class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all" />
+						<TagBadgeInput bind:value={form.dislikes} tags={allTags} placeholder="ej: verduras,pescado" />
 					</div>
 				</div>
 				<div class="flex gap-2 mt-4">

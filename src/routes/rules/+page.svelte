@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Rule } from '$lib/types/index.js';
-	import TagInput from '$lib/components/TagInput.svelte';
+	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
 
 	let rules: Rule[] = [];
 	let allTags: string[] = [];
@@ -97,8 +97,7 @@
 				<div class="grid gap-3">
 					<div>
 						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">Tag</label>
-						<TagInput bind:value={form.tag} tags={allTags} placeholder="ej: pescado, carne, vegetariano"
-							class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all" />
+						<TagBadgeInput bind:value={form.tag} tags={allTags} placeholder="ej: pescado, carne, vegetariano" multiple={false} />
 					</div>
 					<div>
 						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">Condición</label>

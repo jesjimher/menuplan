@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { Recipe } from '$lib/types/index.js';
 	import TagInput from '$lib/components/TagInput.svelte';
-	import MultiTagInput from '$lib/components/MultiTagInput.svelte';
+	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
 
 	let recipes: Recipe[] = [];
 	let showForm = false;
@@ -265,8 +265,7 @@
 					<textarea placeholder="Descripción" bind:value={form.description}
 						class="px-3 py-2.5 rounded-lg text-sm h-20 resize-none focus:outline-none transition-all"
 						style="border: 1px solid var(--border); color: var(--text);"></textarea>
-					<MultiTagInput bind:value={form.tags} tags={allTags} placeholder="Tags (ej: comida,carne,rápido)"
-						class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all" />
+					<TagBadgeInput bind:value={form.tags} tags={allTags} placeholder="Tags (ej: comida,carne,rápido)" />
 					<div>
 						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">
 							Días mínimos entre ocurrencias
