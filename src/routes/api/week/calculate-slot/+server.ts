@@ -15,7 +15,7 @@ export async function POST({ request }) {
 		slot_index,
 		is_accompaniment: is_accompaniment ?? 0,
 		member_id: null,
-		required_tag: (is_accompaniment ?? 0) === 0 ? (mealCfg?.required_tags[slot_index] ?? null) : null
+		required_tags: (is_accompaniment ?? 0) === 0 ? (mealCfg?.required_tags[slot_index] ?? []) : []
 	};
 
 	calculatePlan(weekKey, [slot], weekData.slots);

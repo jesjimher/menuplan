@@ -4,14 +4,21 @@ import { getAllRules } from './rules.js';
 import { checkRules } from '$lib/utils/ruleChecker.js';
 import { getOptions } from './options.js';
 
-function parseRequiredTags(raw: string | null): (string | null)[] {
+function parseRequiredTags(raw: string | null): string[][] {
 	if (!raw) return [];
 	try {
 		const parsed = JSON.parse(raw);
-		if (Array.isArray(parsed)) return parsed;
-		return [typeof parsed === 'string' ? parsed : null];
+		if (Array.isArray(parsed)) {
+			return parsed.map(item => {
+				if (Array.isArray(item)) return item.filter((t): t is string => typeof t === 'string' && !!t);
+				if (typeof item === 'string' && item) return [item]; // formato antiguo: string por slot
+				return [];
+			});
+		}
+		if (typeof parsed === 'string' && parsed) return [[parsed]];
+		return [];
 	} catch {
-		return [raw]; // legacy: plain string → primer slot
+		return [[raw]]; // legacy: plain string → primer slot
 	}
 }
 
@@ -134,7 +141,7 @@ export function getHistory(): string[] {
 	return rows.map(r => r.week_key);
 }
 
-export function updateSlotRequiredTag(weekKey: string, weekday: number, mealType: string, slotIndex: number, tag: string | null): void {
+export function updateSlotRequiredTag(weekKey: string, weekday: number, mealType: string, slotIndex: number, tags: string[]): void {
 	const db = getDb();
 	const options = getOptions();
 
@@ -142,13 +149,13 @@ export function updateSlotRequiredTag(weekKey: string, weekday: number, mealType
 		'SELECT * FROM week_day_config WHERE week_key = ? AND weekday = ? AND meal_type = ?'
 	).get(weekKey, weekday, mealType) as WeekDayConfig | undefined;
 
-	const tags = existing ? parseRequiredTags(existing.required_tag) : [];
-	while (tags.length <= slotIndex) tags.push(null);
-	tags[slotIndex] = tag;
-	// Eliminar nulls del final
-	while (tags.length > 0 && tags[tags.length - 1] === null) tags.pop();
+	const allTags = existing ? parseRequiredTags(existing.required_tag) : [];
+	while (allTags.length <= slotIndex) allTags.push([]);
+	allTags[slotIndex] = tags;
+	// Eliminar arrays vacíos del final
+	while (allTags.length > 0 && allTags[allTags.length - 1].length === 0) allTags.pop();
 
-	const serialized = tags.length === 0 ? null : JSON.stringify(tags);
+	const serialized = allTags.length === 0 ? null : JSON.stringify(allTags);
 
 	if (existing) {
 		db.prepare('UPDATE week_day_config SET required_tag = ? WHERE week_key = ? AND weekday = ? AND meal_type = ?')

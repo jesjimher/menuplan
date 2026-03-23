@@ -10,7 +10,7 @@ export async function POST({ request }) {
 	const weekData = getWeekData(weekKey);
 
 	// Build list of empty slots based on configs
-	const slotsToFill: { weekday: number; meal_type: 'comida' | 'cena'; slot_index: number; is_accompaniment: number; member_id: number | null; required_tag?: string | null }[] = [];
+	const slotsToFill: { weekday: number; meal_type: 'comida' | 'cena'; slot_index: number; is_accompaniment: number; member_id: number | null; required_tags?: string[] }[] = [];
 
 	for (let weekday = 1; weekday <= 7; weekday++) {
 		const config = weekData.configs[weekday];
@@ -26,7 +26,7 @@ export async function POST({ request }) {
 				);
 
 				if (!existing || !existing.recipe) {
-					slotsToFill.push({ weekday, meal_type: mealType, slot_index: slotIdx, is_accompaniment: 0, member_id: null, required_tag: mealConfig.required_tags[slotIdx] ?? null });
+					slotsToFill.push({ weekday, meal_type: mealType, slot_index: slotIdx, is_accompaniment: 0, member_id: null, required_tags: mealConfig.required_tags[slotIdx] ?? [] });
 				}
 
 				// Side dishes per recipe

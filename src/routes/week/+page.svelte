@@ -234,15 +234,31 @@
 		await loadWeek();
 	}
 
-	async function setRequiredTag(weekday: number, mealType: string, slotIdx: number, tag: string) {
-		const value = tag.trim().toLowerCase() || null;
-		editingTagKey = null;
+	function getSlotTags(weekday: number, mealType: string, slotIdx: number): string[] {
+		return weekData?.configs[weekday]?.[mealType as 'comida' | 'cena']?.required_tags[slotIdx] ?? [];
+	}
+
+	async function setSlotTags(weekday: number, mealType: string, slotIdx: number, tags: string[]) {
 		await fetch('/api/week/config', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIdx, required_tag: value })
+			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIdx, required_tags: tags })
 		});
 		await loadWeek();
+	}
+
+	async function addRequiredTag(weekday: number, mealType: string, slotIdx: number, tag: string) {
+		const value = tag.trim().toLowerCase();
+		editingTagKey = null;
+		if (!value) return;
+		const current = getSlotTags(weekday, mealType, slotIdx);
+		if (current.includes(value)) return;
+		await setSlotTags(weekday, mealType, slotIdx, [...current, value]);
+	}
+
+	async function removeRequiredTag(weekday: number, mealType: string, slotIdx: number, tag: string) {
+		const current = getSlotTags(weekday, mealType, slotIdx);
+		await setSlotTags(weekday, mealType, slotIdx, current.filter(t => t !== tag));
 	}
 
 	function closeDropdown() {
@@ -425,7 +441,7 @@
 									{#each Array(cfg.recipe_count) as _, slotIdx}
 										{@const slot = getSlot(weekday, mealType, slotIdx, 0)}
 										{@const key = slotKey(weekday, mealType, slotIdx, 0)}
-										{@const slotTag = cfg.required_tags[slotIdx] ?? null}
+										{@const slotTags = cfg.required_tags[slotIdx] ?? []}
 										{@const slotTagEditKey = `tag-${weekday}-${mealType}-${slotIdx}`}
 
 										<div>
@@ -444,7 +460,7 @@
 														</span>
 													</button>
 													<div class="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover/slot:opacity-100 transition-opacity">
-														{#if !slotTag && editingTagKey !== slotTagEditKey}
+														{#if editingTagKey !== slotTagEditKey}
 															<button
 																on:click|stopPropagation={() => editingTagKey = slotTagEditKey}
 																class="w-6 h-6 flex items-center justify-center rounded-lg shadow-sm transition-colors"
@@ -530,41 +546,35 @@
 												{/if}
 											</div>
 
-											<!-- Tag requerido del slot -->
-											{#if editingTagKey === slotTagEditKey}
-												<div class="mt-1">
-													<TagInput
-														autofocus
-														value={slotTag ?? ''}
-														tags={allTags}
-														placeholder="tag requerido..."
-														class="w-full text-xs px-2 py-1 rounded-lg outline-none"
-														on:change={(e) => setRequiredTag(weekday, mealType, slotIdx, e.detail)}
-														on:keydown={(e) => {
-															if (e.key === 'Escape') editingTagKey = null;
-															if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-														}}
-														--tag-border="var(--border-hover)"
-													/>
-												</div>
-											{:else if slotTag}
-												<div class="mt-1">
-													<span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-														style="background: {isComida ? 'var(--comida-slot-filled)' : 'var(--cena-slot-filled)'}; color: var(--text);">
-														{slotTag}
-														<button
-															on:click|stopPropagation={() => { editingTagKey = slotTagEditKey; }}
-															class="hover:opacity-60 transition-opacity"
-															title="Editar"
-														>
-															<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-														</button>
-														<button
-															on:click|stopPropagation={() => setRequiredTag(weekday, mealType, slotIdx, '')}
-															class="hover:opacity-60 transition-opacity font-bold"
-															title="Quitar"
-														>&times;</button>
-													</span>
+											<!-- Tags requeridos del slot -->
+											{#if slotTags.length > 0 || editingTagKey === slotTagEditKey}
+												<div class="mt-1 flex flex-wrap gap-1 items-center">
+													{#each slotTags as tag}
+														<span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+															style="background: {isComida ? 'var(--comida-slot-filled)' : 'var(--cena-slot-filled)'}; color: var(--text);">
+															{tag}
+															<button
+																on:click|stopPropagation={() => removeRequiredTag(weekday, mealType, slotIdx, tag)}
+																class="hover:opacity-60 transition-opacity font-bold"
+																title="Quitar"
+															>&times;</button>
+														</span>
+													{/each}
+													{#if editingTagKey === slotTagEditKey}
+														<TagInput
+															autofocus
+															value=""
+															tags={allTags}
+															placeholder="tag requerido..."
+															class="text-xs"
+															on:change={(e) => addRequiredTag(weekday, mealType, slotIdx, e.detail)}
+															on:keydown={(e) => {
+																if (e.key === 'Escape') editingTagKey = null;
+																if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+															}}
+															--tag-border="var(--border-hover)"
+														/>
+													{/if}
 												</div>
 											{/if}
 

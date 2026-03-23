@@ -65,7 +65,7 @@ export interface MealConfig {
 	recipe_count: number;
 	accompaniment_per_recipe: number;
 	accompaniment_per_slot: number;
-	required_tags: (string | null)[];
+	required_tags: string[][];
 }
 
 export interface DayConfig {

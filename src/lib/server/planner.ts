@@ -11,7 +11,7 @@ interface SlotToFill {
 	slot_index: number;
 	is_accompaniment: number;
 	member_id: number | null;
-	required_tag?: string | null;
+	required_tags?: string[];
 }
 
 function parseTags(tags: string): string[] {
@@ -80,10 +80,13 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 			candidates = fillCandidates(slot, allRecipes, member, members, options, rules, tagCounts, weekKey, true);
 		}
 
-		// Apply required_tag filter (only for main dishes)
-		if (!slot.is_accompaniment && slot.required_tag) {
-			const rt = slot.required_tag.trim().toLowerCase();
-			const filtered = candidates.filter(r => parseTags(r.tags).includes(rt));
+		// Apply required_tags filter (only for main dishes, AND condition)
+		if (!slot.is_accompaniment && slot.required_tags && slot.required_tags.length > 0) {
+			const rts = slot.required_tags.map(t => t.trim().toLowerCase());
+			const filtered = candidates.filter(r => {
+				const recipeTags = parseTags(r.tags);
+				return rts.every(rt => recipeTags.includes(rt));
+			});
 			if (filtered.length > 0) candidates = filtered;
 		}
 

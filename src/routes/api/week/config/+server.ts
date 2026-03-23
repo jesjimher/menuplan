@@ -3,8 +3,8 @@ import { updateDayConfig, updateSlotRequiredTag } from '$lib/server/weekplan.js'
 
 export async function POST({ request }) {
 	const body = await request.json();
-	if ('slot_index' in body && 'required_tag' in body) {
-		updateSlotRequiredTag(body.weekKey, body.weekday, body.meal_type, body.slot_index, body.required_tag || null);
+	if ('slot_index' in body && 'required_tags' in body) {
+		updateSlotRequiredTag(body.weekKey, body.weekday, body.meal_type, body.slot_index, Array.isArray(body.required_tags) ? body.required_tags : []);
 	} else {
 		updateDayConfig(body.weekKey, body.weekday, body.meal_type, {
 			recipe_count: body.recipe_count,
