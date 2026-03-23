@@ -291,36 +291,57 @@
 <div class="flex flex-col h-full" style="background: #f0ebe3; font-family: 'DM Sans', sans-serif;">
 
 	<!-- Cabecera -->
-	<header class="bg-white border-b border-stone-200 px-5 py-3 shrink-0">
-		<div class="flex flex-wrap items-center gap-2">
+	<header class="bg-white border-b border-stone-200 px-3 sm:px-5 py-2 sm:py-3 shrink-0">
+		<div class="flex flex-wrap items-center gap-1 sm:gap-2">
 			<button on:click={prevWeek}
-				class="px-3 py-1.5 text-sm font-medium text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors">
-				← Anterior
+				class="px-2 sm:px-3 py-1.5 text-sm font-medium text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors">
+				<span class="sm:hidden">←</span>
+				<span class="hidden sm:inline">← Anterior</span>
 			</button>
-			<h1 class="text-lg font-semibold text-stone-900 tracking-tight" style="font-family: 'Lora', serif;">
-				Semana {weekKey}
+			<h1 class="text-base sm:text-lg font-semibold text-stone-900 tracking-tight" style="font-family: 'Lora', serif;">
+				<span class="sm:hidden">{weekKey}</span>
+				<span class="hidden sm:inline">Semana {weekKey}</span>
 			</h1>
 			<button on:click={nextWeek}
-				class="px-3 py-1.5 text-sm font-medium text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors">
-				Siguiente →
+				class="px-2 sm:px-3 py-1.5 text-sm font-medium text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors">
+				<span class="sm:hidden">→</span>
+				<span class="hidden sm:inline">Siguiente →</span>
 			</button>
 
-			<div class="ml-auto flex gap-1.5 flex-wrap items-center">
+			<div class="ml-auto flex gap-1 sm:gap-1.5 flex-wrap items-center">
 				<button on:click={calculatePlan} disabled={calculating}
-					class="px-4 py-1.5 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-colors">
-					{calculating ? 'Calculando…' : 'Completar huecos'}
+					class="px-2 sm:px-4 py-1.5 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
+					title="Completar huecos">
+					{#if calculating}
+						<span class="sm:hidden">⏳</span>
+						<span class="hidden sm:inline">Calculando…</span>
+					{:else}
+						<svg class="sm:hidden w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+						<span class="hidden sm:inline">Completar huecos</span>
+					{/if}
 				</button>
 				<button on:click={recalculatePlan} disabled={calculating}
-					class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-colors">
-					{calculating ? 'Calculando…' : 'Recalcular plan completo'}
+					class="px-2 sm:px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
+					title="Recalcular plan completo">
+					{#if calculating}
+						<span class="sm:hidden">⏳</span>
+						<span class="hidden sm:inline">Calculando…</span>
+					{:else}
+						<svg class="sm:hidden w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+						<span class="hidden sm:inline">Recalcular plan completo</span>
+					{/if}
 				</button>
 				<button on:click={copyPrevious}
-					class="px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-lg transition-colors">
-					Copiar semana anterior
+					class="px-2 sm:px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+					title="Copiar semana anterior">
+					<svg class="sm:hidden w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+					<span class="hidden sm:inline">Copiar semana anterior</span>
 				</button>
 				<button on:click={clearPlan}
-					class="px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-					Limpiar
+					class="px-2 sm:px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+					title="Limpiar">
+					<svg class="sm:hidden w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+					<span class="hidden sm:inline">Limpiar</span>
 				</button>
 			</div>
 		</div>
