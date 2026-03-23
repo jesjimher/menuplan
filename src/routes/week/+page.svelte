@@ -585,7 +585,7 @@
 																		bind:value={searchQuery}
 																		on:input={() => handleSearch(weekday, mealType, 1)}
 																		class="w-full text-sm px-2.5 py-1.5 border border-stone-300 rounded-lg focus:outline-none focus:border-stone-500 text-stone-900 placeholder-stone-500"
-																		autofocus
+																		use:focusOnMount
 																	/>
 																</div>
 																<div class="max-h-64 overflow-y-auto">
