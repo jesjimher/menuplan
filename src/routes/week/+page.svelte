@@ -434,8 +434,10 @@
 												<div class="relative group/slot">
 													<button
 														on:click|stopPropagation={() => openDropdown === key ? closeDropdown() : openSlotDropdown(weekday, mealType, slotIdx, 0)}
-														class="w-full text-left px-1 py-1.5 text-xs transition-colors min-h-[2rem] pr-14 flex items-start"
-														style="color: {slot?.recipe ? 'var(--text)' : 'var(--text-muted)'};"
+														class="w-full text-left text-xs transition-colors min-h-[2rem] pr-14 flex items-start {slot?.recipe ? 'px-1 py-1.5' : 'px-2.5 py-2 rounded-xl'}"
+														style="{slot?.recipe
+															? `color: var(--text);`
+															: `background: var(--surface); border: 2px dashed #b5a898; color: var(--text-muted);`}"
 													>
 														<span class="line-clamp-2 leading-snug {slot?.recipe ? 'font-medium' : 'italic'}">
 															{slot?.recipe?.name ?? 'Sin receta'}
@@ -576,8 +578,10 @@
 														<div class="relative group/acc">
 															<button
 																on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, accSlotIdx, 1)}
-																class="w-full text-left px-1 py-1 text-xs transition-colors pr-8"
-																style="color: {accSlot?.recipe ? 'var(--text-secondary)' : 'var(--text-muted)'};"
+																class="w-full text-left text-xs transition-colors pr-8 {accSlot?.recipe ? 'px-1 py-1' : 'px-2 py-1.5 rounded-lg'}"
+																style="{accSlot?.recipe
+																	? `color: var(--text-secondary);`
+																	: `background: var(--surface); border: 2px dashed #b5a898; color: var(--text-muted);`}"
 															>
 																<span class="leading-snug {accSlot?.recipe ? '' : 'italic'}" style="font-size: 0.7rem;">
 																	{accSlot?.recipe?.name ?? '+ acomp.'}
@@ -645,8 +649,10 @@
 												<div class="dropdown-container relative">
 													<button
 														on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, aIdx, 1)}
-														class="w-full text-left px-1 py-1 text-xs transition-colors"
-														style="color: {accSlot?.recipe ? 'var(--text-secondary)' : 'var(--text-muted)'};"
+														class="w-full text-left text-xs transition-colors {accSlot?.recipe ? 'px-1 py-1' : 'px-2 py-1.5 rounded-lg'}"
+														style="{accSlot?.recipe
+															? `color: var(--text-secondary);`
+															: `background: var(--surface); border: 2px dashed #b5a898; color: var(--text-muted);`}"
 													>
 														<span class="{accSlot?.recipe ? '' : 'italic'}" style="font-size: 0.7rem;">
 															{accSlot?.recipe?.name ?? '+ acomp. franja'}
