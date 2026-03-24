@@ -28,9 +28,9 @@ Aplicación **SvelteKit** con `@sveltejs/adapter-node` para despliegue en Docker
 ### Capa de datos (`src/lib/db/index.ts`)
 Singleton de conexión SQLite. El schema está incrustado como constante de string (no se lee el fichero `.sql` en tiempo de ejecución — existe solo como referencia — para evitar problemas de bundling). La ruta de la BD por defecto es `./menuplan.db`, sobreescrita por la variable de entorno `DATABASE_PATH`.
 
-**Al modificar el schema de `recipes`:** regenerar `data/sample-recipes.sql` ejecutando:
+**Al modificar el schema de `recipes`:** regenerar `data/sample-recipes.sql` ejecutando (excluye el BLOB `image_data`):
 ```bash
-/usr/bin/sqlite3 menuplan.db ".dump recipes" | grep "^INSERT INTO recipes" > /tmp/recipes_inserts.sql
+/usr/bin/sqlite3 menuplan.db "SELECT 'INSERT INTO recipes (id,name,description,tags,min_days,created_at) VALUES (' || id || ',' || quote(name) || ',' || quote(description) || ',' || quote(tags) || ',' || min_days || ',' || quote(created_at) || ');' FROM recipes" > /tmp/recipes_inserts.sql
 { echo "-- Recetas de ejemplo para menuplan"; echo "-- Importar con: sqlite3 menuplan.db < data/sample-recipes.sql"; echo "-- O desde Node: better-sqlite3 exec(readFileSync('data/sample-recipes.sql', 'utf8'))"; echo ""; cat /tmp/recipes_inserts.sql; } > data/sample-recipes.sql
 ```
 
@@ -38,14 +38,15 @@ Singleton de conexión SQLite. El schema está incrustado como constante de stri
 - `week_plans.member_id` es nullable (NULL = para todos los miembros). La restricción UNIQUE usa un `CREATE UNIQUE INDEX` separado con `COALESCE(member_id, -1)` porque SQLite no admite expresiones en restricciones `UNIQUE()` inline.
 - Los tags se almacenan como strings separados por comas en todas partes (recetas, restricciones de miembros, etc.). Todas las comparaciones de tags hacen lowercase y trim de cada elemento.
 - `week_plans.is_accompaniment` (0/1) distingue platos principales de acompañamientos dentro de la misma tabla.
-- `week_day_config` sobreescribe las opciones globales por combinación (week_key, weekday, meal_type).
+- `week_day_config` sobreescribe las opciones globales por combinación (week_key, weekday, meal_type). Los campos `disabled`/`disabled_comment` permiten desactivar un slot concreto (día+comida) para semanas en que no hace falta planificarlo.
+- `recipes.image_data` (BLOB) e `image_type` almacenan la imagen de la receta directamente en la BD. Las imágenes **no** se incluyen en `data/sample-recipes.sql` — el dump filtra solo las columnas de texto. Servirlas usa el endpoint `/api/recipes/[id]/image`.
 
 ### Módulos de servidor (`src/lib/server/`)
 Funciones puras, sin estado. Cada módulo tiene helpers CRUD simples. Destacados:
 
 - **`weekplan.ts`** — `getWeekData()` devuelve la forma completa `WeekData` (slots + configuraciones por día + violaciones de reglas) con una única consulta JOIN. `assignRecipe()` usa `INSERT ... ON CONFLICT ... DO UPDATE` — el target del conflicto debe coincidir con el índice de expresión.
 - **`planner.ts`** — `calculatePlan()` rellena slots vacíos en orden (Lun→Dom, comida antes que cena). Filtra por tag de tipo de comida → restricciones dietéticas → min_days → reglas no_more_than → prioriza reglas at_least. Relaja min_days un 50% en el reintento si no hay candidatos.
-- **`recipes.ts`** — `importPlantoeatRecipes()` parsea el formato de exportación de Plantoeat. Los tags en Plantoeat se separan con ` ^ ` (espacio-acento-espacio), no con comas.
+- **`recipes.ts`** — `importPlantoeatRecipes()` parsea el formato de exportación de Plantoeat. Los tags en Plantoeat se separan con ` ^ ` (espacio-acento-espacio), no con comas. `getRecipeImageData()`/`setRecipeImage()`/`clearRecipeImage()` gestionan el BLOB de imagen; las demás funciones usan `RECIPE_COLS` que excluye `image_data` para no cargar el BLOB en queries normales.
 
 ### Utilidades compartidas (`src/lib/utils/`)
 - **`ruleChecker.ts`** — se ejecuta tanto en cliente como en servidor. Recibe `SlotData[]` + `Rule[]`, cuenta ocurrencias de tags en slots que no son acompañamientos, devuelve las violaciones.
@@ -53,6 +54,8 @@ Funciones puras, sin estado. Cada módulo tiene helpers CRUD simples. Destacados
 
 ### Rutas
 - `src/routes/api/` — endpoints REST, todos devuelven JSON. Los endpoints de mutación de semana (`/assign`, `/remove`, `/calculate`, `/clear`, `/copy-previous`, `/config`) aceptan POST con body JSON que incluye `weekKey`.
+- `/api/recipes/[id]/image` — GET devuelve el BLOB de imagen con el Content-Type correcto; PUT recibe `multipart/form-data` con el campo `image`; DELETE borra la imagen.
+- `/api/image-search` — GET proxy hacia DuckDuckGo Images (obtiene el token `vqd` primero, luego la lista de imágenes). Devuelve array de `{url, thumbnail, title}`.
 - `src/routes/week/+page.svelte` — la página principal y más compleja. Usa **actualizaciones optimistas**: los cambios de slot actualizan `weekData.slots` localmente de forma inmediata, luego persisten en la API y llaman a `refreshViolations()` en background. El flag `initialLoading` (true solo en el primer montaje) controla el spinner de carga — los refrescos posteriores de datos nunca ocultan la grid.
 
 ### Patrón de reactividad en la página de semana
