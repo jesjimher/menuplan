@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Reglas de colaboración
+
+- **Nunca hacer operaciones git de escritura** (commit, push, merge, rebase, reset, etc.). Solo operaciones de lectura como `git status`, `git diff`, `git log`.
+
 ## Comandos
 
 ```bash
