@@ -199,7 +199,7 @@
 <div class="min-h-full" style="background: var(--bg);">
 
 	<!-- Cabecera -->
-	<div class="px-6 pt-8 pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
+	<div class="px-4 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
 		<div class="max-w-4xl mx-auto flex items-end justify-between gap-4">
 			<div>
 				<h1 class="text-4xl font-bold leading-none" style="font-family: 'Lora', serif; color: var(--text);">
@@ -209,18 +209,26 @@
 			</div>
 			<div class="flex gap-2 shrink-0">
 				<button on:click={() => showImport = !showImport}
-					class="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+					class="p-2 sm:px-4 sm:py-2 rounded-lg transition-colors"
 					style="color: var(--text); border: 1px solid var(--border);"
 					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
-					on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
-					Importar
+					on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
+					title="Importar">
+					<svg class="sm:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 9V5a2 2 0 00-2-2H5a2 2 0 00-2 2v4m16 8l-7 7-7-7m7 7V9" />
+					</svg>
+					<span class="hidden sm:inline text-sm font-medium">Importar</span>
 				</button>
 				<button on:click={startNew}
-					class="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+					class="p-2 sm:px-4 sm:py-2 rounded-lg transition-colors"
 					style="background: var(--primary); color: white;"
 					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--primary-hover)'}
-					on:mouseleave={(e) => e.currentTarget.style.background = 'var(--primary)'}>
-					+ Nueva receta
+					on:mouseleave={(e) => e.currentTarget.style.background = 'var(--primary)'}
+					title="Nueva receta">
+					<svg class="sm:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14" />
+					</svg>
+					<span class="hidden sm:inline text-sm font-medium">+ Nueva receta</span>
 				</button>
 			</div>
 		</div>
@@ -255,21 +263,22 @@
 
 		<!-- Barra de acción masiva -->
 		{#if checkedIds.size > 0}
-			<div class="flex items-center gap-3 mb-4 px-4 py-3 rounded-xl shadow-sm"
+			<div class="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 px-4 py-3 rounded-xl shadow-sm"
 				style="background: var(--surface); border: 1px solid var(--border);">
 				<span class="text-sm font-medium shrink-0" style="color: var(--text);">
-					{checkedIds.size} seleccionada{checkedIds.size > 1 ? 's' : ''}
+					{checkedIds.size} sel.
 				</span>
-				<div class="relative flex-1">
+				<div class="relative flex-1 min-w-[120px]">
 					<TagInput
 						bind:value={bulkTag}
 						tags={allTags}
-						placeholder="Tag a añadir..."
+						placeholder="Tag..."
 						class="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none"
 					/>
 				</div>
 				<button on:click={applyBulkTag} disabled={!bulkTag.trim() || bulkAdding}
-					class="px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors"
+					class="p-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors"
+				title="Añadir tag"
 					style="background: var(--primary); color: white;">
 					{bulkAdding ? 'Añadiendo...' : 'Añadir tag'}
 				</button>
@@ -460,18 +469,24 @@
 							<p class="text-xs mt-1.5" style="color: var(--text-muted);">Mín. {recipe.min_days} días entre ocurrencias</p>
 						{/if}
 					</div>
-					<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+					<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
 						<button on:click={() => startEdit(recipe)}
-							class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+							class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
 							style="color: var(--text-secondary);"
 							on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
-							on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
-							Editar
+							on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
+							title="Editar">
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+							</svg>
 						</button>
 						<button on:click={() => deleteRecipe(recipe.id)}
-							class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
-							style="color: var(--error);">
-							Borrar
+							class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+							style="color: var(--error);"
+							title="Borrar">
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+							</svg>
 						</button>
 					</div>
 				</div>

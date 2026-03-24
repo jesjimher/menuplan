@@ -4,6 +4,7 @@
 	import { checkRules } from '$lib/utils/ruleChecker.js';
 	import { getWeekKey, getPreviousWeekKey, getWeekDates, WEEKDAY_NAMES, SHORT_MONTH_NAMES } from '$lib/utils/dates.js';
 	import TagInput from '$lib/components/TagInput.svelte';
+	import { sidebarOpen } from '$lib/stores/ui.js';
 
 	let weekKey = $state(getWeekKey());
 	let weekData = $state<WeekData | null>(null);
@@ -401,9 +402,18 @@
 
 	<!-- Cabecera -->
 	<header class="px-3 sm:px-5 py-2.5 sm:py-3 shrink-0" style="background: var(--surface); border-bottom: 1px solid var(--border);">
-		<div class="flex flex-wrap items-center gap-1 sm:gap-2">
+		<div class="flex items-center gap-1 sm:gap-2">
+			<button class="lg:hidden px-2 py-1.5 rounded-lg transition-colors shrink-0"
+				style="color: var(--text);"
+				on:click={() => $sidebarOpen = true}
+				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+				on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+				</svg>
+			</button>
 			<button on:click={prevWeek}
-				class="px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+				class="shrink-0 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
 				style="color: var(--text-secondary);"
 				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
 				on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
@@ -415,7 +425,7 @@
 				<span class="hidden sm:inline">Semana {weekKey}</span>
 			</h1>
 			<button on:click={nextWeek}
-				class="px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+				class="shrink-0 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
 				style="color: var(--text-secondary);"
 				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
 				on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
@@ -423,7 +433,7 @@
 				<span class="hidden sm:inline">Siguiente &rarr;</span>
 			</button>
 
-			<div class="ml-auto flex gap-1 sm:gap-1.5 flex-wrap items-center">
+			<div class="ml-auto flex gap-1 sm:gap-1.5 items-center">
 				<button on:click={calculatePlan} disabled={calculating}
 					class="px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
 					style="background: var(--primary); color: white;"
@@ -439,7 +449,7 @@
 					{/if}
 				</button>
 				<button on:click={recalculatePlan} disabled={calculating}
-					class="px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
+					class="hidden sm:inline-flex px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
 					style="background: var(--comida-accent); color: white;"
 					title="Recalcular plan completo">
 					{#if calculating}
@@ -622,7 +632,7 @@
 															</span>
 														{/if}
 													</button>
-													<div class="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover/slot:opacity-100 transition-opacity">
+													<div class="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover/slot:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
 														{#if editingTagKey !== slotTagEditKey}
 															<button
 																on:click|stopPropagation={() => editingTagKey = slotTagEditKey}

@@ -68,7 +68,7 @@
 <div class="min-h-full" style="background: var(--bg);">
 
 	<!-- Cabecera -->
-	<div class="px-6 pt-8 pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
+	<div class="px-4 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
 		<div class="max-w-2xl mx-auto flex items-end justify-between gap-4">
 			<div>
 				<h1 class="text-4xl font-bold leading-none" style="font-family: 'Lora', serif; color: var(--text);">
@@ -77,11 +77,15 @@
 				<p class="mt-1.5 text-sm" style="color: var(--text-secondary);">{members.length} miembro{members.length !== 1 ? 's' : ''} en tu familia</p>
 			</div>
 			<button on:click={startNew}
-				class="px-4 py-2 text-sm font-medium rounded-lg transition-colors shrink-0"
+				class="p-2 sm:px-4 sm:py-2 rounded-lg transition-colors shrink-0"
 				style="background: var(--primary); color: white;"
 				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--primary-hover)'}
-				on:mouseleave={(e) => e.currentTarget.style.background = 'var(--primary)'}>
-				+ Nuevo miembro
+				on:mouseleave={(e) => e.currentTarget.style.background = 'var(--primary)'}
+				title="Nuevo miembro">
+				<svg class="sm:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14" />
+				</svg>
+				<span class="hidden sm:inline text-sm font-medium">+ Nuevo miembro</span>
 			</button>
 		</div>
 	</div>
@@ -131,7 +135,7 @@
 					style="background: var(--surface); border: 1px solid var(--border);">
 					<div class="flex items-start justify-between gap-3">
 						<h3 class="font-semibold text-lg leading-snug" style="font-family: 'Lora', serif; color: var(--text);">{member.name}</h3>
-						<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+						<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
 							<button on:click={() => startEdit(member)}
 								class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
 								style="color: var(--text-secondary);"

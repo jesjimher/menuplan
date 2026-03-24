@@ -1,8 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/stores';
-
-	let sidebarOpen = false;
+	import { sidebarOpen } from '$lib/stores/ui.js';
 
 	const navItems = [
 		{ href: '/week', label: 'Semana', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
@@ -18,19 +17,19 @@
 
 <div class="flex h-screen overflow-hidden" style="background: var(--bg);">
 	<!-- Sidebar overlay para móvil -->
-	{#if sidebarOpen}
-		<div class="fixed inset-0 z-20 bg-black/25 lg:hidden" on:click={() => sidebarOpen = false}></div>
+	{#if $sidebarOpen}
+		<div class="fixed inset-0 z-20 bg-black/25 lg:hidden" on:click={() => $sidebarOpen = false}></div>
 	{/if}
 
 	<!-- Sidebar -->
-	<aside class="fixed inset-y-0 left-0 z-30 w-56 flex flex-col transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 {sidebarOpen ? 'translate-x-0' : '-translate-x-full'}"
+	<aside class="fixed inset-y-0 left-0 z-30 w-56 flex flex-col transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 {$sidebarOpen ? 'translate-x-0' : '-translate-x-full'}"
 		style="background: var(--surface); border-right: 1px solid var(--border);">
 
 		<!-- Logo -->
 		<div class="flex items-center justify-between h-16 px-5 shrink-0"
 			style="border-bottom: 1px solid var(--border);">
 			<span class="text-xl font-bold" style="font-family: 'Lora', serif; color: var(--text);">MenuPlan</span>
-			<button class="lg:hidden" style="color: var(--text-secondary);" on:click={() => sidebarOpen = false}>
+			<button class="lg:hidden" style="color: var(--text-secondary);" on:click={() => $sidebarOpen = false}>
 				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
 			</button>
 		</div>
@@ -44,7 +43,7 @@
 					style="{currentPath.startsWith(item.href)
 						? `background: var(--nav-active); color: var(--day-text);`
 						: `color: var(--text); hover: var(--surface-warm);`}"
-					on:click={() => sidebarOpen = false}
+					on:click={() => $sidebarOpen = false}
 					on:mouseenter={(e) => { if (!currentPath.startsWith(item.href)) e.currentTarget.style.background = 'var(--surface-warm)'; }}
 					on:mouseleave={(e) => { if (!currentPath.startsWith(item.href)) e.currentTarget.style.background = 'transparent'; }}
 				>
@@ -59,16 +58,18 @@
 
 	<!-- Contenido principal -->
 	<div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-		<!-- Top bar (móvil) -->
+		<!-- Top bar (móvil) - no se muestra en /week -->
+		{#if !currentPath.startsWith('/week')}
 		<header class="flex items-center h-14 px-4 lg:hidden shrink-0"
 			style="background: var(--surface); border-bottom: 1px solid var(--border);">
-			<button style="color: var(--text);" on:click={() => sidebarOpen = true}>
+			<button style="color: var(--text);" on:click={() => $sidebarOpen = true}>
 				<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 				</svg>
 			</button>
 			<span class="ml-3 text-lg font-bold" style="font-family: 'Lora', serif; color: var(--text);">MenuPlan</span>
 		</header>
+		{/if}
 
 		<main class="flex-1 overflow-auto">
 			<slot />

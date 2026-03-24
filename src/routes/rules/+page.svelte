@@ -79,7 +79,8 @@
 				<p class="mt-1.5 text-sm" style="color: var(--text-secondary);">{rules.length} regla{rules.length !== 1 ? 's' : ''} definida{rules.length !== 1 ? 's' : ''}</p>
 			</div>
 			<button on:click={startNew}
-				class="px-4 py-2 text-sm font-medium rounded-lg transition-colors shrink-0"
+				class="p-2 sm:px-4 sm:py-2 rounded-lg transition-colors shrink-0"
+			title="Nueva regla"
 				style="background: var(--primary); color: white;"
 				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--primary-hover)'}
 				on:mouseleave={(e) => e.currentTarget.style.background = 'var(--primary)'}>
