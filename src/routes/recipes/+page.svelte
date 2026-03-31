@@ -103,6 +103,7 @@
 		pendingImageUrl = null;
 		showImageSearch = false;
 		showForm = true;
+		document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 
 	function startNew() {
