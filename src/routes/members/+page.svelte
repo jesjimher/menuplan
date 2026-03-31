@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { Member } from '$lib/types/index.js';
 	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
+	import { sidebarOpen } from '$lib/stores/ui.js';
 
 	let members: Member[] = [];
 	let allTags: string[] = [];
@@ -68,13 +69,18 @@
 <div class="min-h-full" style="background: var(--bg);">
 
 	<!-- Cabecera -->
-	<div class="px-4 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6" style="background: var(--surface); border-bottom: 1px solid var(--border);">
-		<div class="max-w-2xl mx-auto flex items-end justify-between gap-4">
-			<div>
-				<h1 class="text-4xl font-bold leading-none" style="font-family: 'Lora', serif; color: var(--text);">
-					Miembros
-				</h1>
-				<p class="mt-1.5 text-sm" style="color: var(--text-secondary);">{members.length} miembro{members.length !== 1 ? 's' : ''} en tu familia</p>
+	<header class="sticky top-0 z-10 px-4 sm:px-6 py-3 shrink-0" style="background: rgba(255,248,243,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--surface-container-highest);">
+		<div class="max-w-2xl mx-auto flex items-center gap-3">
+			<button class="lg:hidden p-1.5 rounded-lg transition-colors shrink-0"
+				style="color: var(--primary);"
+				on:click={() => $sidebarOpen = true}>
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+				</svg>
+			</button>
+			<div class="flex-1 min-w-0">
+				<h1 class="text-xl sm:text-2xl font-black tracking-tight leading-none" style="font-family: 'Epilogue', sans-serif; color: var(--primary);">Miembros</h1>
+				<p class="text-xs mt-0.5" style="color: var(--text-secondary);">{members.length} miembro{members.length !== 1 ? 's' : ''} en tu familia</p>
 			</div>
 			<button on:click={startNew}
 				class="p-2 sm:px-4 sm:py-2 rounded-lg transition-colors shrink-0"
@@ -88,14 +94,14 @@
 				<span class="hidden sm:inline text-sm font-medium">+ Nuevo miembro</span>
 			</button>
 		</div>
-	</div>
+	</header>
 
 	<div class="max-w-2xl mx-auto px-6 py-6">
 
 		<!-- Formulario -->
 		{#if showForm}
 			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
-				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Lora', serif; color: var(--text);">{editingMember ? 'Editar miembro' : 'Nuevo miembro'}</h3>
+				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Epilogue', sans-serif; color: var(--text);">{editingMember ? 'Editar miembro' : 'Nuevo miembro'}</h3>
 				<div class="grid gap-3">
 					<input type="text" placeholder="Nombre *" bind:value={form.name}
 						class="px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
@@ -121,7 +127,7 @@
 					</button>
 					<button on:click={() => showForm = false}
 						class="px-4 py-2 rounded-lg text-sm transition-colors"
-						style="background: var(--surface-warm); color: var(--text);">
+						style="background: var(--surface-container); color: var(--text);">
 						Cancelar
 					</button>
 				</div>
@@ -134,12 +140,12 @@
 				<div class="group p-5 rounded-2xl transition-all duration-150"
 					style="background: var(--surface); border: 1px solid var(--border);">
 					<div class="flex items-start justify-between gap-3">
-						<h3 class="font-semibold text-lg leading-snug" style="font-family: 'Lora', serif; color: var(--text);">{member.name}</h3>
+						<h3 class="font-semibold text-lg leading-snug" style="font-family: 'Epilogue', sans-serif; color: var(--text);">{member.name}</h3>
 						<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
 							<button on:click={() => startEdit(member)}
 								class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
 								style="color: var(--text-secondary);"
-								on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+								on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container)'}
 								on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
 								Editar
 							</button>
