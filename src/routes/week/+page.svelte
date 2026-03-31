@@ -398,47 +398,74 @@
 	if (!target.closest('.dropdown-container')) closeDropdown();
 }} />
 
-<div class="flex flex-col h-full" style="background: var(--bg);">
+<div class="flex flex-col h-full" style="background: var(--background);">
 
 	<!-- Cabecera -->
-	<header class="px-3 sm:px-5 py-2.5 sm:py-3 shrink-0" style="background: var(--surface); border-bottom: 1px solid var(--border);">
-		<div class="flex items-center gap-1 sm:gap-2">
-			<button class="lg:hidden px-2 py-1.5 rounded-lg transition-colors shrink-0"
-				style="color: var(--text);"
-				on:click={() => $sidebarOpen = true}
-				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
-				on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
+	<header class="px-4 sm:px-6 py-3 shrink-0" style="background: rgba(255,248,243,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--surface-container-highest);">
+		<div class="flex items-center gap-2 sm:gap-3">
+			<button class="lg:hidden p-1.5 rounded-lg transition-colors shrink-0"
+				style="color: var(--primary);"
+				on:click={() => $sidebarOpen = true}>
 				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 				</svg>
 			</button>
-			<button on:click={prevWeek}
-				class="shrink-0 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-				style="color: var(--text-secondary);"
-				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
-				on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
-				<span class="sm:hidden">&larr;</span>
-				<span class="hidden sm:inline">&larr; Anterior</span>
-			</button>
-			<h1 class="text-lg sm:text-xl font-semibold tracking-tight" style="font-family: 'Lora', serif; color: var(--text);">
+			<h1 class="text-xl sm:text-2xl font-black tracking-tight" style="font-family: 'Epilogue', sans-serif; color: var(--primary);">
 				<span class="sm:hidden">{weekKey}</span>
 				<span class="hidden sm:inline">Semana {weekKey}</span>
 			</h1>
-			<button on:click={nextWeek}
-				class="shrink-0 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-				style="color: var(--text-secondary);"
-				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
-				on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
-				<span class="sm:hidden">&rarr;</span>
-				<span class="hidden sm:inline">Siguiente &rarr;</span>
-			</button>
+			<nav class="flex items-center gap-1 sm:gap-2 text-sm font-bold">
+				<button on:click={prevWeek}
+					class="flex items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors"
+					style="color: var(--text-secondary);"
+					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container)'}
+					on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
+					<span class="sm:hidden">&larr;</span>
+					<span class="hidden sm:inline">&larr; Anterior</span>
+				</button>
+				<button on:click={nextWeek}
+					class="flex items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors"
+					style="color: var(--text-secondary);"
+					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container)'}
+					on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
+					<span class="sm:hidden">&rarr;</span>
+					<span class="hidden sm:inline">Siguiente &rarr;</span>
+				</button>
+			</nav>
 
-			<div class="ml-auto flex gap-1 sm:gap-1.5 items-center">
+			<div class="ml-auto flex gap-1 sm:gap-2 items-center">
+				<!-- Icono copiar + limpiar -->
+				<div class="hidden sm:flex items-center gap-1 pr-2 mr-1" style="border-right: 1px solid var(--surface-container-highest);">
+					<button on:click={copyPrevious}
+						class="p-2 rounded-lg transition-colors"
+						style="color: var(--text-secondary);"
+						on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container)'}
+						on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
+						title="Copiar semana anterior">
+						<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+					</button>
+					<button on:click={clearPlan}
+						class="p-2 rounded-lg transition-colors"
+						style="color: var(--text-secondary);"
+						on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container)'}
+						on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
+						title="Limpiar plan">
+						<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+					</button>
+				</div>
+				<button on:click={recalculatePlan} disabled={calculating}
+					class="hidden sm:inline-flex px-3 py-1.5 text-sm font-bold rounded-lg transition-colors disabled:opacity-40"
+					style="color: var(--text-secondary);"
+					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container)'}
+					on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
+					title="Recalcular plan completo">
+					{calculating ? 'Calculando...' : 'Recalcular'}
+				</button>
 				<button on:click={calculatePlan} disabled={calculating}
-					class="px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
+					class="px-4 sm:px-5 py-2 rounded-full text-sm font-bold disabled:opacity-40 transition-all shadow-sm"
 					style="background: var(--primary); color: white;"
-					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--primary-hover)'}
-					on:mouseleave={(e) => e.currentTarget.style.background = 'var(--primary)'}
+					on:mouseenter={(e) => { if (!calculating) e.currentTarget.style.background = 'var(--primary-hover)'; }}
+					on:mouseleave={(e) => { if (!calculating) e.currentTarget.style.background = 'var(--primary)'; }}
 					title="Completar huecos">
 					{#if calculating}
 						<span class="sm:hidden">...</span>
@@ -448,57 +475,39 @@
 						<span class="hidden sm:inline">Completar huecos</span>
 					{/if}
 				</button>
-				<button on:click={recalculatePlan} disabled={calculating}
-					class="hidden sm:inline-flex px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
-					style="background: var(--comida-accent); color: white;"
-					title="Recalcular plan completo">
-					{#if calculating}
-						<span class="sm:hidden">...</span>
-						<span class="hidden sm:inline">Calculando...</span>
-					{:else}
-						<svg class="sm:hidden w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-						<span class="hidden sm:inline">Recalcular</span>
-					{/if}
-				</button>
-				<button on:click={copyPrevious}
-					class="px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-					style="color: var(--text-secondary);"
-					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
-					on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
-					title="Copiar semana anterior">
-					<svg class="sm:hidden w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-					<span class="hidden sm:inline">Copiar anterior</span>
-				</button>
-				<button on:click={clearPlan}
-					class="px-2 sm:px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-					style="color: var(--error);"
-					title="Limpiar">
-					<svg class="sm:hidden w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-					<span class="hidden sm:inline">Limpiar</span>
-				</button>
 			</div>
 		</div>
 	</header>
 
 	<!-- Banner de violaciones -->
-	<div class="mx-3 sm:mx-5 mt-3 px-4 h-10 flex items-center rounded-xl shrink-0 overflow-hidden"
-		style="{weekData?.violations && weekData.violations.length > 0
-			? `background: var(--error-bg); border: 1px solid var(--error-border);`
-			: `background: var(--success-bg); border: 1px solid var(--success-border);`}">
-		{#if weekData?.violations && weekData.violations.length > 0}
-			<span class="text-xs font-semibold uppercase tracking-wide mr-3 shrink-0" style="color: var(--error);">Reglas incumplidas:</span>
-			<span class="text-sm truncate" style="color: var(--error);">{weekData.violations.map(v => v.message).join(' · ')}</span>
-		{:else}
-			<span class="text-sm" style="color: var(--success);">Se cumplen todas las reglas</span>
-		{/if}
-	</div>
+	{#if weekData}
+		<div class="mx-4 sm:mx-6 mt-4 px-4 py-3 flex items-center gap-3 rounded-xl shrink-0"
+			style="{weekData.violations && weekData.violations.length > 0
+				? `background: var(--error-bg); border-left: 4px solid var(--error);`
+				: `background: var(--success-bg); border-left: 4px solid var(--success);`}">
+			{#if weekData.violations && weekData.violations.length > 0}
+				<div class="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style="background: rgba(186,26,26,0.1);">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--error);"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="text-xs font-black uppercase tracking-wide" style="font-family: 'Epilogue', sans-serif; color: var(--error);">Reglas incumplidas</p>
+					<p class="text-sm truncate mt-0.5" style="color: var(--error);">{weekData.violations.map(v => v.message).join(' · ')}</p>
+				</div>
+			{:else}
+				<div class="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style="background: rgba(45,106,62,0.1);">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--success);"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+				</div>
+				<p class="text-sm font-medium" style="color: var(--success);">Se cumplen todas las reglas</p>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Grid semanal -->
-	<div class="flex-1 overflow-auto p-3 sm:p-4">
+	<div class="flex-1 overflow-auto p-3 sm:p-5">
 		{#if !weekData}
 			<div class="text-center py-16 text-sm" style="color: var(--text-muted);">Cargando...</div>
 		{:else}
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5 lg:gap-y-0">
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 lg:gap-x-3 lg:gap-y-0">
 				{#each [1,2,3,4,5,6,7] as weekday, i}
 					{@const date = weekDates[i]}
 					{@const isWeekend = i >= 5}
@@ -507,34 +516,34 @@
 					{@const dayFullyDisabled = dayComidaCfg?.disabled && dayCenaCfg?.disabled}
 
 					<div class="rounded-2xl overflow-hidden flex flex-col lg:contents"
-						style="background: var(--surface); border: 1px solid var(--border);">
+						style="background: var(--surface-container-low);">
 
 						<!-- Cabecera del día -->
-						<div class="px-3 py-2.5 shrink-0 lg:rounded-t-2xl lg:overflow-hidden lg:border lg:border-b-0"
-							style="background: {isWeekend ? 'var(--weekend-bg)' : 'var(--day-bg)'}; border-color: var(--border); grid-column: {i+1}; grid-row: 1;">
-							<div class="flex items-start justify-between gap-1">
-								<div>
-									<p class="font-semibold text-base" style="font-family: 'Lora', serif; color: var(--day-text);">{WEEKDAY_NAMES[i]}</p>
-									{#if date}
-										<p class="text-xs" style="color: {isWeekend ? 'var(--weekend-date)' : 'var(--day-date)'};">{date.getUTCDate()} {SHORT_MONTH_NAMES[date.getUTCMonth()]}</p>
-									{/if}
+						<div class="px-2 pt-4 pb-2 shrink-0 text-center"
+							style="grid-column: {i+1}; grid-row: 1; background: var(--background);">
+							<div class="flex flex-col items-center">
+								<div class="flex items-center gap-1">
+									<p class="font-black text-base leading-tight" style="font-family: 'Epilogue', sans-serif; color: {isWeekend ? 'var(--primary-hover)' : 'var(--primary)'};">{WEEKDAY_NAMES[i]}</p>
+									<button
+										on:click={() => disableDay(weekday)}
+										title={dayFullyDisabled ? 'Planificar este día' : 'No planificar este día'}
+										class="w-4 h-4 inline-flex items-center justify-center rounded-full transition-all hover:scale-125 hover:rotate-90"
+										style="color: {dayFullyDisabled ? 'var(--error)' : 'var(--text-muted)'};"
+									>
+										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+									</button>
 								</div>
-								<button
-									on:click={() => disableDay(weekday)}
-									title={dayFullyDisabled ? 'Planificar este día' : 'No planificar este día'}
-									class="mt-0.5 w-5 h-5 flex items-center justify-center rounded transition-opacity hover:opacity-70 shrink-0"
-									style="color: {dayFullyDisabled ? 'var(--error)' : 'var(--text-muted)'};"
-								>
-									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-								</button>
+								{#if date}
+									<p class="text-[10px] uppercase tracking-widest font-bold mt-0.5" style="color: var(--secondary);">{date.getUTCDate()} {SHORT_MONTH_NAMES[date.getUTCMonth()]}</p>
+								{/if}
 							</div>
 						</div>
 
 						<!-- Comida y Cena -->
 						{#if dayFullyDisabled}
 							<!-- Día completo sin planificar: un único bloque con comentario -->
-							<div class="flex-1 flex flex-col lg:flex-none lg:rounded-b-2xl lg:overflow-hidden lg:border lg:border-t-0"
-								style="background: var(--surface); border-color: var(--border); grid-column: {i+1}; grid-row: 2 / 4;">
+							<div class="flex-1 flex flex-col lg:flex-none"
+								style="background: var(--surface-container-low); grid-column: {i+1}; grid-row: 2 / 4;">
 								<div class="px-2.5 py-3 flex-1">
 									<input
 										type="text"
@@ -542,7 +551,7 @@
 										value={dayComidaCfg?.disabled_comment ?? ''}
 										on:change={(e) => setDayComment(weekday, (e.target as HTMLInputElement).value)}
 										class="w-full text-xs px-2.5 py-2 rounded-xl italic focus:outline-none"
-										style="background: var(--surface); border: 2px dashed var(--border-hover); color: var(--text-muted);"
+										style="background: var(--surface); border: 2px dashed var(--border); color: var(--text-muted);"
 										/>
 								</div>
 							</div>
@@ -551,28 +560,28 @@
 							{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
 							{@const isComida = mealType === 'comida'}
 
-							<div class="flex-1 flex flex-col lg:flex-none {isComida ? 'lg:border-l lg:border-r' : 'lg:rounded-b-2xl lg:overflow-hidden lg:border lg:border-t-0'}"
-								style="background: {isComida ? 'var(--comida-bg)' : 'var(--cena-bg)'}; border-color: var(--border); {isComida ? `border-bottom: 1px solid var(--border);` : ''} grid-column: {i+1}; grid-row: {j+2};">
+							<div class="flex-1 flex flex-col lg:flex-none"
+								style="background: {isComida ? 'var(--surface-container-low)' : 'var(--background)'}; grid-column: {i+1}; grid-row: {j+2};">
 
 								<!-- Encabezado de franja -->
-								<div class="flex items-center gap-1 px-3 py-2"
-									style="background: {isComida ? 'var(--comida-header)' : 'var(--cena-header)'};">
-									<span class="flex-1 text-xs font-semibold uppercase tracking-wider"
-										style="color: {cfg.disabled ? 'var(--text-muted)' : 'var(--text)'}; {cfg.disabled ? 'text-decoration: line-through;' : ''}">
-										{isComida ? 'Comida' : 'Cena'}
+								<div class="flex items-center gap-1 px-2.5 py-2 border-b"
+									style="border-color: var(--surface-container-highest);">
+									<span class="flex-1 text-[10px] font-black uppercase tracking-tighter"
+										style="color: {cfg.disabled ? 'var(--text-muted)' : 'var(--text-secondary)'}; {cfg.disabled ? 'text-decoration: line-through; opacity: 0.5;' : ''}">
+										{isComida ? 'COMIDA' : 'CENA'}
 									</span>
 									{#if !cfg.disabled}
 										<button
 											on:click={() => updateConfig(weekday, mealType, 'recipe_count', Math.max(1, cfg.recipe_count - 1))}
 											class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
-											style="color: var(--text-secondary);"
+											style="color: var(--text-muted);"
 										>&minus;</button>
 										<span class="text-xs w-4 text-center tabular-nums"
-											style="color: var(--text-secondary);">{cfg.recipe_count}</span>
+											style="color: var(--text-muted);">{cfg.recipe_count}</span>
 										<button
 											on:click={() => updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count + 1)}
 											class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
-											style="color: var(--text-secondary);"
+											style="color: var(--text-muted);"
 										>+</button>
 									{/if}
 									<button
@@ -587,25 +596,27 @@
 
 								{#if cfg.disabled}
 									<!-- Comida desactivada: mostrar campo de comentario -->
-									<div class="px-2.5 pb-2.5 pt-1.5 flex-1">
+									<div class="px-2.5 pb-2.5 pt-2 flex-1">
 										<input
 											type="text"
 											placeholder="Motivo (ej. Cenamos fuera)..."
 											value={cfg.disabled_comment ?? ''}
 											on:change={(e) => setDisabledComment(weekday, mealType, (e.target as HTMLInputElement).value)}
 											class="w-full text-xs px-2.5 py-2 rounded-xl italic focus:outline-none"
-											style="background: var(--surface); border: 2px dashed var(--border-hover); color: var(--text-muted);"
+											style="background: var(--surface); border: 2px dashed var(--border); color: var(--text-muted);"
 										/>
 									</div>
 								{:else}
 
 								<!-- Slots -->
-								<div class="px-2.5 pb-2.5 pt-1 space-y-1.5 flex-1">
+								<div class="px-2 pb-3 pt-2 space-y-2 flex-1">
 									{#each Array(cfg.recipe_count) as _, slotIdx}
 										{@const slot = getSlot(weekday, mealType, slotIdx, 0)}
 										{@const key = slotKey(weekday, mealType, slotIdx, 0)}
 										{@const slotTags = cfg.required_tags[slotIdx] ?? []}
 										{@const slotTagEditKey = `tag-${weekday}-${mealType}-${slotIdx}`}
+										{@const imgH = cfg.recipe_count === 1 ? 'min-h-[100px]' : cfg.recipe_count === 2 ? 'min-h-[52px]' : 'min-h-[40px]'}
+										{@const emptyH = cfg.recipe_count === 1 ? 'min-h-[3.5rem]' : cfg.recipe_count === 2 ? 'min-h-[1.75rem]' : 'min-h-[1.25rem]'}
 
 										<div>
 											<!-- Receta principal -->
@@ -613,55 +624,55 @@
 												<div class="relative group/slot">
 													<button
 														on:click|stopPropagation={() => openDropdown === key ? closeDropdown() : openSlotDropdown(weekday, mealType, slotIdx, 0)}
-														class="w-full text-left text-xs transition-colors {slot?.recipe?.image_type ? 'relative overflow-hidden rounded-xl min-h-[72px]' : slot?.recipe ? 'px-1 py-1 min-h-[2rem] flex items-center' : 'px-2.5 py-2 rounded-xl min-h-[2rem] flex items-center'}"
+														class="w-full text-left text-xs transition-all {slot?.recipe?.image_type ? `relative overflow-hidden rounded-xl shadow-sm hover:shadow-md ${imgH}` : slot?.recipe ? 'px-3 py-2.5 rounded-xl shadow-sm min-h-[2.5rem] flex items-start' : `px-2.5 py-3 rounded-xl ${emptyH} flex flex-col items-center justify-center gap-1`}"
 														style="{slot?.recipe
-															? (slot.recipe.image_type ? '' : `color: var(--text);`)
-															: `background: var(--surface); border: 2px dashed #b5a898; color: var(--text-muted);`}"
+															? (slot.recipe.image_type ? 'background: var(--surface);' : `background: var(--surface); color: var(--text);`)
+															: `background: var(--surface-container-low); border: 2px dashed var(--border); color: var(--text-muted);`}"
 													>
 														{#if slot?.recipe?.image_type}
 															<img src="/api/recipes/{slot.recipe.id}/image" alt=""
-																class="absolute inset-0 w-full h-full object-cover"
+																class="absolute inset-0 w-full h-full object-cover group-hover/slot:scale-105 transition-transform duration-500"
 																on:error={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
-															<span class="absolute bottom-0 left-0 right-0 px-2 py-1.5 font-semibold leading-tight"
-																style="background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0) 100%); color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+															<span class="absolute bottom-0 left-0 right-0 px-2.5 py-2 font-bold text-[11px] leading-tight"
+																style="background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 100%); color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
 																{slot.recipe.name}
 															</span>
+														{:else if slot?.recipe}
+															<span class="leading-snug font-semibold text-[11px]">{slot.recipe.name}</span>
 														{:else}
-															<span class="leading-snug {slot?.recipe ? 'font-medium' : 'italic'}">
-																{slot?.recipe?.name ?? 'Sin receta'}
-															</span>
+															<span class="text-lg leading-none" style="color: var(--text-muted);">+</span>
 														{/if}
 													</button>
 													<div class="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover/slot:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
 														{#if editingTagKey !== slotTagEditKey}
 															<button
 																on:click|stopPropagation={() => editingTagKey = slotTagEditKey}
-																class="w-6 h-6 flex items-center justify-center rounded-lg shadow-sm transition-colors"
-																style="background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary);"
+																class="w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-colors"
+																style="background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); color: var(--primary);"
 																title="Añadir tag requerido"
 															><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg></button>
 														{/if}
 														<button
 															on:click|stopPropagation={() => randomSlot(weekday, mealType as 'comida'|'cena', slotIdx, 0)}
 															disabled={busySlots.has(slotKey(weekday, mealType, slotIdx, 0))}
-															class="w-6 h-6 flex items-center justify-center rounded-lg shadow-sm disabled:opacity-40 disabled:cursor-wait transition-colors text-sm"
-															style="background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary);"
+															class="w-6 h-6 flex items-center justify-center rounded-full shadow-sm disabled:opacity-40 disabled:cursor-wait transition-colors text-sm"
+															style="background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); color: var(--primary);"
 															title="Receta aleatoria"
 														>{busySlots.has(slotKey(weekday, mealType, slotIdx, 0)) ? '...' : '↻'}</button>
 														{#if slot?.recipe}
 															<a
 																href="/recipes?edit={slot.recipe.id}"
 																on:click|stopPropagation
-																class="w-6 h-6 flex items-center justify-center rounded-lg shadow-sm transition-colors text-sm"
-																style="background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary);"
+																class="w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-colors text-sm"
+																style="background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); color: var(--primary);"
 																title="Editar receta"
 															>
 																<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
 															</a>
 															<button
 																on:click|stopPropagation={() => removeSlot(weekday, mealType, slotIdx, 0)}
-																class="w-6 h-6 flex items-center justify-center rounded-lg shadow-sm transition-colors text-sm"
-																style="background: var(--surface); border: 1px solid var(--border); color: var(--error);"
+																class="w-6 h-6 flex items-center justify-center rounded-full shadow-sm transition-colors text-sm"
+																style="background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); color: var(--error);"
 																title="Quitar"
 															>&times;</button>
 														{/if}
@@ -670,27 +681,29 @@
 
 												<!-- Dropdown búsqueda receta -->
 												{#if openDropdown === key}
-													<div class="fixed z-[9999] w-72 rounded-xl shadow-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);" use:fixedDropdown>
-														<div class="p-2" style="border-bottom: 1px solid var(--border);">
+													<div class="fixed z-[9999] w-72 rounded-xl shadow-2xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--surface-container-highest);" use:fixedDropdown>
+														<div class="p-2" style="border-bottom: 1px solid var(--surface-container-highest);">
 															<input
 																type="text"
 																placeholder="Buscar receta..."
 																bind:value={searchQuery}
 																on:input={() => handleSearch(weekday, mealType, 0)}
-																class="w-full text-sm px-2.5 py-1.5 rounded-lg focus:outline-none"
-																style="border: 1px solid var(--border); color: var(--text);"
+																class="w-full text-sm px-2.5 py-2 rounded-lg focus:outline-none"
+																style="background: var(--surface-container-low); color: var(--text);"
 																use:focusOnMount
 															/>
 														</div>
 														{#if topRecipes.length > 0 && !searchQuery}
-															<div class="px-2 py-1.5"
-																style="background: {isComida ? 'var(--comida-header)' : 'var(--cena-header)'}; border-bottom: 1px solid var(--border);">
-																<p class="text-xs font-semibold mb-1" style="color: var(--text);">Top este día:</p>
+															<div class="px-3 py-2"
+																style="background: var(--surface-container-low); border-bottom: 1px solid var(--surface-container-highest);">
+																<p class="text-[10px] font-black uppercase tracking-tighter mb-1.5" style="color: var(--text-muted);">Top este día</p>
 																{#each topRecipes as r}
 																	<button
 																		on:click|stopPropagation={() => selectRecipe(weekday, mealType, slotIdx, 0, r.id)}
-																		class="block w-full text-left text-xs px-2 py-1 rounded-lg transition-opacity hover:opacity-70"
-																		style="color: var(--text);"
+																		class="block w-full text-left text-xs px-2 py-1.5 rounded-lg transition-colors font-medium"
+																		style="color: var(--primary);"
+																		on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container)'}
+																		on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
 																	>{r.name}</button>
 																{/each}
 															</div>
@@ -702,14 +715,14 @@
 																{#each searchResults as r}
 																	<button
 																		on:click|stopPropagation={() => selectRecipe(weekday, mealType, slotIdx, 0, r.id)}
-																		class="block w-full text-left px-3 py-2 transition-colors"
-																		style="border-bottom: 1px solid var(--border); color: var(--text);"
-																		on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+																		class="block w-full text-left px-3 py-2.5 transition-colors"
+																		style="border-bottom: 1px solid var(--surface-container-highest); color: var(--text);"
+																		on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container-low)'}
 																		on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
 																	>
-																		<p class="text-sm" style="color: var(--text);">{r.name}</p>
+																		<p class="text-sm font-semibold" style="color: var(--text);">{r.name}</p>
 																		{#if r.tags}
-																			<p class="text-xs mt-0.5" style="color: var(--text-secondary);">{r.tags}</p>
+																			<p class="text-xs mt-0.5" style="color: var(--text-muted);">{r.tags}</p>
 																		{/if}
 																	</button>
 																{/each}
@@ -721,10 +734,10 @@
 
 											<!-- Tags requeridos del slot -->
 											{#if slotTags.length > 0 || editingTagKey === slotTagEditKey}
-												<div class="mt-1 flex flex-wrap gap-1 items-center">
+												<div class="mt-1.5 flex flex-wrap gap-1 items-center">
 													{#each slotTags as tag}
-														<span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-															style="background: {isComida ? 'var(--comida-slot-filled)' : 'var(--cena-slot-filled)'}; color: var(--text);">
+														<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-sm"
+															style="background: var(--secondary-container); color: var(--secondary);">
 															{tag}
 															<button
 																on:click|stopPropagation={() => removeRequiredTag(weekday, mealType, slotIdx, tag)}
@@ -757,16 +770,16 @@
 													{@const accSlotIdx = slotIdx * cfg.accompaniment_per_recipe + aIdx}
 													{@const accSlot = getSlot(weekday, mealType, accSlotIdx, 1)}
 													{@const accKey = slotKey(weekday, mealType, accSlotIdx, 1)}
-													<div class="dropdown-container relative mt-1">
+													<div class="dropdown-container relative mt-1.5">
 														<div class="relative group/acc">
 															<button
 																on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, accSlotIdx, 1)}
-																class="w-full text-left text-xs transition-colors pr-8 {accSlot?.recipe ? 'px-1 py-1' : 'px-2 py-1.5 rounded-lg'}"
+																class="w-full text-left text-[10px] transition-colors pr-6 px-2 py-1.5 rounded-lg"
 																style="{accSlot?.recipe
-																	? `color: var(--text-secondary);`
-																	: `background: var(--surface); border: 2px dashed #b5a898; color: var(--text-muted);`}"
+																	? `background: var(--secondary-container); color: var(--secondary);`
+																	: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
 															>
-																<span class="leading-snug {accSlot?.recipe ? '' : 'italic'}" style="font-size: 0.7rem;">
+																<span class="leading-snug {accSlot?.recipe ? 'font-semibold' : 'italic'}">
 																	{accSlot?.recipe?.name ?? '+ acomp.'}
 																</span>
 															</button>
@@ -774,8 +787,8 @@
 																<div class="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/acc:opacity-100 transition-opacity">
 																	<button
 																		on:click|stopPropagation={() => removeSlot(weekday, mealType, accSlotIdx, 1)}
-																		class="w-5 h-5 flex items-center justify-center rounded-lg shadow-sm transition-colors text-xs"
-																		style="background: var(--surface); border: 1px solid var(--border); color: var(--error);"
+																		class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors text-xs"
+																		style="background: rgba(255,255,255,0.9); color: var(--error);"
 																	>&times;</button>
 																</div>
 															{/if}
@@ -783,14 +796,14 @@
 
 														{#if openDropdown === accKey}
 															<div class="fixed z-[9999] w-72 rounded-xl shadow-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);" use:fixedDropdown>
-																<div class="p-2" style="border-bottom: 1px solid var(--border);">
+																<div class="p-2" style="border-bottom: 1px solid var(--surface-container-highest);">
 																	<input
 																		type="text"
 																		placeholder="Buscar acomp..."
 																		bind:value={searchQuery}
 																		on:input={() => handleSearch(weekday, mealType, 1)}
 																		class="w-full text-sm px-2.5 py-1.5 rounded-lg focus:outline-none"
-																		style="border: 1px solid var(--border); color: var(--text);"
+																		style="background: var(--surface-container-low); color: var(--text);"
 																		use:focusOnMount
 																	/>
 																</div>
@@ -802,13 +815,13 @@
 																			<button
 																				on:click|stopPropagation={() => selectRecipe(weekday, mealType, accSlotIdx, 1, r.id)}
 																				class="block w-full text-left px-3 py-2 transition-colors"
-																				style="border-bottom: 1px solid var(--border); color: var(--text);"
-																				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
+																				style="border-bottom: 1px solid var(--surface-container-highest); color: var(--text);"
+																				on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container-low)'}
 																				on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
 																			>
-																				<p class="text-sm" style="color: var(--text);">{r.name}</p>
+																				<p class="text-sm font-medium" style="color: var(--text);">{r.name}</p>
 																				{#if r.tags}
-																					<p class="text-xs mt-0.5" style="color: var(--text-secondary);">{r.tags}</p>
+																					<p class="text-xs mt-0.5" style="color: var(--text-muted);">{r.tags}</p>
 																				{/if}
 																			</button>
 																		{/each}
@@ -824,20 +837,20 @@
 
 									<!-- Acompañamientos por franja -->
 									{#if cfg.accompaniment_per_slot > 0}
-										<div class="pt-1 space-y-1"
-											style="border-top: 1px solid var(--border);">
+										<div class="pt-1.5 space-y-1.5"
+											style="border-top: 1px solid var(--surface-container-highest);">
 											{#each Array(cfg.accompaniment_per_slot) as _, aIdx}
 												{@const accSlot = getSlot(weekday, mealType, aIdx, 1)}
 												{@const accKey = slotKey(weekday, mealType, aIdx, 1) + '-slot'}
 												<div class="dropdown-container relative">
 													<button
 														on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, aIdx, 1)}
-														class="w-full text-left text-xs transition-colors {accSlot?.recipe ? 'px-1 py-1' : 'px-2 py-1.5 rounded-lg'}"
+														class="w-full text-left text-[10px] transition-colors px-2 py-1.5 rounded-lg"
 														style="{accSlot?.recipe
-															? `color: var(--text-secondary);`
-															: `background: var(--surface); border: 2px dashed #b5a898; color: var(--text-muted);`}"
+															? `background: var(--secondary-container); color: var(--secondary);`
+															: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
 													>
-														<span class="{accSlot?.recipe ? '' : 'italic'}" style="font-size: 0.7rem;">
+														<span class="{accSlot?.recipe ? 'font-semibold' : 'italic'}">
 															{accSlot?.recipe?.name ?? '+ acomp. franja'}
 														</span>
 													</button>

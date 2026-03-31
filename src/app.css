@@ -1,61 +1,65 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Lora:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;700;800;900&family=Inter:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 :root {
-  /* Base */
-  --bg: #faf6f1;
+  /* Surfaces — tonal layering, no hard lines */
+  --bg: #fff8f3;
+  --background: #fff8f3;
   --surface: #ffffff;
-  --surface-warm: #f3ede6;
+  --surface-container-low: #fff2e2;
+  --surface-container: #fdebd5;
+  --surface-container-high: #f7e6d0;
+  --surface-container-highest: #f1e0ca;
 
-  /* Text — always high contrast */
-  --text: #1c1917;
-  --text-secondary: #3d322a;
-  --text-muted: #5c4f43;
+  /* Text */
+  --text: #1a120a;
+  --text-secondary: #3d2f22;
+  --text-muted: #4a3828;
 
-  /* Primary accent — warm terracotta */
-  --primary: #b85c38;
-  --primary-hover: #a04e2e;
-  --primary-light: #fceee7;
+  /* Primary — warm deep brown */
+  --primary: #552b17;
+  --primary-hover: #70412b;
+  --primary-light: #ffdbcc;
 
-  /* Borders */
-  --border: #e4dbd2;
-  --border-hover: #d1c6bb;
+  /* Secondary */
+  --secondary: #3d2f22;
+  --secondary-container: #ecddcc;
 
-  /* Comida — warm gold */
-  --comida-bg: #fef8f0;
-  --comida-header: #f0dfca;
-  --comida-accent: #c4913a;
-  --comida-slot-filled: #f5e4cb;
-  --comida-slot-border: #d4a458;
+  /* Borders — ghost style */
+  --border: #d6c2bb;
+  --border-hover: #84746d;
 
-  /* Cena — warm rose */
-  --cena-bg: #fdf4f1;
-  --cena-header: #f0d8d0;
-  --cena-accent: #b87868;
-  --cena-slot-filled: #f3d8ce;
-  --cena-slot-border: #c8907e;
+  /* Meal type tones */
+  --comida-bg: #fff2e2;
+  --comida-header: #fdebd5;
+  --comida-accent: #552b17;
+  --comida-slot-filled: #fdebd5;
+  --comida-slot-border: #d6c2bb;
 
-  /* Day headers */
-  --day-bg: #3d322a;
-  --day-text: #ffffff;
-  --day-date: #c4b8a8;
-  --weekend-bg: #5a2e28;
-  --weekend-date: #d8b8a8;
+  --cena-bg: #fff8f3;
+  --cena-header: #fff2e2;
+  --cena-accent: #675d4f;
+  --cena-slot-filled: #fdebd5;
+  --cena-slot-border: #d6c2bb;
+
+  /* Day headers — light themed */
+  --day-bg: transparent;
+  --day-text: #552b17;
+  --day-date: #3d2f22;
+  --weekend-bg: transparent;
+  --weekend-date: #3d2f22;
 
   /* Status */
   --success: #2d6a3e;
   --success-bg: #eef7f0;
   --success-border: #c0dcc8;
-  --error: #b83a3a;
-  --error-bg: #fdf0f0;
+  --error: #ba1a1a;
+  --error-bg: #ffdad6;
   --error-border: #e0c4c4;
 
   /* Nav */
-  --nav-active: #3d322a;
-}
-
-html {
-  font-size: 125%;
+  --nav-active: #fdebd5;
+  --nav-active-text: #552b17;
 }
 
 * {
@@ -63,7 +67,7 @@ html {
 }
 
 body {
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
   color: var(--text);
-  background: var(--bg);
+  background: var(--background);
 }

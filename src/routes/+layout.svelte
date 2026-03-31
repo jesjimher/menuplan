@@ -15,42 +15,44 @@
 	$: currentPath = $page.url.pathname;
 </script>
 
-<div class="flex h-screen overflow-hidden" style="background: var(--bg);">
+<div class="flex h-screen overflow-hidden" style="background: var(--background);">
 	<!-- Sidebar overlay para móvil -->
 	{#if $sidebarOpen}
-		<div class="fixed inset-0 z-20 bg-black/25 lg:hidden" on:click={() => $sidebarOpen = false}></div>
+		<div class="fixed inset-0 z-20 bg-black/20 lg:hidden" on:click={() => $sidebarOpen = false}></div>
 	{/if}
 
 	<!-- Sidebar -->
-	<aside class="fixed inset-y-0 left-0 z-30 w-56 flex flex-col transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 {$sidebarOpen ? 'translate-x-0' : '-translate-x-full'}"
-		style="background: var(--surface); border-right: 1px solid var(--border);">
+	<aside class="fixed inset-y-0 left-0 z-30 w-64 flex flex-col transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 {$sidebarOpen ? 'translate-x-0' : '-translate-x-full'}"
+		style="background: var(--surface-container-low);">
 
 		<!-- Logo -->
-		<div class="flex items-center justify-between h-16 px-5 shrink-0"
-			style="border-bottom: 1px solid var(--border);">
-			<span class="text-xl font-bold" style="font-family: 'Lora', serif; color: var(--text);">MenuPlan</span>
+		<div class="flex items-center justify-between h-20 px-6 shrink-0">
+			<div>
+				<h1 class="text-xl font-black tracking-tight leading-none" style="font-family: 'Epilogue', sans-serif; color: var(--primary);">MenuPlan</h1>
+				<p class="text-[10px] font-bold tracking-widest uppercase mt-1" style="color: var(--text-secondary);">Planificador culinario</p>
+			</div>
 			<button class="lg:hidden" style="color: var(--text-secondary);" on:click={() => $sidebarOpen = false}>
 				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
 			</button>
 		</div>
 
 		<!-- Navegación -->
-		<nav class="flex-1 px-3 py-4 space-y-0.5">
+		<nav class="flex-1 px-3 py-2 space-y-0.5">
 			{#each navItems as item}
 				<a
 					href={item.href}
-					class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+					class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors"
 					style="{currentPath.startsWith(item.href)
-						? `background: var(--nav-active); color: var(--day-text);`
-						: `color: var(--text); hover: var(--surface-warm);`}"
+						? `background: var(--surface-container); color: var(--primary);`
+						: `color: var(--text-secondary);`}"
 					on:click={() => $sidebarOpen = false}
-					on:mouseenter={(e) => { if (!currentPath.startsWith(item.href)) e.currentTarget.style.background = 'var(--surface-warm)'; }}
+					on:mouseenter={(e) => { if (!currentPath.startsWith(item.href)) e.currentTarget.style.background = 'var(--surface-container)'; }}
 					on:mouseleave={(e) => { if (!currentPath.startsWith(item.href)) e.currentTarget.style.background = 'transparent'; }}
 				>
 					<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d={item.icon} />
 					</svg>
-					<span>{item.label}</span>
+					<span style="font-family: 'Epilogue', sans-serif;">{item.label}</span>
 				</a>
 			{/each}
 		</nav>
@@ -61,13 +63,13 @@
 		<!-- Top bar (móvil) - no se muestra en /week -->
 		{#if !currentPath.startsWith('/week')}
 		<header class="flex items-center h-14 px-4 lg:hidden shrink-0"
-			style="background: var(--surface); border-bottom: 1px solid var(--border);">
-			<button style="color: var(--text);" on:click={() => $sidebarOpen = true}>
+			style="background: rgba(255,248,243,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--surface-container-highest);">
+			<button style="color: var(--primary);" on:click={() => $sidebarOpen = true}>
 				<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 				</svg>
 			</button>
-			<span class="ml-3 text-lg font-bold" style="font-family: 'Lora', serif; color: var(--text);">MenuPlan</span>
+			<span class="ml-3 text-lg font-black" style="font-family: 'Epilogue', sans-serif; color: var(--primary);">MenuPlan</span>
 		</header>
 		{/if}
 
