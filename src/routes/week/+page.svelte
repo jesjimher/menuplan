@@ -26,9 +26,18 @@
 	let topRecipes = $state<Recipe[]>([]);
 	let searchTimeout: ReturnType<typeof setTimeout>;
 
+	// Drag & move state
+	type SlotCoord = { weekday: number; mealType: string; slotIndex: number; isAcc: number };
+	let dragSource = $state<SlotCoord | null>(null);
+	let dragOver = $state<string | null>(null);
+	let moveSource = $state<SlotCoord | null>(null);
+	let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+	let isTouchDevice = false;
+
 	let weekDates = $derived(getWeekDates(weekKey));
 
 	onMount(async () => {
+		isTouchDevice = 'ontouchstart' in window;
 		await Promise.all([loadWeek(), loadRecipes(), loadRules(), loadTags()]);
 	});
 
@@ -148,6 +157,29 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc })
 		});
+	}
+
+	function moveRecipe(from: SlotCoord, to: SlotCoord) {
+		if (slotKey(from.weekday, from.mealType, from.slotIndex, from.isAcc) ===
+			slotKey(to.weekday, to.mealType, to.slotIndex, to.isAcc)) return;
+		const fromRecipe = getSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc)?.recipe ?? null;
+		const toRecipe   = getSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc)?.recipe ?? null;
+		if (!fromRecipe) return;
+		patchSlot(to.weekday,   to.mealType,   to.slotIndex,   to.isAcc,   fromRecipe);
+		patchSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc, toRecipe);
+		const doAssign = (coord: SlotCoord, recipe: Recipe | null) => {
+			if (recipe) {
+				fetch('/api/week/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ weekKey, weekday: coord.weekday, meal_type: coord.mealType,
+						slot_index: coord.slotIndex, is_accompaniment: coord.isAcc, recipe_id: recipe.id, member_id: null }) });
+			} else {
+				fetch('/api/week/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ weekKey, weekday: coord.weekday, meal_type: coord.mealType,
+						slot_index: coord.slotIndex, is_accompaniment: coord.isAcc }) });
+			}
+		};
+		doAssign(to, fromRecipe);
+		doAssign(from, toRecipe);
 	}
 
 	async function randomSlot(weekday: number, mealType: 'comida' | 'cena', slotIndex: number, isAcc: number) {
@@ -393,10 +425,13 @@
 	}
 </script>
 
-<svelte:window on:click={(e) => {
-	const target = e.target as HTMLElement;
-	if (!target.closest('.dropdown-container')) closeDropdown();
-}} />
+<svelte:window
+	on:click={(e) => {
+		const target = e.target as HTMLElement;
+		if (!target.closest('.dropdown-container')) closeDropdown();
+	}}
+	on:keydown={(e) => { if (e.key === 'Escape') { moveSource = null; dragSource = null; } }}
+/>
 
 <div class="flex flex-col h-full" style="background: var(--background);">
 
@@ -620,10 +655,48 @@
 
 										<div>
 											<!-- Receta principal -->
-											<div class="dropdown-container relative">
+											<div class="dropdown-container relative"
+												style:box-shadow={dragOver === key ? '0 0 0 2px var(--primary)' : undefined}
+												style:outline={moveSource ? '2px dashed var(--primary)' : undefined}
+												style:outline-offset={moveSource ? '2px' : undefined}
+												on:dragover|preventDefault={(e) => { if (!dragSource) return; e.dataTransfer!.dropEffect = 'move'; dragOver = key; }}
+												on:dragleave={(e) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) dragOver = null; }}
+												on:drop|preventDefault={() => {
+													if (!dragSource) return;
+													moveRecipe(dragSource, { weekday, mealType, slotIndex: slotIdx, isAcc: 0 });
+													dragSource = null; dragOver = null;
+												}}
+											>
 												<div class="relative group/slot">
 													<button
-														on:click|stopPropagation={() => openDropdown === key ? closeDropdown() : openSlotDropdown(weekday, mealType, slotIdx, 0)}
+														draggable={!isTouchDevice && !!slot?.recipe ? 'true' : 'false'}
+														class:opacity-40={dragSource && slotKey(weekday, mealType, slotIdx, 0) === slotKey(dragSource.weekday, dragSource.mealType, dragSource.slotIndex, dragSource.isAcc)}
+														on:click|stopPropagation={() => {
+															if (moveSource) {
+																moveRecipe(moveSource, { weekday, mealType, slotIndex: slotIdx, isAcc: 0 });
+																moveSource = null;
+																return;
+															}
+															openDropdown === key ? closeDropdown() : openSlotDropdown(weekday, mealType, slotIdx, 0);
+														}}
+														on:dragstart={(e) => {
+															if (!slot?.recipe) return;
+															dragSource = { weekday, mealType, slotIndex: slotIdx, isAcc: 0 };
+															openDropdown = null;
+															e.dataTransfer!.effectAllowed = 'move';
+															e.dataTransfer!.setData('text/plain', key);
+														}}
+														on:dragend={() => { dragSource = null; dragOver = null; }}
+														on:touchstart|passive={() => {
+															if (!isTouchDevice || !slot?.recipe) return;
+															longPressTimer = setTimeout(() => {
+																moveSource = { weekday, mealType, slotIndex: slotIdx, isAcc: 0 };
+																openDropdown = null;
+																longPressTimer = null;
+															}, 500);
+														}}
+														on:touchend={() => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }}
+														on:touchmove={() => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }}
 														class="w-full text-left text-xs transition-all {slot?.recipe?.image_type ? `relative overflow-hidden rounded-xl shadow-sm hover:shadow-md ${imgH}` : slot?.recipe ? 'px-3 py-2.5 rounded-xl shadow-sm min-h-[2.5rem] flex items-start' : `px-2.5 py-3 rounded-xl ${emptyH} flex flex-col items-center justify-center gap-1`}"
 														style="{slot?.recipe
 															? (slot.recipe.image_type ? 'background: var(--surface);' : `background: var(--surface); color: var(--text);`)
@@ -770,10 +843,48 @@
 													{@const accSlotIdx = slotIdx * cfg.accompaniment_per_recipe + aIdx}
 													{@const accSlot = getSlot(weekday, mealType, accSlotIdx, 1)}
 													{@const accKey = slotKey(weekday, mealType, accSlotIdx, 1)}
-													<div class="dropdown-container relative mt-1.5">
+													<div class="dropdown-container relative mt-1.5"
+														style:box-shadow={dragOver === accKey ? '0 0 0 2px var(--primary)' : undefined}
+														style:outline={moveSource ? '2px dashed var(--primary)' : undefined}
+														style:outline-offset={moveSource ? '2px' : undefined}
+														on:dragover|preventDefault={(e) => { if (!dragSource) return; e.dataTransfer!.dropEffect = 'move'; dragOver = accKey; }}
+														on:dragleave={(e) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) dragOver = null; }}
+														on:drop|preventDefault={() => {
+															if (!dragSource) return;
+															moveRecipe(dragSource, { weekday, mealType, slotIndex: accSlotIdx, isAcc: 1 });
+															dragSource = null; dragOver = null;
+														}}
+													>
 														<div class="relative group/acc">
 															<button
-																on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, accSlotIdx, 1)}
+																draggable={!isTouchDevice && !!accSlot?.recipe ? 'true' : 'false'}
+																class:opacity-40={dragSource && slotKey(weekday, mealType, accSlotIdx, 1) === slotKey(dragSource.weekday, dragSource.mealType, dragSource.slotIndex, dragSource.isAcc)}
+																on:click|stopPropagation={() => {
+																	if (moveSource) {
+																		moveRecipe(moveSource, { weekday, mealType, slotIndex: accSlotIdx, isAcc: 1 });
+																		moveSource = null;
+																		return;
+																	}
+																	openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, accSlotIdx, 1);
+																}}
+																on:dragstart={(e) => {
+																	if (!accSlot?.recipe) return;
+																	dragSource = { weekday, mealType, slotIndex: accSlotIdx, isAcc: 1 };
+																	openDropdown = null;
+																	e.dataTransfer!.effectAllowed = 'move';
+																	e.dataTransfer!.setData('text/plain', accKey);
+																}}
+																on:dragend={() => { dragSource = null; dragOver = null; }}
+																on:touchstart|passive={() => {
+																	if (!isTouchDevice || !accSlot?.recipe) return;
+																	longPressTimer = setTimeout(() => {
+																		moveSource = { weekday, mealType, slotIndex: accSlotIdx, isAcc: 1 };
+																		openDropdown = null;
+																		longPressTimer = null;
+																	}, 500);
+																}}
+																on:touchend={() => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }}
+																on:touchmove={() => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }}
 																class="w-full text-left text-[10px] transition-colors pr-6 px-2 py-1.5 rounded-lg"
 																style="{accSlot?.recipe
 																	? `background: var(--secondary-container); color: var(--secondary);`
@@ -868,4 +979,19 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if moveSource}
+		<div class="fixed bottom-0 left-0 right-0 z-50 px-4 py-3 flex items-center justify-between shadow-lg"
+			style="background: var(--primary); color: white;">
+			<span class="text-sm font-bold">
+				Toca el destino de «{getSlot(moveSource.weekday, moveSource.mealType, moveSource.slotIndex, moveSource.isAcc)?.recipe?.name}»
+			</span>
+			<button
+				on:click={() => moveSource = null}
+				class="text-sm font-bold px-3 py-1 rounded-full"
+				style="background: rgba(255,255,255,0.2);">
+				Cancelar
+			</button>
+		</div>
+	{/if}
 </div>
