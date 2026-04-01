@@ -697,7 +697,8 @@
 														}}
 														on:touchend={() => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }}
 														on:touchmove={() => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }}
-														class="w-full text-left text-xs transition-all {slot?.recipe?.image_type ? `relative overflow-hidden rounded-xl shadow-sm hover:shadow-md ${imgH}` : slot?.recipe ? 'px-3 py-2.5 rounded-xl shadow-sm min-h-[2.5rem] flex items-start' : `px-2.5 py-3 rounded-xl ${emptyH} flex flex-col items-center justify-center gap-1`}"
+														on:contextmenu|preventDefault={() => {}}
+														class="w-full text-left text-xs transition-all select-none {slot?.recipe?.image_type ? `relative overflow-hidden rounded-xl shadow-sm hover:shadow-md ${imgH}` : slot?.recipe ? 'px-3 py-2.5 rounded-xl shadow-sm min-h-[2.5rem] flex items-start' : `px-2.5 py-3 rounded-xl ${emptyH} flex flex-col items-center justify-center gap-1`}"
 														style="{slot?.recipe
 															? (slot.recipe.image_type ? 'background: var(--surface);' : `background: var(--surface); color: var(--text);`)
 															: `background: var(--surface-container-low); border: 2px dashed var(--border); color: var(--text-muted);`}"
@@ -885,7 +886,8 @@
 																}}
 																on:touchend={() => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }}
 																on:touchmove={() => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }}
-																class="w-full text-left text-[10px] transition-colors pr-6 px-2 py-1.5 rounded-lg"
+																on:contextmenu|preventDefault={() => {}}
+																class="w-full text-left text-[10px] transition-colors select-none pr-6 px-2 py-1.5 rounded-lg"
 																style="{accSlot?.recipe
 																	? `background: var(--secondary-container); color: var(--secondary);`
 																	: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
@@ -995,3 +997,9 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	.select-none {
+		-webkit-touch-callout: none;
+	}
+</style>
