@@ -570,7 +570,7 @@
 							style="grid-column: {i+1}; grid-row: 1; background: var(--background);">
 							<div class="flex flex-col items-center">
 								<div class="flex items-center gap-1">
-									<p class="font-black text-base leading-tight" style="font-family: 'Epilogue', sans-serif; color: {isWeekend ? 'var(--primary-hover)' : 'var(--primary)'};">{WEEKDAY_NAMES[i]}</p>
+									<p class="font-semibold text-base leading-tight" style="font-family: 'Epilogue', sans-serif; color: {isWeekend ? 'var(--primary-hover)' : 'var(--primary)'};">{WEEKDAY_NAMES[i]}</p>
 									<button
 										on:click={() => disableDay(weekday)}
 										title={dayFullyDisabled ? 'Planificar este día' : 'No planificar este día'}
@@ -590,16 +590,14 @@
 						{#if dayFullyDisabled}
 							<div class="flex-1 flex flex-col lg:flex-none"
 								style="background: var(--surface-container-low); grid-column: {i+1}; grid-row: 2 / 4;">
-								<div class="px-2.5 py-3 flex-1">
-									<input
-										type="text"
+								<div class="px-2.5 py-3 flex-1 flex flex-col">
+									<textarea
 										placeholder="Motivo (ej. Vacaciones en París)..."
-										value={dayComidaCfg?.disabled_comment ?? ''}
-										on:change={(e) => setDayComment(weekday, (e.target as HTMLInputElement).value)}
-										class="w-full text-xs px-2.5 py-2 rounded-xl italic focus:outline-none"
+										on:change={(e) => setDayComment(weekday, (e.target as HTMLTextAreaElement).value)}
+										class="flex-1 w-full text-xs px-2.5 py-2 rounded-xl italic focus:outline-none resize-none"
 										style="background: var(--surface); border: 2px dashed var(--border); color: var(--text-muted);"
 										aria-label="Motivo de desactivación del día"
-									/>
+									>{dayComidaCfg?.disabled_comment ?? ''}</textarea>
 								</div>
 							</div>
 						{:else}
@@ -643,16 +641,14 @@
 								</div>
 
 								{#if cfg.disabled}
-									<div class="px-2.5 pb-2.5 pt-2 flex-1">
-										<input
-											type="text"
+									<div class="px-2.5 pb-2.5 pt-2 flex-1 flex flex-col">
+										<textarea
 											placeholder="Motivo (ej. Cenamos fuera)..."
-											value={cfg.disabled_comment ?? ''}
-											on:change={(e) => setDisabledComment(weekday, mealType, (e.target as HTMLInputElement).value)}
-											class="w-full text-xs px-2.5 py-2 rounded-xl italic focus:outline-none"
+											on:change={(e) => setDisabledComment(weekday, mealType, (e.target as HTMLTextAreaElement).value)}
+											class="flex-1 w-full text-xs px-2.5 py-2 rounded-xl italic focus:outline-none resize-none"
 											style="background: var(--surface); border: 2px dashed var(--border); color: var(--text-muted);"
 											aria-label="Motivo de desactivación de {mealType}"
-										/>
+										>{cfg.disabled_comment ?? ''}</textarea>
 									</div>
 								{:else}
 

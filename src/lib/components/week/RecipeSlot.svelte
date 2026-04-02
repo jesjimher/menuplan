@@ -123,7 +123,7 @@
 				on:touchend={onTouchEnd}
 				on:touchmove={onTouchMove}
 				on:contextmenu|preventDefault={() => {}}
-				class="w-full text-left text-[10px] transition-colors select-none pr-6 px-2 py-1.5 rounded-lg"
+				class="w-full text-left text-xs transition-colors select-none pr-6 px-2 py-1.5 rounded-lg"
 				style="{slot?.recipe
 					? `background: var(--secondary-container); color: var(--secondary);`
 					: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
@@ -209,12 +209,12 @@
 						<img src="/api/recipes/{slot.recipe.id}/image" alt={slot.recipe.name}
 							class="absolute inset-0 w-full h-full object-cover group-hover/slot:scale-105 transition-transform duration-500"
 							on:error={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
-						<span class="absolute bottom-0 left-0 right-0 px-2.5 py-2 font-bold text-[11px] leading-tight"
-							style="background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 100%); color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+						<span class="absolute bottom-0 left-0 right-0 px-2.5 py-2 font-bold text-sm leading-tight"
+							style="background: linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0) 100%); color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">
 							{slot.recipe.name}
 						</span>
 					{:else if slot?.recipe}
-						<span class="leading-snug font-semibold text-[11px]">{slot.recipe.name}</span>
+						<span class="leading-snug font-semibold text-sm">{slot.recipe.name}</span>
 					{:else}
 						<span class="text-lg leading-none" style="color: var(--text-muted);">+</span>
 					{/if}
