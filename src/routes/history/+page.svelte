@@ -1,17 +1,13 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import type { WeekData } from '$lib/types/index.js';
 	import { WEEKDAY_NAMES } from '$lib/utils/dates.js';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 
-	let history: string[] = [];
-	let selectedWeek: string | null = null;
-	let weekData: WeekData | null = null;
+	let { data } = $props();
+	let history = $derived(data.history);
 
-	onMount(async () => {
-		const res = await fetch('/api/history');
-		history = await res.json();
-	});
+	let selectedWeek: string | null = $state(null);
+	let weekData: WeekData | null = $state(null);
 
 	async function selectWeek(weekKey: string) {
 		selectedWeek = weekKey;

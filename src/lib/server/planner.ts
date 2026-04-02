@@ -1,5 +1,6 @@
 import { getDb } from '$lib/db/index.js';
 import type { Recipe, Member, SlotData } from '$lib/types/index.js';
+import { parseTags } from '$lib/utils/parseTags.js';
 import { getAllRules } from './rules.js';
 import { getAllMembers } from './members.js';
 import { getOptions } from './options.js';
@@ -12,10 +13,6 @@ interface SlotToFill {
 	is_accompaniment: number;
 	member_id: number | null;
 	required_tags?: string[];
-}
-
-function parseTags(tags: string): string[] {
-	return tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
 }
 
 function getRecentRecipeIds(weekKey: string, recipeId: number, minDays: number): boolean {

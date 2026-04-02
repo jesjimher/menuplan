@@ -1,27 +1,32 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
+	import { enhance } from '$app/forms';
 	import type { Recipe } from '$lib/types/index.js';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 
-	let recipes: Recipe[] = [];
-	let showForm = false;
-	let showImport = false;
-	let editingRecipe: Recipe | null = null;
-	let importText = '';
-	let importing = false;
-	let searchQ = '';
-	let selectedTags: string[] = [];
+	let { data } = $props();
+	let recipes = $derived(data.recipes);
+	let allTags = $derived(data.allTags);
 
-	let form = { name: '', description: '', tags: '', min_days: -1 };
+	let showForm = $state(false);
+	let showImport = $state(false);
+	let editingRecipe: Recipe | null = $state(null);
+	let importText = $state('');
+	let importing = $state(false);
+	let searchQ = $state('');
+	let selectedTags: string[] = $state([]);
+
+	let form = $state({ name: '', description: '', tags: '', min_days: -1 });
 
 	// Image picker state
-	let showImageSearch = false;
-	let imageSearchQ = '';
-	let imageResults: { url: string; thumbnail: string; title: string }[] = [];
-	let imageSearching = false;
-	let pendingImageUrl: string | null = null; // URL to store when saving
+	let showImageSearch = $state(false);
+	let imageSearchQ = $state('');
+	let imageResults: { url: string; thumbnail: string; title: string }[] = $state([]);
+	let imageSearching = $state(false);
+	let pendingImageUrl: string | null = $state(null);
 
 	async function openImageSearch() {
 		showImageSearch = true;
@@ -45,15 +50,21 @@
 		showImageSearch = false;
 	}
 
-	let checkedIds = new Set<number>();
-	let bulkTag = '';
-	let bulkAdding = false;
+	let checkedIds: Set<number> = $state(new Set());
+	let bulkTag = $state('');
+	let bulkAdding = $state(false);
 
-	$: allTags = [...new Set(
-		recipes.flatMap(r => r.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))
-	)].sort();
+	let filteredRecipes = $derived(recipes.filter(r => {
+		const matchesText = !searchQ ||
+			r.name.toLowerCase().includes(searchQ.toLowerCase()) ||
+			r.tags.toLowerCase().includes(searchQ.toLowerCase());
 
-	$: allVisibleSelected = filteredRecipes.length > 0 && filteredRecipes.every(r => checkedIds.has(r.id));
+		const recipeTags = r.tags.split(',').map(t => t.trim().toLowerCase());
+		const matchesTags = selectedTags.every(t => recipeTags.includes(t));
+		return matchesText && matchesTags;
+	}));
+
+	let allVisibleSelected = $derived(filteredRecipes.length > 0 && filteredRecipes.every(r => checkedIds.has(r.id)));
 
 	function toggleSelectAll() {
 		if (allVisibleSelected) {
@@ -64,8 +75,7 @@
 		checkedIds = checkedIds;
 	}
 
-	onMount(async () => {
-		await loadRecipes();
+	onMount(() => {
 		const params = new URLSearchParams(window.location.search);
 		const editId = params.get('edit');
 		if (editId) {
@@ -73,11 +83,6 @@
 			if (r) startEdit(r);
 		}
 	});
-
-	async function loadRecipes() {
-		const res = await fetch('/api/recipes');
-		recipes = await res.json();
-	}
 
 	function toggleTag(tag: string) {
 		const t = tag.trim().toLowerCase();
@@ -87,16 +92,6 @@
 			selectedTags = [...selectedTags, t];
 		}
 	}
-
-	$: filteredRecipes = recipes.filter(r => {
-		const matchesText = !searchQ ||
-			r.name.toLowerCase().includes(searchQ.toLowerCase()) ||
-			r.tags.toLowerCase().includes(searchQ.toLowerCase());
-
-		const recipeTags = r.tags.split(',').map(t => t.trim().toLowerCase());
-		const matchesTags = selectedTags.every(t => recipeTags.includes(t));
-		return matchesText && matchesTags;
-	});
 
 	function startEdit(r: Recipe) {
 		editingRecipe = r;
@@ -115,86 +110,25 @@
 		showForm = true;
 	}
 
-	async function saveRecipe() {
-		if (!form.name) return;
-		let savedId: number;
-		if (editingRecipe) {
-			await fetch(`/api/recipes/${editingRecipe.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(form)
-			});
-			savedId = editingRecipe.id;
-		} else {
-			const res = await fetch('/api/recipes', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(form)
-			});
-			const created = await res.json();
-			savedId = created.id;
+	async function handleRecipeSubmit({ result, update }: { result: any; update: () => Promise<void> }) {
+		if (result.type === 'success') {
+			const savedId = result.data?.createdId ?? result.data?.updatedId ?? editingRecipe?.id;
+			if (pendingImageUrl && savedId) {
+				await fetch(`/api/recipes/${savedId}/image`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ url: pendingImageUrl })
+				});
+			}
+			showForm = false;
+			pendingImageUrl = null;
 		}
-		if (pendingImageUrl) {
-			await fetch(`/api/recipes/${savedId}/image`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ url: pendingImageUrl })
-			});
-		}
-		showForm = false;
-		pendingImageUrl = null;
-		await loadRecipes();
+		await update();
 	}
 
 	async function removeImage(id: number) {
 		await fetch(`/api/recipes/${id}/image`, { method: 'DELETE' });
-		await loadRecipes();
-	}
-
-	async function deleteRecipe(id: number) {
-		if (!confirm('¿Eliminar esta receta?')) return;
-		await fetch(`/api/recipes/${id}`, { method: 'DELETE' });
-		await loadRecipes();
-	}
-
-	async function applyBulkTag() {
-		const tag = bulkTag.trim().toLowerCase();
-		if (!tag || checkedIds.size === 0) return;
-		bulkAdding = true;
-		try {
-			await Promise.all([...checkedIds].map(id => {
-				const recipe = recipes.find(r => r.id === id)!;
-				const current = recipe.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-				if (current.includes(tag)) return Promise.resolve();
-				const newTags = [...current, tag].join(',');
-				return fetch(`/api/recipes/${id}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ ...recipe, tags: newTags })
-				});
-			}));
-			bulkTag = '';
-			checkedIds = new Set();
-			await loadRecipes();
-		} finally {
-			bulkAdding = false;
-		}
-	}
-
-	async function importRecipes() {
-		importing = true;
-		try {
-			await fetch('/api/recipes', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ import_text: importText })
-			});
-			importText = '';
-			showImport = false;
-			await loadRecipes();
-		} finally {
-			importing = false;
-		}
+		await invalidateAll();
 	}
 </script>
 
@@ -275,20 +209,34 @@
 				<span class="text-sm font-medium shrink-0" style="color: var(--text);">
 					{checkedIds.size} sel.
 				</span>
-				<div class="relative flex-1 min-w-[120px]">
-					<TagInput
-						bind:value={bulkTag}
-						tags={allTags}
-						placeholder="Tag..."
-						class="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none"
-					/>
-				</div>
-				<button on:click={applyBulkTag} disabled={!bulkTag.trim() || bulkAdding}
-					class="p-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors"
-				title="Añadir tag"
-					style="background: var(--primary); color: white;">
-					{bulkAdding ? 'Añadiendo...' : 'Añadir tag'}
-				</button>
+				<form method="POST" action="?/bulkTag"
+					use:enhance={() => {
+						bulkAdding = true;
+						return async ({ update }) => {
+							bulkTag = '';
+							checkedIds = new Set();
+							bulkAdding = false;
+							await update();
+						};
+					}}
+					class="contents">
+					<input type="hidden" name="ids" value={[...checkedIds].join(',')} />
+					<input type="hidden" name="tag" value={bulkTag} />
+					<div class="relative flex-1 min-w-[120px]">
+						<TagInput
+							bind:value={bulkTag}
+							tags={allTags}
+							placeholder="Tag..."
+							class="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none"
+						/>
+					</div>
+					<button type="submit" disabled={!bulkTag.trim() || bulkAdding}
+						class="p-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors"
+						title="Añadir tag"
+						style="background: var(--primary); color: white;">
+						{bulkAdding ? 'Añadiendo...' : 'Añadir tag'}
+					</button>
+				</form>
 				<button on:click={() => { checkedIds = new Set(); }}
 					class="text-sm shrink-0 transition-colors"
 					style="color: var(--text-secondary);">
@@ -299,36 +247,55 @@
 
 		<!-- Panel de importación -->
 		{#if showImport}
-			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
+			<form method="POST" action="?/import"
+				use:enhance={() => {
+					importing = true;
+					return async ({ update }) => {
+						importText = '';
+						showImport = false;
+						importing = false;
+						await update();
+					};
+				}}
+				class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
 				<h3 class="text-lg font-semibold mb-3" style="font-family: 'Epilogue', sans-serif; color: var(--text);">Importar desde Plantoeat</h3>
-				<textarea bind:value={importText}
+				<textarea name="import_text" bind:value={importText}
 					placeholder="Pega aquí el texto exportado de Plantoeat..."
 					class="w-full h-40 px-3 py-2.5 rounded-lg text-sm font-mono resize-none focus:outline-none transition-all"
 					style="border: 1px solid var(--border); color: var(--text);"></textarea>
 				<div class="flex gap-2 mt-3">
-					<button on:click={importRecipes} disabled={importing || !importText}
+					<button type="submit" disabled={importing || !importText}
 						class="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
 						style="background: var(--primary); color: white;">
 						{importing ? 'Importando...' : 'Importar'}
 					</button>
-					<button on:click={() => showImport = false}
+					<button type="button" on:click={() => showImport = false}
 						class="px-4 py-2 rounded-lg text-sm transition-colors"
 						style="background: var(--surface-container); color: var(--text);">
 						Cancelar
 					</button>
 				</div>
-			</div>
+			</form>
 		{/if}
 
 		<!-- Formulario de receta -->
 		{#if showForm}
-			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
+			<form method="POST" action={editingRecipe ? '?/update' : '?/create'}
+				use:enhance={() => {
+					return async (event) => { await handleRecipeSubmit(event); };
+				}}
+				class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
+				{#if editingRecipe}
+					<input type="hidden" name="id" value={editingRecipe.id} />
+				{/if}
+				<input type="hidden" name="tags" value={form.tags} />
+				<input type="hidden" name="min_days" value={form.min_days} />
 				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Epilogue', sans-serif; color: var(--text);">{editingRecipe ? 'Editar receta' : 'Nueva receta'}</h3>
 				<div class="grid gap-3">
-					<input type="text" placeholder="Nombre *" bind:value={form.name}
+					<input type="text" name="name" placeholder="Nombre *" bind:value={form.name}
 						class="px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
 						style="border: 1px solid var(--border); color: var(--text);" />
-					<textarea placeholder="Descripción" bind:value={form.description}
+					<textarea name="description" placeholder="Descripción" bind:value={form.description}
 						class="px-3 py-2.5 rounded-lg text-sm h-20 resize-none focus:outline-none transition-all"
 						style="border: 1px solid var(--border); color: var(--text);"></textarea>
 					<TagBadgeInput bind:value={form.tags} tags={allTags} placeholder="Tags (ej: comida,carne,rápido)" />
@@ -409,18 +376,18 @@
 					</div>
 				</div>
 				<div class="flex gap-2 mt-4">
-					<button on:click={saveRecipe} disabled={!form.name}
+					<button type="submit" disabled={!form.name}
 						class="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
 						style="background: var(--primary); color: white;">
 						Guardar
 					</button>
-					<button on:click={() => showForm = false}
+					<button type="button" on:click={() => showForm = false}
 						class="px-4 py-2 rounded-lg text-sm transition-colors"
 						style="background: var(--surface-container); color: var(--text);">
 						Cancelar
 					</button>
 				</div>
-			</div>
+			</form>
 		{/if}
 
 		<!-- Cabecera de lista -->
@@ -487,14 +454,22 @@
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
 							</svg>
 						</button>
-						<button on:click={() => deleteRecipe(recipe.id)}
-							class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
-							style="color: var(--error);"
-							title="Borrar">
-							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-							</svg>
-						</button>
+						<form method="POST" action="?/delete"
+							use:enhance={({ cancel }) => {
+								if (!confirm('¿Eliminar esta receta?')) { cancel(); return; }
+								return async ({ update }) => { await update(); };
+							}}
+							class="contents">
+							<input type="hidden" name="id" value={recipe.id} />
+							<button type="submit"
+								class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+								style="color: var(--error);"
+								title="Borrar">
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+								</svg>
+							</button>
+						</form>
 					</div>
 				</div>
 			{:else}

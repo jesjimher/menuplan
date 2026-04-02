@@ -1,28 +1,16 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { enhance } from '$app/forms';
 	import type { Member } from '$lib/types/index.js';
 	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 
-	let members: Member[] = [];
-	let allTags: string[] = [];
-	let showForm = false;
-	let editingMember: Member | null = null;
-	let form = { name: '', cannot_eat: '', likes: '', dislikes: '' };
+	let { data } = $props();
+	let members = $derived(data.members);
+	let allTags = $derived(data.allTags);
 
-	onMount(async () => {
-		await Promise.all([loadMembers(), loadTags()]);
-	});
-
-	async function loadMembers() {
-		const res = await fetch('/api/members');
-		members = await res.json();
-	}
-
-	async function loadTags() {
-		const res = await fetch('/api/recipes?tags=1');
-		allTags = await res.json();
-	}
+	let showForm = $state(false);
+	let editingMember: Member | null = $state(null);
+	let form = $state({ name: '', cannot_eat: '', likes: '', dislikes: '' });
 
 	function startEdit(m: Member) {
 		editingMember = m;
@@ -34,31 +22,6 @@
 		editingMember = null;
 		form = { name: '', cannot_eat: '', likes: '', dislikes: '' };
 		showForm = true;
-	}
-
-	async function saveMember() {
-		if (!form.name) return;
-		if (editingMember) {
-			await fetch(`/api/members/${editingMember.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(form)
-			});
-		} else {
-			await fetch('/api/members', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(form)
-			});
-		}
-		showForm = false;
-		await loadMembers();
-	}
-
-	async function deleteMember(id: number) {
-		if (!confirm('¿Eliminar este miembro?')) return;
-		await fetch(`/api/members/${id}`, { method: 'DELETE' });
-		await loadMembers();
 	}
 
 	function parseTags(str: string): string[] {
@@ -100,10 +63,23 @@
 
 		<!-- Formulario -->
 		{#if showForm}
-			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
+			<form method="POST" action={editingMember ? '?/update' : '?/create'}
+				use:enhance={() => {
+					return async ({ update }) => {
+						showForm = false;
+						await update();
+					};
+				}}
+				class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
+				{#if editingMember}
+					<input type="hidden" name="id" value={editingMember.id} />
+				{/if}
+				<input type="hidden" name="cannot_eat" value={form.cannot_eat} />
+				<input type="hidden" name="likes" value={form.likes} />
+				<input type="hidden" name="dislikes" value={form.dislikes} />
 				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Epilogue', sans-serif; color: var(--text);">{editingMember ? 'Editar miembro' : 'Nuevo miembro'}</h3>
 				<div class="grid gap-3">
-					<input type="text" placeholder="Nombre *" bind:value={form.name}
+					<input type="text" name="name" placeholder="Nombre *" bind:value={form.name}
 						class="px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
 						style="border: 1px solid var(--border); color: var(--text);" />
 					<div>
@@ -120,18 +96,18 @@
 					</div>
 				</div>
 				<div class="flex gap-2 mt-4">
-					<button on:click={saveMember} disabled={!form.name}
+					<button type="submit" disabled={!form.name}
 						class="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
 						style="background: var(--primary); color: white;">
 						Guardar
 					</button>
-					<button on:click={() => showForm = false}
+					<button type="button" on:click={() => showForm = false}
 						class="px-4 py-2 rounded-lg text-sm transition-colors"
 						style="background: var(--surface-container); color: var(--text);">
 						Cancelar
 					</button>
 				</div>
-			</div>
+			</form>
 		{/if}
 
 		<!-- Lista de miembros -->
@@ -149,11 +125,19 @@
 								on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
 								Editar
 							</button>
-							<button on:click={() => deleteMember(member.id)}
-								class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
-								style="color: var(--error);">
-								Borrar
-							</button>
+							<form method="POST" action="?/delete"
+								use:enhance={({ cancel }) => {
+									if (!confirm('¿Eliminar este miembro?')) { cancel(); return; }
+									return async ({ update }) => { await update(); };
+								}}
+								class="contents">
+								<input type="hidden" name="id" value={member.id} />
+								<button type="submit"
+									class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+									style="color: var(--error);">
+									Borrar
+								</button>
+							</form>
 						</div>
 					</div>
 

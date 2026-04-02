@@ -1,12 +1,21 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
-
-	export let value: string = '';
-	export let tags: string[] = [];
-	export let placeholder: string = '';
-	export let autofocus: boolean = false;
-	let cls = '';
-	export { cls as class };
+	let {
+		value = $bindable(''),
+		tags = [],
+		placeholder = '',
+		autofocus = false,
+		class: cls = '',
+		onchange,
+		onkeydown
+	}: {
+		value?: string;
+		tags?: string[];
+		placeholder?: string;
+		autofocus?: boolean;
+		class?: string;
+		onchange?: (value: string) => void;
+		onkeydown?: (e: KeyboardEvent) => void;
+	} = $props();
 
 	function focusOnMount(node: HTMLInputElement) {
 		if (autofocus) node.focus();
@@ -47,24 +56,24 @@
 		};
 	}
 
-	const dispatch = createEventDispatcher<{ change: string }>();
+	let open = $state(false);
 
-	let open = false;
-
-	$: displayed = tags
-		.filter(t => !value || t.toLowerCase().includes(value.toLowerCase()))
-		.slice(0, 10);
-	$: total = tags.filter(t => !value || t.toLowerCase().includes(value.toLowerCase())).length;
+	let displayed = $derived(
+		tags.filter(t => !value || t.toLowerCase().includes(value.toLowerCase())).slice(0, 10)
+	);
+	let total = $derived(
+		tags.filter(t => !value || t.toLowerCase().includes(value.toLowerCase())).length
+	);
 
 	function select(tag: string) {
 		value = tag;
 		open = false;
-		dispatch('change', tag);
+		onchange?.(tag);
 	}
 
 	function handleBlur() {
 		setTimeout(() => { open = false; }, 150);
-		dispatch('change', value);
+		onchange?.(value);
 	}
 </script>
 
@@ -75,23 +84,25 @@
 		type="text"
 		{placeholder}
 		class={cls}
-		on:input={() => open = true}
-		on:focus={() => open = true}
-		on:blur={handleBlur}
-		on:keydown
+		role="combobox"
+		aria-expanded={open && displayed.length > 0}
+		aria-autocomplete="list"
+		oninput={() => open = true}
+		onfocus={() => open = true}
+		onblur={handleBlur}
+		onkeydown={onkeydown}
 	/>
 	{#if open && displayed.length > 0}
 		<ul use:smartPosition class="z-[9999] rounded-lg shadow-lg overflow-hidden text-sm"
-			style="background: var(--surface); border: 1px solid var(--border);">
+			style="background: var(--surface); border: 1px solid var(--border);"
+			role="listbox">
 			{#each displayed as tag}
-				<li>
+				<li role="option">
 					<button
 						type="button"
-						class="w-full text-left px-3 py-1.5 truncate"
+						class="suggestion-item w-full text-left px-3 py-1.5 truncate"
 						style="color: var(--text);"
-						on:mousedown|preventDefault={() => select(tag)}
-						on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-warm)'}
-						on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
+						onmousedown={(e) => { e.preventDefault(); select(tag); }}
 					>{tag}</button>
 				</li>
 			{/each}
@@ -101,3 +112,9 @@
 		</ul>
 	{/if}
 </div>
+
+<style>
+	.suggestion-item:hover {
+		background: var(--surface-warm);
+	}
+</style>

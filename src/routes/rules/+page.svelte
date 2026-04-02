@@ -1,28 +1,16 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { enhance } from '$app/forms';
 	import type { Rule } from '$lib/types/index.js';
 	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 
-	let rules: Rule[] = [];
-	let allTags: string[] = [];
-	let showForm = false;
-	let editingRule: Rule | null = null;
-	let form = { tag: '', direction: 'at_least' as 'at_least' | 'no_more_than', times: 1 };
+	let { data } = $props();
+	let rules = $derived(data.rules);
+	let allTags = $derived(data.allTags);
 
-	onMount(async () => {
-		await Promise.all([loadRules(), loadTags()]);
-	});
-
-	async function loadRules() {
-		const res = await fetch('/api/rules');
-		rules = await res.json();
-	}
-
-	async function loadTags() {
-		const res = await fetch('/api/recipes?tags=1');
-		allTags = await res.json();
-	}
+	let showForm = $state(false);
+	let editingRule: Rule | null = $state(null);
+	let form = $state({ tag: '', direction: 'at_least' as 'at_least' | 'no_more_than', times: 1 });
 
 	function startEdit(r: Rule) {
 		editingRule = r;
@@ -34,31 +22,6 @@
 		editingRule = null;
 		form = { tag: '', direction: 'at_least', times: 1 };
 		showForm = true;
-	}
-
-	async function saveRule() {
-		if (!form.tag) return;
-		if (editingRule) {
-			await fetch(`/api/rules/${editingRule.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(form)
-			});
-		} else {
-			await fetch('/api/rules', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(form)
-			});
-		}
-		showForm = false;
-		await loadRules();
-	}
-
-	async function deleteRule(id: number) {
-		if (!confirm('¿Eliminar esta regla?')) return;
-		await fetch(`/api/rules/${id}`, { method: 'DELETE' });
-		await loadRules();
 	}
 
 	function ruleText(r: Rule) {
@@ -102,7 +65,18 @@
 
 		<!-- Formulario -->
 		{#if showForm}
-			<div class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
+			<form method="POST" action={editingRule ? '?/update' : '?/create'}
+				use:enhance={() => {
+					return async ({ update }) => {
+						showForm = false;
+						await update();
+					};
+				}}
+				class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
+				{#if editingRule}
+					<input type="hidden" name="id" value={editingRule.id} />
+				{/if}
+				<input type="hidden" name="tag" value={form.tag} />
 				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Epilogue', sans-serif; color: var(--text);">{editingRule ? 'Editar regla' : 'Nueva regla'}</h3>
 				<div class="grid gap-3">
 					<div>
@@ -111,7 +85,7 @@
 					</div>
 					<div>
 						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">Condición</label>
-						<select bind:value={form.direction}
+						<select name="direction" bind:value={form.direction}
 							class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
 							style="border: 1px solid var(--border); color: var(--text); background: var(--surface);">
 							<option value="at_least">Al menos</option>
@@ -120,24 +94,24 @@
 					</div>
 					<div>
 						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">Número de veces</label>
-						<input type="number" bind:value={form.times} min="1"
+						<input type="number" name="times" bind:value={form.times} min="1"
 							class="w-28 px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
 							style="border: 1px solid var(--border); color: var(--text);" />
 					</div>
 				</div>
 				<div class="flex gap-2 mt-4">
-					<button on:click={saveRule} disabled={!form.tag}
+					<button type="submit" disabled={!form.tag}
 						class="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
 						style="background: var(--primary); color: white;">
 						Guardar
 					</button>
-					<button on:click={() => showForm = false}
+					<button type="button" on:click={() => showForm = false}
 						class="px-4 py-2 rounded-lg text-sm transition-colors"
 						style="background: var(--surface-container); color: var(--text);">
 						Cancelar
 					</button>
 				</div>
-			</div>
+			</form>
 		{/if}
 
 		<!-- Lista de reglas -->
@@ -174,11 +148,19 @@
 							on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
 							Editar
 						</button>
-						<button on:click={() => deleteRule(rule.id)}
-							class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
-							style="color: var(--error);">
-							Borrar
-						</button>
+						<form method="POST" action="?/delete"
+							use:enhance={({ cancel }) => {
+								if (!confirm('¿Eliminar esta regla?')) { cancel(); return; }
+								return async ({ update }) => { await update(); };
+							}}
+							class="contents">
+							<input type="hidden" name="id" value={rule.id} />
+							<button type="submit"
+								class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+								style="color: var(--error);">
+								Borrar
+							</button>
+						</form>
 					</div>
 				</div>
 			{:else}

@@ -1,5 +1,6 @@
 import { getDb } from '$lib/db/index.js';
 import type { Recipe } from '$lib/types/index.js';
+import { buildSafeUpdate } from './utils.js';
 
 const RECIPE_COLS = 'id, name, description, tags, min_days, image_type, created_at';
 
@@ -30,7 +31,7 @@ export function clearRecipeImage(id: number): void {
 	db.prepare('UPDATE recipes SET image_data = NULL, image_type = NULL WHERE id = ?').run(id);
 }
 
-export function createRecipe(data: Omit<Recipe, 'id' | 'created_at'>): Recipe {
+export function createRecipe(data: Omit<Recipe, 'id' | 'created_at' | 'image_type'>): Recipe {
 	const db = getDb();
 	const result = db.prepare(
 		'INSERT INTO recipes (name, description, tags, min_days) VALUES (?, ?, ?, ?)'
@@ -39,10 +40,7 @@ export function createRecipe(data: Omit<Recipe, 'id' | 'created_at'>): Recipe {
 }
 
 export function updateRecipe(id: number, data: Partial<Omit<Recipe, 'id' | 'created_at'>>): Recipe | undefined {
-	const db = getDb();
-	const fields = Object.keys(data).map(k => `${k} = ?`).join(', ');
-	const values = [...Object.values(data), id];
-	db.prepare(`UPDATE recipes SET ${fields} WHERE id = ?`).run(...values);
+	buildSafeUpdate('recipes', id, data as Record<string, unknown>, ['name', 'description', 'tags', 'min_days']);
 	return getRecipeById(id);
 }
 

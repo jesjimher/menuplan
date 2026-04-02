@@ -1,8 +1,5 @@
 import type { Rule, SlotData, RuleViolation } from '$lib/types/index.js';
-
-function parseTags(tags: string): string[] {
-	return tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-}
+import { parseTags } from './parseTags.js';
 
 export function checkRules(slots: SlotData[], rules: Rule[]): RuleViolation[] {
 	const tagCounts: Record<string, number> = {};

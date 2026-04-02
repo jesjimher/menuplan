@@ -1,5 +1,6 @@
 import { getDb } from '$lib/db/index.js';
 import type { Member } from '$lib/types/index.js';
+import { buildSafeUpdate } from './utils.js';
 
 export function getAllMembers(): Member[] {
 	const db = getDb();
@@ -20,10 +21,7 @@ export function createMember(data: Omit<Member, 'id'>): Member {
 }
 
 export function updateMember(id: number, data: Partial<Omit<Member, 'id'>>): Member | undefined {
-	const db = getDb();
-	const fields = Object.keys(data).map(k => `${k} = ?`).join(', ');
-	const values = [...Object.values(data), id];
-	db.prepare(`UPDATE members SET ${fields} WHERE id = ?`).run(...values);
+	buildSafeUpdate('members', id, data as Record<string, unknown>, ['name', 'cannot_eat', 'likes', 'dislikes']);
 	return getMemberById(id);
 }
 
