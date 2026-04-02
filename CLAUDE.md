@@ -28,18 +28,14 @@ Aplicación **SvelteKit** con `@sveltejs/adapter-node` para despliegue en Docker
 ### Capa de datos (`src/lib/db/index.ts`)
 Singleton de conexión SQLite. El schema está incrustado como constante de string (no se lee el fichero `.sql` en tiempo de ejecución — existe solo como referencia — para evitar problemas de bundling). La ruta de la BD por defecto es `./menuplan.db`, sobreescrita por la variable de entorno `DATABASE_PATH`.
 
-**Al modificar el schema de `recipes`:** regenerar `data/sample-recipes.sql` ejecutando (excluye el BLOB `image_data`):
-```bash
-/usr/bin/sqlite3 menuplan.db "SELECT 'INSERT INTO recipes (id,name,description,tags,min_days,created_at) VALUES (' || id || ',' || quote(name) || ',' || quote(description) || ',' || quote(tags) || ',' || min_days || ',' || quote(created_at) || ');' FROM recipes" > /tmp/recipes_inserts.sql
-{ echo "-- Recetas de ejemplo para menuplan"; echo "-- Importar con: sqlite3 menuplan.db < data/sample-recipes.sql"; echo "-- O desde Node: better-sqlite3 exec(readFileSync('data/sample-recipes.sql', 'utf8'))"; echo ""; cat /tmp/recipes_inserts.sql; } > data/sample-recipes.sql
-```
+**Al modificar el schema de `recipes`:** regenerar `data/sample-recipes.sql` 
 
 **Decisiones clave del schema:**
 - `week_plans.member_id` es nullable (NULL = para todos los miembros). La restricción UNIQUE usa un `CREATE UNIQUE INDEX` separado con `COALESCE(member_id, -1)` porque SQLite no admite expresiones en restricciones `UNIQUE()` inline.
 - Los tags se almacenan como strings separados por comas en todas partes (recetas, restricciones de miembros, etc.). Todas las comparaciones de tags hacen lowercase y trim de cada elemento.
 - `week_plans.is_accompaniment` (0/1) distingue platos principales de acompañamientos dentro de la misma tabla.
 - `week_day_config` sobreescribe las opciones globales por combinación (week_key, weekday, meal_type). Los campos `disabled`/`disabled_comment` permiten desactivar un slot concreto (día+comida) para semanas en que no hace falta planificarlo.
-- `recipes.image_data` (BLOB) e `image_type` almacenan la imagen de la receta directamente en la BD. Las imágenes **no** se incluyen en `data/sample-recipes.sql` — el dump filtra solo las columnas de texto. Servirlas usa el endpoint `/api/recipes/[id]/image`.
+- `recipes.image_data` (BLOB) e `image_type` almacenan la imagen de la receta directamente en la BD. 
 
 ### Módulos de servidor (`src/lib/server/`)
 Funciones puras, sin estado. Cada módulo tiene helpers CRUD simples. Destacados:
