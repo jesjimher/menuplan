@@ -258,7 +258,12 @@
 					{:else if slot?.recipe}
 						<span class="leading-snug font-semibold text-sm">{slot.recipe.name}</span>
 					{:else}
-						<span class="text-lg leading-none" style="color: var(--text-muted);">+</span>
+						<div class="empty-slot">
+							<svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+								<path d="M12 4.5v15m7.5-7.5h-15"/>
+							</svg>
+							<span class="empty-text">Añadir receta</span>
+						</div>
 					{/if}
 				</button>
 				<div class="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover/slot:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
@@ -409,5 +414,24 @@
 	.slot-action-btn-danger:hover {
 		background: rgba(255, 255, 255, 1);
 		box-shadow: 0 3px 8px rgba(0,0,0,0.4), 0 0 0 1.5px rgba(0,0,0,0.28);
+	}
+	.empty-slot {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 2px;
+		min-height: 100%;
+	}
+	.empty-icon {
+		width: 24px;
+		height: 24px;
+		color: var(--text-muted);
+		opacity: 0.5;
+	}
+	.empty-text {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--text-muted);
 	}
 </style>
