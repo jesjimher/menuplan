@@ -537,10 +537,6 @@
 		onCopyPrevious={copyPrevious}
 	/>
 
-	{#if weekData}
-		<ViolationBanner violations={weekData.violations ?? []} />
-	{/if}
-
 	{#if errorMsg}
 		<div class="px-4 sm:px-6 py-2 text-sm font-medium flex items-center justify-between"
 			style="background: var(--error-container, #fdd); color: var(--error, #c00);">
@@ -730,6 +726,10 @@
 					</div>
 				{/each}
 			</div>
+		{/if}
+
+		{#if weekData}
+			<ViolationBanner violations={weekData.violations ?? []} />
 		{/if}
 	</div>
 

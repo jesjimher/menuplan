@@ -4,7 +4,7 @@
 	let { violations }: { violations: RuleViolation[] } = $props();
 </script>
 
-<div class="mx-4 sm:mx-6 mt-4 px-4 py-3 flex items-center gap-3 rounded-xl shrink-0"
+<div class="mt-4 mb-4 px-4 py-3 flex items-center gap-3 rounded-xl shrink-0"
 	style="{violations.length > 0
 		? `background: var(--error-bg); border-left: 4px solid var(--error);`
 		: `background: var(--success-bg); border-left: 4px solid var(--success);`}">
