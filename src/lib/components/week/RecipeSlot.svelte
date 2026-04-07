@@ -90,6 +90,47 @@
 		fixedDropdown: (node: HTMLElement) => { destroy: () => void };
 	} = $props();
 
+	let dropdownActiveIndex = $state(-1);
+
+	let topCount = $derived(topRecipes.length > 0 && !searchQuery ? topRecipes.length : 0);
+	let allDropdownItems = $derived(
+		(topRecipes.length > 0 && !searchQuery ? topRecipes : []).concat(searchResults)
+	);
+
+	$effect(() => {
+		searchResults; topRecipes; searchQuery;
+		dropdownActiveIndex = -1;
+	});
+
+	let topListEl: HTMLElement | null = null;
+	let searchListEl: HTMLElement | null = null;
+
+	$effect(() => {
+		const idx = dropdownActiveIndex;
+		if (idx < 0) return;
+		if (idx < topCount && topListEl) {
+			(topListEl.querySelectorAll('button')[idx] as HTMLElement | undefined)?.scrollIntoView({ block: 'nearest' });
+		} else if (searchListEl) {
+			(searchListEl.querySelectorAll('button')[idx - topCount] as HTMLElement | undefined)?.scrollIntoView({ block: 'nearest' });
+		}
+	});
+
+	function handleDropdownKeydown(e: KeyboardEvent) {
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			dropdownActiveIndex = Math.min(dropdownActiveIndex + 1, allDropdownItems.length - 1);
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			dropdownActiveIndex = Math.max(dropdownActiveIndex - 1, -1);
+		} else if (e.key === 'Enter' && dropdownActiveIndex >= 0) {
+			e.preventDefault();
+			onSelectRecipe(allDropdownItems[dropdownActiveIndex].id);
+			dropdownActiveIndex = -1;
+		} else if (e.key === 'Escape') {
+			onCloseDropdown();
+		}
+	}
+
 	let imgH = $derived(
 		isAcc ? '' :
 		cfg.recipe_count === 1 ? 'min-h-[100px]' :
@@ -152,20 +193,21 @@
 						placeholder="Buscar acomp..."
 						bind:value={searchQuery}
 						on:input={onSearch}
+						on:keydown={handleDropdownKeydown}
 						class="w-full text-sm px-2.5 py-1.5 rounded-lg focus:outline-none"
 						style="background: var(--surface-container-low); color: var(--text);"
 						use:focusOnMount
 					/>
 				</div>
-				<div class="max-h-64 overflow-y-auto">
+				<div class="max-h-64 overflow-y-auto" bind:this={searchListEl}>
 					{#if searchResults.length === 0}
 						<p class="text-xs px-3 py-3" style="color: var(--text-muted);">Sin resultados</p>
 					{:else}
-						{#each searchResults as r}
+						{#each searchResults as r, i}
 							<button
 								on:click|stopPropagation={() => onSelectRecipe(r.id)}
 								class="dropdown-item block w-full text-left px-3 py-2 transition-colors"
-								style="border-bottom: 1px solid var(--surface-container-highest); color: var(--text);"
+								style="border-bottom: 1px solid var(--surface-container-highest); color: var(--text); {dropdownActiveIndex === i ? 'background: var(--surface-container-low);' : ''}"
 							>
 								<p class="text-sm font-medium" style="color: var(--text);">{r.name}</p>
 								{#if r.tags}
@@ -267,33 +309,34 @@
 							placeholder="Buscar receta..."
 							bind:value={searchQuery}
 							on:input={onSearch}
+							on:keydown={handleDropdownKeydown}
 							class="w-full text-sm px-2.5 py-2 rounded-lg focus:outline-none"
 							style="background: var(--surface-container-low); color: var(--text);"
 							use:focusOnMount
 						/>
 					</div>
 					{#if topRecipes.length > 0 && !searchQuery}
-						<div class="px-3 py-2"
+						<div class="px-3 py-2" bind:this={topListEl}
 							style="background: var(--surface-container-low); border-bottom: 1px solid var(--surface-container-highest);">
 							<p class="text-[10px] font-black uppercase tracking-tighter mb-1.5" style="color: var(--text-muted);">Top este día</p>
-							{#each topRecipes as r}
+							{#each topRecipes as r, i}
 								<button
 									on:click|stopPropagation={() => onSelectRecipe(r.id)}
 									class="dropdown-item-subtle block w-full text-left text-xs px-2 py-1.5 rounded-lg transition-colors font-medium"
-									style="color: var(--primary);"
+									style="color: var(--primary); {dropdownActiveIndex === i ? 'background: var(--surface-container);' : ''}"
 								>{r.name}</button>
 							{/each}
 						</div>
 					{/if}
-					<div class="max-h-64 overflow-y-auto">
+					<div class="max-h-64 overflow-y-auto" bind:this={searchListEl}>
 						{#if searchResults.length === 0}
 							<p class="text-xs px-3 py-3" style="color: var(--text-muted);">Sin resultados</p>
 						{:else}
-							{#each searchResults as r}
+							{#each searchResults as r, i}
 								<button
 									on:click|stopPropagation={() => onSelectRecipe(r.id)}
 									class="dropdown-item block w-full text-left px-3 py-2.5 transition-colors"
-									style="border-bottom: 1px solid var(--surface-container-highest); color: var(--text);"
+									style="border-bottom: 1px solid var(--surface-container-highest); color: var(--text); {dropdownActiveIndex === topCount + i ? 'background: var(--surface-container-low);' : ''}"
 								>
 									<p class="text-sm font-semibold" style="color: var(--text);">{r.name}</p>
 									{#if r.tags}
