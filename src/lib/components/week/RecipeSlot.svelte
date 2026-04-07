@@ -391,17 +391,23 @@
 		background: var(--surface-container);
 	}
 	.slot-action-btn {
-		background: var(--primary);
-		color: white;
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(4px);
+		color: var(--primary);
+		box-shadow: 0 2px 5px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(0,0,0,0.22);
 	}
 	.slot-action-btn:hover {
-		background: var(--primary-hover, color-mix(in srgb, var(--primary) 55%, black));
+		background: rgba(255, 255, 255, 1);
+		box-shadow: 0 3px 8px rgba(0,0,0,0.4), 0 0 0 1.5px rgba(0,0,0,0.28);
 	}
 	.slot-action-btn-danger {
-		background: var(--error);
-		color: white;
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(4px);
+		color: var(--error);
+		box-shadow: 0 2px 5px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(0,0,0,0.22);
 	}
 	.slot-action-btn-danger:hover {
-		background: color-mix(in srgb, var(--error) 55%, black);
+		background: rgba(255, 255, 255, 1);
+		box-shadow: 0 3px 8px rgba(0,0,0,0.4), 0 0 0 1.5px rgba(0,0,0,0.28);
 	}
 </style>
