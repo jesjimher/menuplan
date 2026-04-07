@@ -12,7 +12,8 @@ export function getOptions(): Options {
 		meals_per_day: parseInt(map.meals_per_day ?? '1'),
 		dinners_per_day: parseInt(map.dinners_per_day ?? '1'),
 		side_dishes_per_recipe: parseInt(map.side_dishes_per_recipe ?? '1'),
-		side_dishes_per_slot: parseInt(map.side_dishes_per_slot ?? '0')
+		side_dishes_per_slot: parseInt(map.side_dishes_per_slot ?? '0'),
+		sidebar_collapsed_by_default: map.sidebar_collapsed_by_default === '1'
 	};
 }
 
@@ -21,7 +22,11 @@ export function setOptions(opts: Partial<Options>): Options {
 	const update = db.prepare('INSERT OR REPLACE INTO options (key, value) VALUES (?, ?)');
 
 	for (const [key, value] of Object.entries(opts)) {
-		update.run(key, String(value));
+		if (typeof value === 'boolean') {
+			update.run(key, value ? '1' : '0');
+		} else {
+			update.run(key, String(value));
+		}
 	}
 
 	return getOptions();

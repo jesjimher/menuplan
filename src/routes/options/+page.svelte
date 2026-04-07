@@ -70,11 +70,19 @@
 				</div>
 
 				<div class="px-5 py-4" style="border-color: var(--border);">
-					<label class="block text-sm font-medium mb-0.5" style="color: var(--text);">Acompañamientos por franja horaria</label>
-					<p class="text-xs mb-2" style="color: var(--text-muted);">Un acompañamiento fijo por franja, independiente del nº de recetas</p>
+					<label class="block text-sm font-medium mb-2" style="color: var(--text);">Acompañamientos por franja horaria</label>
+					<p class="text-xs mb-2" style="color: var(--text-muted);">Un acompañamiento fijo por franquicia, independiente del nº de recetas</p>
 					<input type="number" name="side_dishes_per_slot" bind:value={options.side_dishes_per_slot} min="0"
 						class="w-28 px-3 py-2 rounded-lg text-sm focus:outline-none transition-all"
 						style="border: 1px solid var(--border); color: var(--text);" />
+				</div>
+
+				<div class="px-5 py-4" style="border-color: var(--border);">
+					<label class="flex items-center gap-3 cursor-pointer">
+						<input type="checkbox" name="sidebar_collapsed_by_default" bind:checked={options.sidebar_collapsed_by_default}
+							class="w-4 h-4 rounded accent-[var(--primary)]" />
+						<span class="text-sm font-medium" style="color: var(--text);">Barra lateral colapsada por defecto</span>
+					</label>
 				</div>
 			</div>
 

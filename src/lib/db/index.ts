@@ -68,7 +68,8 @@ INSERT OR IGNORE INTO options VALUES
     ('meals_per_day',          '1'),
     ('dinners_per_day',        '1'),
     ('side_dishes_per_recipe', '1'),
-    ('side_dishes_per_slot',   '0');
+    ('side_dishes_per_slot',   '0'),
+    ('sidebar_collapsed_by_default', '0');
 `;
 
 export function getDb(): Database.Database {

@@ -53,6 +53,7 @@ export interface Options {
 	dinners_per_day: number;
 	side_dishes_per_recipe: number;
 	side_dishes_per_slot: number;
+	sidebar_collapsed_by_default: boolean;
 }
 
 export interface SlotData {

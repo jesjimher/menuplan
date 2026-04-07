@@ -15,9 +15,10 @@ export const actions = {
 			meals_per_day: parseInt(fd.get('meals_per_day')?.toString() ?? ''),
 			dinners_per_day: parseInt(fd.get('dinners_per_day')?.toString() ?? ''),
 			side_dishes_per_recipe: parseInt(fd.get('side_dishes_per_recipe')?.toString() ?? ''),
-			side_dishes_per_slot: parseInt(fd.get('side_dishes_per_slot')?.toString() ?? '')
+			side_dishes_per_slot: parseInt(fd.get('side_dishes_per_slot')?.toString() ?? ''),
+			sidebar_collapsed_by_default: fd.get('sidebar_collapsed_by_default') === 'on'
 		};
-		if (Object.values(values).some(v => isNaN(v))) {
+		if (Object.values(values).filter(v => typeof v === 'number').some(v => isNaN(v))) {
 			return fail(400, { error: 'Todos los campos deben ser números válidos' });
 		}
 		setOptions(values);
