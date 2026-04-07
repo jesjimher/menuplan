@@ -164,7 +164,7 @@
 				on:touchend={onTouchEnd}
 				on:touchmove={onTouchMove}
 				on:contextmenu|preventDefault={() => {}}
-				class="w-full text-left text-xs transition-colors select-none pr-6 px-2 py-1.5 rounded-lg"
+				class="w-full text-left text-xs transition-colors select-none pr-6 px-2 py-1.5 rounded-lg empty-accompaniment {slot?.recipe ? 'has-recipe filled-accompaniment' : ''}"
 				style="{slot?.recipe
 					? `background: var(--secondary-container); color: var(--secondary);`
 					: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
@@ -242,7 +242,7 @@
 					on:touchend={onTouchEnd}
 					on:touchmove={onTouchMove}
 					on:contextmenu|preventDefault={() => {}}
-					class="w-full text-left text-xs transition-all select-none {slot?.recipe?.image_type ? `relative overflow-hidden rounded-xl shadow-sm hover:shadow-md ${imgH}` : slot?.recipe ? 'px-3 py-2.5 rounded-xl shadow-sm min-h-[2.5rem] flex items-start' : `px-2.5 py-3 rounded-xl ${emptyH} flex flex-col items-center justify-center gap-1`}"
+					class="w-full text-left text-xs transition-all select-none empty-recipe-slot {slot?.recipe?.image_type ? `relative overflow-hidden rounded-xl shadow-sm hover:shadow-md ${imgH}` : slot?.recipe ? 'recipe-without-image px-3 py-2.5 rounded-xl shadow-sm min-h-[2.5rem] flex items-start' : `px-2.5 py-3 rounded-xl ${emptyH} flex flex-col items-center justify-center gap-1`}"
 					style="{slot?.recipe
 						? (slot.recipe.image_type ? 'background: var(--surface);' : `background: var(--surface); color: var(--text);`)
 						: `background: var(--surface-container-low); border: 2px dashed var(--border); color: var(--text-muted);`}"
@@ -415,6 +415,23 @@
 		background: rgba(255, 255, 255, 1);
 		box-shadow: 0 3px 8px rgba(0,0,0,0.4), 0 0 0 1.5px rgba(0,0,0,0.28);
 	}
+	.empty-recipe-slot:not(:has(.empty-slot)) {
+		/* empty state when no recipe is assigned - handled via inner element */
+	}
+	.empty-recipe-slot:has(.empty-slot) {
+		transition: all 0.2s ease;
+	}
+	.empty-recipe-slot:has(.empty-slot):hover {
+		border-style: solid;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+	}
+	.recipe-without-image {
+		transition: all 0.2s ease;
+	}
+	.recipe-without-image:hover {
+		box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+		transform: translateY(-1px);
+	}
 	.empty-slot {
 		display: flex;
 		flex-direction: column;
@@ -433,5 +450,20 @@
 		font-size: 13px;
 		font-weight: 500;
 		color: var(--text-muted);
+	}
+	.empty-accompaniment {
+		transition: all 0.2s ease;
+	}
+	.empty-accompaniment:hover:not(.has-recipe) {
+		border-style: solid;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+		transform: scale(1.01);
+	}
+	.filled-accompaniment {
+		transition: all 0.2s ease;
+	}
+	.filled-accompaniment:hover {
+		box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+		transform: translateY(-1px);
 	}
 </style>
