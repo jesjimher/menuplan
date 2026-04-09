@@ -3,7 +3,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import type { WeekData, Recipe, Rule } from '$lib/types/index.js';
 	import { checkRules } from '$lib/utils/ruleChecker.js';
-	import { getPreviousWeekKey, getWeekDates, WEEKDAY_NAMES, SHORT_MONTH_NAMES } from '$lib/utils/dates.js';
+	import { getWeekKey, getPreviousWeekKey, getWeekDates, WEEKDAY_NAMES, SHORT_MONTH_NAMES } from '$lib/utils/dates.js';
 	import WeekHeader from '$lib/components/week/WeekHeader.svelte';
 	import ViolationBanner from '$lib/components/week/ViolationBanner.svelte';
 	import RecipeSlot from '$lib/components/week/RecipeSlot.svelte';
@@ -58,8 +58,19 @@
 
 	let weekDates = $derived(getWeekDates(weekKey));
 
+	const now = new Date();
+	const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+
 	onMount(() => {
 		isTouchDevice = 'ontouchstart' in window;
+
+		// On mobile, auto-scroll to today if viewing the current week
+		if (window.innerWidth < 640 && weekKey === getWeekKey()) {
+			const today = new Date();
+			const jsDay = today.getDay(); // 0=Sun, 1=Mon...6=Sat
+			const isoWeekday = jsDay === 0 ? 7 : jsDay; // 1=Mon...7=Sun
+			document.getElementById(`day-${isoWeekday}`)?.scrollIntoView({ block: 'start' });
+		}
 	});
 
 	function prevWeek() {
@@ -554,16 +565,17 @@
 				{#each [1,2,3,4,5,6,7] as weekday, i}
 					{@const date = weekDates[i]}
 					{@const isWeekend = i >= 5}
+					{@const isToday = date != null && date.getTime() === todayUTC.getTime()}
 					{@const dayComidaCfg = weekData?.configs[weekday]?.comida}
 					{@const dayCenaCfg = weekData?.configs[weekday]?.cena}
 					{@const dayFullyDisabled = dayComidaCfg?.disabled && dayCenaCfg?.disabled}
 
-					<div class="rounded-2xl overflow-hidden flex flex-col lg:contents"
-						style="background: var(--surface-container-low);">
+					<div id="day-{weekday}" class="rounded-2xl overflow-hidden flex flex-col lg:contents"
+						style="background: {isToday ? '#ffe8d4' : 'var(--surface-container-low)'};">
 
 						<!-- Cabecera del día -->
 						<div class="px-2 pt-4 pb-2 shrink-0 text-center"
-							style="grid-column: {i+1}; grid-row: 1; background: var(--background);">
+							style="grid-column: {i+1}; grid-row: 1; background: {isToday ? 'var(--primary-light)' : 'var(--background)'}; {isToday ? 'border-top: 3px solid var(--primary);' : ''}">
 							<div class="flex flex-col items-center">
 								<div class="flex items-center gap-1">
 									<p class="font-semibold text-base leading-tight" style="font-family: 'Epilogue', sans-serif; color: {isWeekend ? 'var(--primary-hover)' : 'var(--primary)'};">{WEEKDAY_NAMES[i]}</p>
@@ -580,12 +592,15 @@
 								{#if date}
 									<p class="text-[10px] uppercase tracking-widest font-bold mt-0.5" style="color: var(--secondary);">{date.getUTCDate()} {SHORT_MONTH_NAMES[date.getUTCMonth()]}</p>
 								{/if}
+								{#if isToday}
+									<span class="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full mt-1" style="background: var(--primary); color: var(--primary-light);">hoy</span>
+								{/if}
 							</div>
 						</div>
 
 						{#if dayFullyDisabled}
 							<div class="flex-1 flex flex-col lg:flex-none"
-								style="background: var(--surface-container-low); grid-column: {i+1}; grid-row: 2 / 4;">
+								style="background: {isToday ? '#ffe8d4' : 'var(--surface-container-low)'}; grid-column: {i+1}; grid-row: 2 / 4;">
 								<div class="px-2.5 py-3 flex-1 flex flex-col">
 									<textarea
 										placeholder="Motivo (ej. Vacaciones en París)..."
@@ -602,7 +617,7 @@
 							{@const isComida = mealType === 'comida'}
 
 							<div class="flex-1 flex flex-col lg:flex-none"
-								style="background: {isComida ? 'var(--surface-container-low)' : 'var(--background)'}; grid-column: {i+1}; grid-row: {j+2};">
+								style="background: {isToday ? '#ffe8d4' : (isComida ? 'var(--surface-container-low)' : 'var(--background)')}; grid-column: {i+1}; grid-row: {j+2};">
 
 								<!-- Encabezado de franja -->
 								<div class="flex items-center gap-1 px-2.5 py-2 border-b"
