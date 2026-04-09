@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import { enhance } from '$app/forms';
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { Recipe } from '$lib/types/index.js';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
@@ -50,7 +51,7 @@
 		showImageSearch = false;
 	}
 
-	let checkedIds: Set<number> = $state(new Set());
+	let checkedIds = new SvelteSet<number>();
 	let bulkTag = $state('');
 	let bulkAdding = $state(false);
 
@@ -72,7 +73,6 @@
 		} else {
 			filteredRecipes.forEach(r => checkedIds.add(r.id));
 		}
-		checkedIds = checkedIds;
 	}
 
 	onMount(() => {
@@ -194,7 +194,7 @@
 				{#each selectedTags as tag}
 					<button on:click={() => toggleTag(tag)}
 						class="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full font-medium transition-colors"
-						style="background: var(--nav-active); color: white;">
+						style="background: var(--primary); color: white;">
 						{tag}
 						<span class="opacity-70">&times;</span>
 					</button>
@@ -202,48 +202,6 @@
 			</div>
 		{/if}
 
-		<!-- Barra de acción masiva -->
-		{#if checkedIds.size > 0}
-			<div class="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 px-4 py-3 rounded-xl shadow-sm"
-				style="background: var(--surface); border: 1px solid var(--border);">
-				<span class="text-sm font-medium shrink-0" style="color: var(--text);">
-					{checkedIds.size} sel.
-				</span>
-				<form method="POST" action="?/bulkTag"
-					use:enhance={() => {
-						bulkAdding = true;
-						return async ({ update }) => {
-							bulkTag = '';
-							checkedIds = new Set();
-							bulkAdding = false;
-							await update();
-						};
-					}}
-					class="contents">
-					<input type="hidden" name="ids" value={[...checkedIds].join(',')} />
-					<input type="hidden" name="tag" value={bulkTag} />
-					<div class="relative flex-1 min-w-[120px]">
-						<TagInput
-							bind:value={bulkTag}
-							tags={allTags}
-							placeholder="Tag..."
-							class="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none"
-						/>
-					</div>
-					<button type="submit" disabled={!bulkTag.trim() || bulkAdding}
-						class="p-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors"
-						title="Añadir tag"
-						style="background: var(--primary); color: white;">
-						{bulkAdding ? 'Añadiendo...' : 'Añadir tag'}
-					</button>
-				</form>
-				<button on:click={() => { checkedIds = new Set(); }}
-					class="text-sm shrink-0 transition-colors"
-					style="color: var(--text-secondary);">
-					Cancelar
-				</button>
-			</div>
-		{/if}
 
 		<!-- Panel de importación -->
 		{#if showImport}
@@ -391,12 +349,59 @@
 		{/if}
 
 		<!-- Cabecera de lista -->
-		<div class="flex items-center justify-between mb-3">
-			<p class="text-sm" style="color: var(--text-secondary);">
-				{filteredRecipes.length} resultado{filteredRecipes.length !== 1 ? 's' : ''}
-			</p>
+		<div class="flex flex-wrap items-center gap-2 mb-3 min-h-[2rem]">
+			{#if checkedIds.size > 0}
+				<span class="text-sm font-medium shrink-0" style="color: var(--text);">{checkedIds.size} sel.</span>
+				<form method="POST" action="?/bulkTag"
+					use:enhance={() => {
+						bulkAdding = true;
+						return async ({ update }) => {
+							bulkTag = '';
+							checkedIds.clear();
+							bulkAdding = false;
+							await update();
+						};
+					}}
+					class="contents">
+					<input type="hidden" name="ids" value={[...checkedIds].join(',')} />
+					<input type="hidden" name="tag" value={bulkTag} />
+					<div class="relative flex-1 min-w-[120px]">
+						<TagInput
+							bind:value={bulkTag}
+							tags={allTags}
+							placeholder="Tag..."
+							class="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none"
+						/>
+					</div>
+					<button type="submit" disabled={!bulkTag.trim() || bulkAdding}
+						class="px-3 py-1 rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors"
+						title="Añadir tag"
+						style="background: var(--primary); color: white;">
+						{bulkAdding ? '...' : 'Añadir tag'}
+					</button>
+				</form>
+				<form method="POST" action="?/bulkDelete"
+					use:enhance={({ cancel }) => {
+						if (!confirm(`¿Eliminar ${checkedIds.size} receta${checkedIds.size !== 1 ? 's' : ''}?`)) { cancel(); return; }
+						return async ({ update }) => {
+							checkedIds.clear();
+							await update();
+						};
+					}}>
+					<input type="hidden" name="ids" value={[...checkedIds].join(',')} />
+					<button type="submit"
+						class="px-3 py-1 rounded-lg text-sm font-medium shrink-0 transition-colors"
+						style="background: var(--error, #dc2626); color: white;">
+						Eliminar
+					</button>
+				</form>
+			{:else}
+				<p class="text-sm" style="color: var(--text-secondary);">
+					{filteredRecipes.length} resultado{filteredRecipes.length !== 1 ? 's' : ''}
+				</p>
+			{/if}
 			<button on:click={toggleSelectAll}
-				class="text-xs font-medium transition-colors"
+				class="text-xs font-medium transition-colors ml-auto shrink-0"
 				style="color: var(--text-secondary);">
 				{allVisibleSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
 			</button>
@@ -412,7 +417,6 @@
 						on:change={() => {
 							if (checkedIds.has(recipe.id)) checkedIds.delete(recipe.id);
 							else checkedIds.add(recipe.id);
-							checkedIds = checkedIds;
 						}}
 						class="mt-0.5 w-4 h-4 shrink-0" style="accent-color: var(--primary);" />
 					{#if recipe.image_type}
@@ -432,7 +436,7 @@
 									<button on:click={() => toggleTag(tag)}
 										class="text-xs px-2 py-0.5 rounded-full font-medium transition-colors"
 										style="{selectedTags.includes(tag.trim().toLowerCase())
-											? 'background: var(--nav-active); color: white;'
+											? 'background: var(--primary); color: white;'
 											: 'background: var(--surface-container); color: var(--text);'}">
 										{tag.trim()}
 									</button>

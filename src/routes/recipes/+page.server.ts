@@ -61,5 +61,11 @@ export const actions = {
 			if (current.includes(tag)) continue;
 			updateRecipe(id, { tags: [...current, tag].join(',') });
 		}
+	},
+	bulkDelete: async ({ request }) => {
+		const fd = await request.formData();
+		const ids = fd.get('ids')?.toString().split(',').map(Number).filter(Boolean);
+		if (!ids?.length) return fail(400, { error: 'Datos incompletos' });
+		for (const id of ids) deleteRecipe(id);
 	}
 };
