@@ -616,7 +616,7 @@
 							{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
 							{@const isComida = mealType === 'comida'}
 
-							<div class="flex-1 flex flex-col lg:flex-none"
+							<div class="flex-1 flex flex-col lg:flex-none {j === 1 ? 'mt-6 lg:mt-8' : ''}"
 								style="background: {isToday ? '#ffe8d4' : (isComida ? 'var(--surface-container-low)' : 'var(--background)')}; grid-column: {i+1}; grid-row: {j+2};">
 
 								<!-- Encabezado de franja -->
