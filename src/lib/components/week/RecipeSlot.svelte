@@ -133,7 +133,7 @@
 
 	function squareLimit(node: HTMLElement) {
 		function update() {
-			node.style.maxHeight = node.offsetWidth + 'px';
+			node.style.maxHeight = (node.offsetWidth * 3 / 4) + 'px';
 		}
 		const ro = new ResizeObserver(update);
 		ro.observe(node);
@@ -143,13 +143,13 @@
 
 	let imgH = $derived(
 		isAcc ? '' :
-		cfg.recipe_count === 1 ? 'min-h-[100px]' :
-		cfg.recipe_count === 2 ? 'min-h-[80px]' : 'min-h-[60px]'
+		cfg.recipe_count === 1 ? 'min-h-[70px]' :
+		cfg.recipe_count === 2 ? 'min-h-[52px]' : 'min-h-[40px]'
 	);
 	let emptyH = $derived(
 		isAcc ? '' :
-		cfg.recipe_count === 1 ? 'min-h-[3.5rem]' :
-		cfg.recipe_count === 2 ? 'min-h-[2.5rem]' : 'min-h-[2rem]'
+		cfg.recipe_count === 1 ? 'min-h-[3rem]' :
+		cfg.recipe_count === 2 ? 'min-h-[2rem]' : 'min-h-[1.5rem]'
 	);
 </script>
 
