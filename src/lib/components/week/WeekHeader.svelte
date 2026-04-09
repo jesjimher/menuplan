@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { sidebarOpen } from '$lib/stores/ui.js';
+	import { getWeekDates } from '$lib/utils/dates.js';
 
 	let {
 		weekKey,
 		calculating = false,
 		onPrevWeek,
+		onToday,
 		onNextWeek,
 		onCalculate,
 		onRecalculate,
@@ -14,15 +16,22 @@
 		weekKey: string;
 		calculating: boolean;
 		onPrevWeek: () => void;
+		onToday: () => void;
 		onNextWeek: () => void;
 		onCalculate: () => void;
 		onRecalculate: () => void;
 		onClear: () => void;
 		onCopyPrevious: () => void;
 	} = $props();
+
+	const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+	const dates = $derived(getWeekDates(weekKey));
+	const year = $derived(parseInt(weekKey.split('-W')[0]));
+	const weekDisplay = $derived(dates?.length === 7 ? `${dates[0].getUTCDate()} a ${dates[6].getUTCDate()} de ${MONTH_NAMES[dates[6].getUTCMonth()]}` : '');
 </script>
 
-<header class="px-4 sm:px-6 py-3 shrink-0" style="background: rgba(255,248,243,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--surface-container-highest);">
+<header class="px-4 sm:px-6 py-3 shrink-0 relative" style="background: rgba(255,248,243,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--surface-container-highest);">
 	<div class="flex items-center gap-2 sm:gap-3">
 		<button class="lg:hidden p-1.5 rounded-lg transition-colors shrink-0"
 			style="color: var(--primary);"
@@ -32,22 +41,32 @@
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 			</svg>
 		</button>
-		<h1 class="text-xl sm:text-2xl font-black tracking-tight" style="font-family: 'Epilogue', sans-serif; color: var(--primary);">
-			<span class="sm:hidden">{weekKey}</span>
-			<span class="hidden sm:inline">Semana {weekKey}</span>
+		<h1 class="text-lg sm:text-xl font-black tracking-tight" style="font-family: 'Epilogue', sans-serif; color: var(--primary); line-height: 1.2;">
+			<div class="sm:hidden">{weekDisplay}</div>
+			<div class="hidden sm:inline-block">
+				<div>{weekDisplay}</div>
+				<div class="text-xs font-normal" style="color: var(--text-muted); margin-top: 0.125rem;">{year}</div>
+			</div>
 		</h1>
-		<nav class="flex items-center gap-1 sm:gap-2 text-sm font-bold" aria-label="Navegación de semanas">
+
+		<nav class="absolute left-1/2 transform -translate-x-1/2 flex items-center justify-center gap-1 sm:gap-2 text-sm font-bold" aria-label="Navegación de semanas">
 			<button on:click={onPrevWeek}
-				class="nav-btn flex items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors"
-				aria-label="Semana anterior">
-				<span class="sm:hidden">&larr;</span>
-				<span class="hidden sm:inline">&larr; Anterior</span>
+				class="nav-btn p-2 rounded-lg transition-colors"
+				aria-label="Semana anterior"
+				title="Anterior">
+				<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+			</button>
+			<button on:click={onToday}
+				class="nav-btn px-3 py-1.5 rounded-lg transition-colors text-xs font-semibold"
+				aria-label="Ir a la semana actual"
+				title="Hoy">
+				Hoy
 			</button>
 			<button on:click={onNextWeek}
-				class="nav-btn flex items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors"
-				aria-label="Semana siguiente">
-				<span class="sm:hidden">&rarr;</span>
-				<span class="hidden sm:inline">Siguiente &rarr;</span>
+				class="nav-btn p-2 rounded-lg transition-colors"
+				aria-label="Semana siguiente"
+				title="Siguiente">
+				<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
 			</button>
 		</nav>
 

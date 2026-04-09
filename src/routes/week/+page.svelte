@@ -87,6 +87,11 @@
 		goto(`/week?weekKey=${next}`, { noScroll: true });
 	}
 
+	function toToday() {
+		const today = getWeekKey();
+		goto(`/week?weekKey=${today}`, { noScroll: true });
+	}
+
 	function getSlot(weekday: number, mealType: string, slotIndex: number, isAccompaniment: number) {
 		return weekData?.slots.find(s =>
 			s.weekday === weekday && s.meal_type === mealType &&
@@ -541,6 +546,7 @@
 		{weekKey}
 		{calculating}
 		onPrevWeek={prevWeek}
+		onToday={toToday}
 		onNextWeek={nextWeek}
 		onCalculate={calculatePlan}
 		onRecalculate={recalculatePlan}
