@@ -131,15 +131,25 @@
 		}
 	}
 
+	function squareLimit(node: HTMLElement) {
+		function update() {
+			node.style.maxHeight = node.offsetWidth + 'px';
+		}
+		const ro = new ResizeObserver(update);
+		ro.observe(node);
+		update();
+		return { destroy() { ro.disconnect(); } };
+	}
+
 	let imgH = $derived(
 		isAcc ? '' :
 		cfg.recipe_count === 1 ? 'min-h-[100px]' :
-		cfg.recipe_count === 2 ? 'min-h-[52px]' : 'min-h-[40px]'
+		cfg.recipe_count === 2 ? 'min-h-[80px]' : 'min-h-[60px]'
 	);
 	let emptyH = $derived(
 		isAcc ? '' :
 		cfg.recipe_count === 1 ? 'min-h-[3.5rem]' :
-		cfg.recipe_count === 2 ? 'min-h-[1.75rem]' : 'min-h-[1.25rem]'
+		cfg.recipe_count === 2 ? 'min-h-[2.5rem]' : 'min-h-[2rem]'
 	);
 </script>
 
@@ -222,8 +232,8 @@
 	</div>
 {:else}
 	<!-- Main recipe slot -->
-	<div>
-		<div class="dropdown-container relative"
+	<div class="flex-1 flex flex-col" use:squareLimit>
+		<div class="dropdown-container relative flex-1 flex flex-col"
 			style:box-shadow={isDragOver ? '0 0 0 2px var(--primary)' : undefined}
 			style:outline={isMoveMode ? '2px dashed var(--primary)' : undefined}
 			style:outline-offset={isMoveMode ? '2px' : undefined}
@@ -231,7 +241,7 @@
 			on:dragleave={onDragLeave}
 			on:drop|preventDefault={onDrop}
 		>
-			<div class="relative group/slot">
+			<div class="relative group/slot flex-1 flex flex-col">
 				<button
 					draggable={!isTouchDevice && !!slot?.recipe ? 'true' : 'false'}
 					class:opacity-40={isDragSource}
@@ -242,7 +252,7 @@
 					on:touchend={onTouchEnd}
 					on:touchmove={onTouchMove}
 					on:contextmenu|preventDefault={() => {}}
-					class="w-full text-left text-xs transition-all select-none empty-recipe-slot {slot?.recipe?.image_type ? `relative overflow-hidden rounded-xl shadow-sm hover:shadow-md ${imgH}` : slot?.recipe ? 'recipe-without-image px-3 py-2.5 rounded-xl shadow-sm min-h-[2.5rem] flex items-start' : `px-2.5 py-3 rounded-xl ${emptyH} flex flex-col items-center justify-center gap-1`}"
+					class="w-full text-left text-xs transition-all select-none empty-recipe-slot lg:flex-1 {slot?.recipe?.image_type ? `relative overflow-hidden rounded-xl shadow-sm hover:shadow-md ${imgH}` : slot?.recipe ? 'recipe-without-image px-3 py-2.5 rounded-xl shadow-sm min-h-[2.5rem] flex items-start' : `px-2.5 py-3 rounded-xl ${emptyH} flex flex-col items-center justify-center gap-1`}"
 					style="{slot?.recipe
 						? (slot.recipe.image_type ? 'background: var(--surface);' : `background: var(--surface); color: var(--text);`)
 						: `background: var(--surface-container-low); border: 2px dashed var(--border); color: var(--text-muted);`}"

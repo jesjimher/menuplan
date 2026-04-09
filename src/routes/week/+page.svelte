@@ -563,11 +563,12 @@
 	{/if}
 
 	<!-- Grid semanal -->
-	<div class="flex-1 overflow-auto p-3 sm:p-5">
+	<div class="flex-1 overflow-hidden flex flex-col min-h-0">
 		{#if !weekData}
 			<div class="text-center py-16 text-sm" style="color: var(--text-muted);">Cargando...</div>
 		{:else}
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 lg:gap-x-3 lg:gap-y-0">
+		<div class="flex-1 overflow-auto p-3 sm:p-5 min-h-0">
+			<div class="week-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 lg:gap-x-3 lg:gap-y-0">
 				{#each [1,2,3,4,5,6,7] as weekday, i}
 					{@const date = weekDates[i]}
 					{@const isWeekend = i >= 5}
@@ -622,7 +623,7 @@
 							{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
 							{@const isComida = mealType === 'comida'}
 
-							<div class="flex-1 flex flex-col lg:flex-none {j === 1 ? 'mt-6 lg:mt-8' : ''}"
+							<div class="flex-1 flex flex-col {j === 1 ? 'mt-6 lg:mt-4' : ''}"
 								style="background: {isToday ? '#ffe8d4' : (isComida ? 'var(--surface-container-low)' : 'var(--background)')}; grid-column: {i+1}; grid-row: {j+2};">
 
 								<!-- Encabezado de franja -->
@@ -670,7 +671,7 @@
 								{:else}
 
 								<!-- Slots -->
-								<div class="px-2 pb-3 pt-2 space-y-2 flex-1">
+								<div class="px-2 pb-3 pt-2 flex-1 flex flex-col gap-2">
 									{#each Array(cfg.recipe_count) as _, slotIdx}
 										{@const slot = getSlot(weekday, mealType, slotIdx, 0)}
 										{@const key = slotKey(weekday, mealType, slotIdx, 0)}
@@ -718,7 +719,7 @@
 
 									<!-- Acompañamientos por franja -->
 									{#if cfg.accompaniment_per_slot > 0}
-										<div class="pt-1.5 space-y-1.5"
+										<div class="pt-1.5 space-y-1.5 shrink-0"
 											style="border-top: 1px solid var(--surface-container-highest);">
 											{#each Array(cfg.accompaniment_per_slot) as _, aIdx}
 												{@const accSlot = getSlot(weekday, mealType, aIdx, 1)}
@@ -747,10 +748,11 @@
 					</div>
 				{/each}
 			</div>
-		{/if}
+		</div>
 
 		{#if weekData}
 			<ViolationBanner violations={weekData.violations ?? []} />
+		{/if}
 		{/if}
 	</div>
 
@@ -771,6 +773,12 @@
 </div>
 
 <style>
+	@media (min-width: 1024px) {
+		.week-grid {
+			min-height: 100%;
+			grid-template-rows: auto 1fr 1fr;
+		}
+	}
 	.select-none {
 		-webkit-touch-callout: none;
 	}
