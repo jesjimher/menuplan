@@ -32,24 +32,26 @@
 </script>
 
 <header class="px-4 sm:px-6 py-3 shrink-0 relative" style="background: rgba(255,248,243,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--surface-container-highest);">
-	<div class="flex items-center gap-2 sm:gap-3">
-		<button class="lg:hidden p-1.5 rounded-lg transition-colors shrink-0"
-			style="color: var(--primary);"
-			aria-label="Abrir menú lateral"
-			on:click={() => $sidebarOpen = true}>
-			<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-			</svg>
-		</button>
-		<h1 class="text-lg sm:text-xl font-black tracking-tight" style="font-family: 'Epilogue', sans-serif; color: var(--primary); line-height: 1.2;">
-			<div class="sm:hidden">{weekDisplay}</div>
-			<div class="hidden sm:inline-block">
-				<div>{weekDisplay}</div>
-				<div class="text-xs font-normal" style="color: var(--text-muted); margin-top: 0.125rem;">{year}</div>
-			</div>
-		</h1>
+	<div class="flex items-center">
+		<div class="flex items-center gap-2 sm:gap-3 shrink-0" style="width: 14rem">
+			<button class="lg:hidden p-1.5 rounded-lg transition-colors shrink-0"
+				style="color: var(--primary);"
+				aria-label="Abrir menú lateral"
+				on:click={() => $sidebarOpen = true}>
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+				</svg>
+			</button>
+			<h1 class="text-lg sm:text-xl font-black tracking-tight" style="font-family: 'Epilogue', sans-serif; color: var(--primary); line-height: 1.2;">
+				<div class="sm:hidden">{weekDisplay}</div>
+				<div class="hidden sm:inline-block">
+					<div>{weekDisplay}</div>
+					<div class="text-xs font-normal" style="color: var(--text-muted); margin-top: 0.125rem;">{year}</div>
+				</div>
+			</h1>
+		</div>
 
-		<nav class="absolute left-1/2 transform -translate-x-1/2 flex items-center justify-center gap-1 sm:gap-2 text-sm font-bold" aria-label="Navegación de semanas">
+		<nav class="flex items-center gap-1 sm:gap-2 text-sm font-bold" aria-label="Navegación de semanas">
 			<button on:click={onPrevWeek}
 				class="nav-btn p-2 rounded-lg transition-colors"
 				aria-label="Semana anterior"
