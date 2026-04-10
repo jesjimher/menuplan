@@ -322,25 +322,53 @@
 		await invalidateAll();
 	}
 
-	async function toggleDisableMeal(weekday: number, mealType: string) {
+	async function decrementMealCount(weekday: number, mealType: string) {
 		if (!weekData) return;
-		const cfg = weekData.configs[weekday]?.[mealType as 'comida' | 'cena'];
-		const nowDisabled = !cfg?.disabled;
-		weekData = {
-			...weekData,
-			configs: {
-				...weekData.configs,
-				[weekday]: {
-					...weekData.configs[weekday],
-					[mealType]: { ...cfg, disabled: nowDisabled, disabled_comment: nowDisabled ? (cfg?.disabled_comment ?? '') : null }
+		const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena');
+		if (cfg.recipe_count <= 1) {
+			const comment = cfg.disabled_comment ?? '';
+			weekData = {
+				...weekData,
+				configs: {
+					...weekData.configs,
+					[weekday]: {
+						...weekData.configs[weekday],
+						[mealType]: { ...cfg, recipe_count: 0, disabled: true, disabled_comment: comment }
+					}
 				}
-			}
-		};
-		await fetch('/api/week/config', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, disabled: nowDisabled, disabled_comment: nowDisabled ? (cfg?.disabled_comment ?? '') : null })
-		});
+			};
+			fetch('/api/week/config', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, recipe_count: 0, disabled: true, disabled_comment: comment })
+			});
+		} else {
+			await updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count - 1);
+		}
+	}
+
+	async function incrementMealCount(weekday: number, mealType: string) {
+		if (!weekData) return;
+		const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena');
+		if (cfg.disabled) {
+			weekData = {
+				...weekData,
+				configs: {
+					...weekData.configs,
+					[weekday]: {
+						...weekData.configs[weekday],
+						[mealType]: { ...cfg, recipe_count: 1, disabled: false, disabled_comment: null }
+					}
+				}
+			};
+			fetch('/api/week/config', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, recipe_count: 1, disabled: false, disabled_comment: null })
+			});
+		} else {
+			await updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count + 1);
+		}
 	}
 
 	async function setDisabledComment(weekday: number, mealType: string, comment: string) {
@@ -622,13 +650,20 @@
 							<div class="flex-1 flex flex-col lg:flex-none"
 								style="{isToday ? 'background: var(--primary-light);' : ''} grid-column: {i+2}; grid-row: 2 / 4;">
 								<div class="px-2.5 py-3 flex-1 flex flex-col">
-									<textarea
-										placeholder="Motivo (ej. Vacaciones en París)..."
-										on:change={(e) => setDayComment(weekday, (e.target as HTMLTextAreaElement).value)}
-										class="flex-1 w-full text-xs px-2.5 py-2 rounded-xl italic focus:outline-none resize-none"
-										style="background: var(--surface); border: 2px dashed var(--border); color: var(--text-muted);"
-										aria-label="Motivo de desactivación del día"
-									>{dayComidaCfg?.disabled_comment ?? ''}</textarea>
+									<div class="flex-1 flex items-center justify-center rounded-xl px-3 py-2 cursor-text"
+									on:click={(e) => (e.currentTarget.querySelector('[contenteditable]') as HTMLElement)?.focus()}
+										style="background: var(--surface); border: 2px dashed var(--border);">
+										<div
+											contenteditable="true"
+											role="textbox"
+											aria-multiline="true"
+											aria-label="Motivo de desactivación del día"
+											on:blur={(e) => setDayComment(weekday, (e.currentTarget as HTMLDivElement).innerText.trim())}
+											data-placeholder="Motivo (ej. Vacaciones en París)..."
+											class="disabled-reason w-full text-center text-xs italic focus:outline-none"
+											style="color: var(--text-secondary);"
+										>{dayComidaCfg?.disabled_comment ?? ''}</div>
+									</div>
 								</div>
 							</div>
 						{:else}
@@ -640,46 +675,43 @@
 								style="{isToday ? 'background: var(--primary-light);' : ''} grid-column: {i+2}; grid-row: {j+2};">
 
 								<!-- Encabezado de franja -->
-								<div class="flex items-center gap-1 px-2.5 py-2 border-b"
+								<div class="flex items-center gap-1 px-2.5 py-2 border-b lg:justify-center"
 									style="border-color: var(--border);">
 									<span class="flex-1 lg:hidden text-[10px] font-black uppercase tracking-tighter"
 										style="color: {cfg.disabled ? 'var(--text-muted)' : (isComida ? 'var(--comida-accent)' : 'var(--cena-accent)')}; {cfg.disabled ? 'text-decoration: line-through; opacity: 0.5;' : ''}">
 										{isComida ? 'COMIDA' : 'CENA'}
 									</span>
-									{#if !cfg.disabled}
-										<button
-											on:click={() => updateConfig(weekday, mealType, 'recipe_count', Math.max(1, cfg.recipe_count - 1))}
-											class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
-											style="color: var(--text-muted);"
-										>&minus;</button>
-										<span class="text-xs w-4 text-center tabular-nums"
-											style="color: var(--text-muted);">{cfg.recipe_count}</span>
-										<button
-											on:click={() => updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count + 1)}
-											class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
-											style="color: var(--text-muted);"
-										>+</button>
-									{/if}
 									<button
-										on:click={() => toggleDisableMeal(weekday, mealType)}
-										title={cfg.disabled ? 'Planificar' : 'No planificar'}
-										aria-label={cfg.disabled ? `Planificar ${mealType}` : `No planificar ${mealType}`}
-										class="w-5 h-5 flex items-center justify-center rounded transition-opacity hover:opacity-70"
-										style="color: {cfg.disabled ? 'var(--error)' : 'var(--text-muted)'};"
-									>
-										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-									</button>
+										on:click={() => decrementMealCount(weekday, mealType)}
+										disabled={cfg.disabled}
+										class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60 disabled:opacity-25 disabled:cursor-not-allowed disabled:pointer-events-none"
+										style="color: var(--text-muted);"
+									>&minus;</button>
+									<span class="text-xs w-4 text-center tabular-nums"
+										style="color: var(--text-muted);">{cfg.disabled ? 0 : cfg.recipe_count}</span>
+									<button
+										on:click={() => incrementMealCount(weekday, mealType)}
+										class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
+										style="color: var(--text-muted);"
+									>+</button>
 								</div>
 
 								{#if cfg.disabled}
 									<div class="px-2.5 pb-2.5 pt-2 flex-1 flex flex-col">
-										<textarea
-											placeholder="Motivo (ej. Cenamos fuera)..."
-											on:change={(e) => setDisabledComment(weekday, mealType, (e.target as HTMLTextAreaElement).value)}
-											class="flex-1 w-full text-xs px-2.5 py-2 rounded-xl italic focus:outline-none resize-none"
-											style="background: var(--surface); border: 2px dashed var(--border); color: var(--text-muted);"
-											aria-label="Motivo de desactivación de {mealType}"
-										>{cfg.disabled_comment ?? ''}</textarea>
+										<div class="flex-1 flex items-center justify-center rounded-xl px-3 py-2 cursor-text"
+									on:click={(e) => (e.currentTarget.querySelector('[contenteditable]') as HTMLElement)?.focus()}
+											style="background: var(--surface); border: 2px dashed var(--border);">
+											<div
+												contenteditable="true"
+												role="textbox"
+												aria-multiline="true"
+												aria-label="Motivo de desactivación de {mealType}"
+												on:blur={(e) => setDisabledComment(weekday, mealType, (e.currentTarget as HTMLDivElement).innerText.trim())}
+												data-placeholder="Motivo (ej. Cenamos fuera)..."
+												class="disabled-reason w-full text-center text-xs italic focus:outline-none"
+												style="color: var(--text-secondary);"
+											>{cfg.disabled_comment ?? ''}</div>
+										</div>
 									</div>
 								{:else}
 
@@ -794,5 +826,10 @@
 	}
 	.select-none {
 		-webkit-touch-callout: none;
+	}
+	.disabled-reason:empty::before {
+		content: attr(data-placeholder);
+		color: var(--text-muted);
+		pointer-events: none;
 	}
 </style>
