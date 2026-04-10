@@ -30,17 +30,17 @@
   --border-hover: #84746d;
 
   /* Meal type tones */
-  --comida-bg: #fff2e2;
-  --comida-header: #fdebd5;
-  --comida-accent: #552b17;
-  --comida-slot-filled: #fdebd5;
-  --comida-slot-border: #d6c2bb;
+  --comida-bg: #eef1f8;
+  --comida-header: #dce3f2;
+  --comida-accent: #4b5580;
+  --comida-slot-filled: #dfe4f4;
+  --comida-slot-border: #b4bdd8;
 
-  --cena-bg: #fff8f3;
-  --cena-header: #fff2e2;
-  --cena-accent: #675d4f;
-  --cena-slot-filled: #fdebd5;
-  --cena-slot-border: #d6c2bb;
+  --cena-bg: #fef0cc;
+  --cena-header: #fcd97a;
+  --cena-accent: #a06010;
+  --cena-slot-filled: #fde9b0;
+  --cena-slot-border: #d4a040;
 
   /* Day headers — light themed */
   --day-bg: transparent;

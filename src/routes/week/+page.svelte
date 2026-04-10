@@ -578,7 +578,7 @@
 					{@const dayFullyDisabled = dayComidaCfg?.disabled && dayCenaCfg?.disabled}
 
 					<div id="day-{weekday}" class="rounded-2xl overflow-hidden flex flex-col lg:contents"
-						style="background: {isToday ? '#ffe8d4' : 'var(--surface-container-low)'};">
+						style="{isToday ? 'background: var(--primary-light);' : ''}">
 
 						<!-- Cabecera del día -->
 						<div class="px-2 pt-4 pb-2 shrink-0 text-center"
@@ -607,7 +607,7 @@
 
 						{#if dayFullyDisabled}
 							<div class="flex-1 flex flex-col lg:flex-none"
-								style="background: {isToday ? '#ffe8d4' : 'var(--surface-container-low)'}; grid-column: {i+1}; grid-row: 2 / 4;">
+								style="{isToday ? 'background: var(--primary-light);' : ''} grid-column: {i+1}; grid-row: 2 / 4;">
 								<div class="px-2.5 py-3 flex-1 flex flex-col">
 									<textarea
 										placeholder="Motivo (ej. Vacaciones en París)..."
@@ -623,14 +623,14 @@
 							{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
 							{@const isComida = mealType === 'comida'}
 
-							<div class="flex-1 flex flex-col {j === 1 ? 'mt-6 lg:mt-4' : ''}"
-								style="background: {isToday ? '#ffe8d4' : (isComida ? 'var(--surface-container-low)' : 'var(--background)')}; grid-column: {i+1}; grid-row: {j+2};">
+							<div class="flex-1 flex flex-col {j === 1 ? 'mt-2 lg:mt-3' : ''}"
+								style="{isToday ? 'background: var(--primary-light);' : ''} grid-column: {i+1}; grid-row: {j+2};">
 
 								<!-- Encabezado de franja -->
 								<div class="flex items-center gap-1 px-2.5 py-2 border-b"
-									style="border-color: var(--surface-container-highest);">
+									style="background: {isComida ? 'var(--comida-header)' : 'var(--cena-header)'}; border-color: {isComida ? 'var(--comida-slot-border)' : 'var(--cena-slot-border)'}; border-left: 3px solid {isComida ? 'var(--comida-accent)' : 'var(--cena-accent)'};">
 									<span class="flex-1 text-[10px] font-black uppercase tracking-tighter"
-										style="color: {cfg.disabled ? 'var(--text-muted)' : 'var(--text-secondary)'}; {cfg.disabled ? 'text-decoration: line-through; opacity: 0.5;' : ''}">
+										style="color: {cfg.disabled ? 'var(--text-muted)' : (isComida ? 'var(--comida-accent)' : 'var(--cena-accent)')}; {cfg.disabled ? 'text-decoration: line-through; opacity: 0.5;' : ''}">
 										{isComida ? 'COMIDA' : 'CENA'}
 									</span>
 									{#if !cfg.disabled}
