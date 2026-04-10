@@ -568,7 +568,20 @@
 			<div class="text-center py-16 text-sm" style="color: var(--text-muted);">Cargando...</div>
 		{:else}
 		<div class="flex-1 overflow-auto p-3 sm:p-5 min-h-0">
-			<div class="week-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 lg:gap-x-3 lg:gap-y-0">
+			<div class="week-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2.5rem_repeat(7,1fr)] gap-3 lg:gap-x-3 lg:gap-y-0">
+				<!-- Etiquetas de fila (solo desktop) -->
+				<div class="hidden lg:block" style="grid-column: 1; grid-row: 1;"></div>
+				<div class="hidden lg:flex items-center justify-center"
+					style="grid-column: 1; grid-row: 2; background: var(--comida-header); border-left: 3px solid var(--comida-accent);">
+					<span style="writing-mode: vertical-rl; transform: rotate(180deg); color: var(--text);"
+						class="text-[11px] font-black uppercase tracking-tight">Comida</span>
+				</div>
+				<div class="hidden lg:flex items-center justify-center mt-2 lg:mt-3"
+					style="grid-column: 1; grid-row: 3; background: var(--cena-header); border-left: 3px solid var(--cena-accent);">
+					<span style="writing-mode: vertical-rl; transform: rotate(180deg); color: var(--text);"
+						class="text-[11px] font-black uppercase tracking-tight">Cena</span>
+				</div>
+
 				{#each [1,2,3,4,5,6,7] as weekday, i}
 					{@const date = weekDates[i]}
 					{@const isWeekend = i >= 5}
@@ -582,7 +595,7 @@
 
 						<!-- Cabecera del día -->
 						<div class="px-2 pt-4 pb-2 shrink-0 text-center"
-							style="grid-column: {i+1}; grid-row: 1; background: {isToday ? 'var(--primary-light)' : 'var(--background)'}; {isToday ? 'border-top: 3px solid var(--primary);' : ''}">
+							style="grid-column: {i+2}; grid-row: 1; background: {isToday ? 'var(--primary-light)' : 'var(--background)'}; {isToday ? 'border-top: 3px solid var(--primary);' : ''}">
 							<div class="flex flex-col items-center">
 								<div class="flex items-center gap-1">
 									<p class="font-semibold text-base leading-tight" style="font-family: 'Epilogue', sans-serif; color: {isWeekend ? 'var(--primary-hover)' : 'var(--primary)'};">{WEEKDAY_NAMES[i]}</p>
@@ -607,7 +620,7 @@
 
 						{#if dayFullyDisabled}
 							<div class="flex-1 flex flex-col lg:flex-none"
-								style="{isToday ? 'background: var(--primary-light);' : ''} grid-column: {i+1}; grid-row: 2 / 4;">
+								style="{isToday ? 'background: var(--primary-light);' : ''} grid-column: {i+2}; grid-row: 2 / 4;">
 								<div class="px-2.5 py-3 flex-1 flex flex-col">
 									<textarea
 										placeholder="Motivo (ej. Vacaciones en París)..."
@@ -623,13 +636,13 @@
 							{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
 							{@const isComida = mealType === 'comida'}
 
-							<div class="flex-1 flex flex-col {j === 1 ? 'mt-2 lg:mt-3' : ''}"
-								style="{isToday ? 'background: var(--primary-light);' : ''} grid-column: {i+1}; grid-row: {j+2};">
+							<div class="flex-1 flex flex-col {j === 1 ? 'mt-2 lg:mt-0 lg:pt-3' : ''}"
+								style="{isToday ? 'background: var(--primary-light);' : ''} grid-column: {i+2}; grid-row: {j+2};">
 
 								<!-- Encabezado de franja -->
 								<div class="flex items-center gap-1 px-2.5 py-2 border-b"
-									style="background: {isComida ? 'var(--comida-header)' : 'var(--cena-header)'}; border-color: {isComida ? 'var(--comida-slot-border)' : 'var(--cena-slot-border)'}; border-left: 3px solid {isComida ? 'var(--comida-accent)' : 'var(--cena-accent)'};">
-									<span class="flex-1 text-[10px] font-black uppercase tracking-tighter"
+									style="border-color: var(--border);">
+									<span class="flex-1 lg:hidden text-[10px] font-black uppercase tracking-tighter"
 										style="color: {cfg.disabled ? 'var(--text-muted)' : (isComida ? 'var(--comida-accent)' : 'var(--cena-accent)')}; {cfg.disabled ? 'text-decoration: line-through; opacity: 0.5;' : ''}">
 										{isComida ? 'COMIDA' : 'CENA'}
 									</span>
