@@ -105,17 +105,22 @@ export function getTopRecipesOverall(mealType: string, limit = 20): (Recipe & { 
 	`).all(mealType, limit) as (Recipe & { freq: number })[];
 }
 
-export function getRecentRecipesForSlot(weekday: number, mealType: string, limit = 20): (Recipe & { last_week: string })[] {
+export function getRecentRecipesForSlot(weekday: number, mealType: string, limit = 20): (Recipe & { last_week: string | null })[] {
 	const db = getDb();
 	return db.prepare(`
-		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at, MAX(wp.week_key) as last_week
-		FROM week_plans wp
-		JOIN recipes r ON r.id = wp.recipe_id
-		WHERE wp.weekday = ? AND wp.meal_type = ? AND wp.is_accompaniment = 0
+		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at,
+		       MAX(wp.week_key) as last_week
+		FROM recipes r
+		LEFT JOIN week_plans wp ON wp.recipe_id = r.id
+		                       AND wp.weekday = ?
+		                       AND wp.meal_type = ?
+		                       AND wp.is_accompaniment = 0
+		WHERE (',' || REPLACE(LOWER(r.tags), ', ', ',') || ',' LIKE '%,' || LOWER(?) || ',%')
 		GROUP BY r.id
+		HAVING last_week IS NOT NULL
 		ORDER BY last_week DESC
 		LIMIT ?
-	`).all(weekday, mealType, limit) as (Recipe & { last_week: string })[];
+	`).all(weekday, mealType, mealType, limit) as (Recipe & { last_week: string | null })[];
 }
 
 export function getOldestPlannedRecipes(mealType: string, limit = 20): (Recipe & { last_week: string | null })[] {
