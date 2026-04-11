@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Recipe, SlotData, MealConfig } from '$lib/types/index.js';
+	import type { SlotData, MealConfig } from '$lib/types/index.js';
 	import TagInput from '$lib/components/TagInput.svelte';
 
 	let {
@@ -11,11 +11,6 @@
 		slotKeyStr,
 		cfg,
 		allTags,
-		// Dropdown state
-		openDropdown,
-		searchQuery = $bindable(''),
-		searchResults,
-		topRecipes,
 		// Busy / drag state
 		isBusy = false,
 		isDragSource = false,
@@ -30,9 +25,6 @@
 		onSelectRecipe,
 		onRemove,
 		onRandom,
-		onOpenDropdown,
-		onCloseDropdown,
-		onSearch,
 		onAddTag,
 		onRemoveTag,
 		onSetEditingTag,
@@ -45,8 +37,6 @@
 		onTouchStart,
 		onTouchEnd,
 		onTouchMove,
-		focusOnMount,
-		fixedDropdown,
 	}: {
 		weekday: number;
 		mealType: string;
@@ -56,10 +46,6 @@
 		slotKeyStr: string;
 		cfg: MealConfig;
 		allTags: string[];
-		openDropdown: string | null;
-		searchQuery: string;
-		searchResults: Recipe[];
-		topRecipes: Recipe[];
 		isBusy?: boolean;
 		isDragSource?: boolean;
 		isDragOver?: boolean;
@@ -71,9 +57,6 @@
 		onSelectRecipe: (recipeId: number) => void;
 		onRemove: () => void;
 		onRandom: () => void;
-		onOpenDropdown: () => void;
-		onCloseDropdown: () => void;
-		onSearch: () => void;
 		onAddTag: (tag: string) => void;
 		onRemoveTag: (tag: string) => void;
 		onSetEditingTag: (key: string | null) => void;
@@ -86,50 +69,7 @@
 		onTouchStart: () => void;
 		onTouchEnd: () => void;
 		onTouchMove: () => void;
-		focusOnMount: (node: HTMLInputElement) => void;
-		fixedDropdown: (node: HTMLElement) => { destroy: () => void };
 	} = $props();
-
-	let dropdownActiveIndex = $state(-1);
-
-	let topCount = $derived(topRecipes.length > 0 && !searchQuery ? topRecipes.length : 0);
-	let allDropdownItems = $derived(
-		(topRecipes.length > 0 && !searchQuery ? topRecipes : []).concat(searchResults)
-	);
-
-	$effect(() => {
-		searchResults; topRecipes; searchQuery;
-		dropdownActiveIndex = -1;
-	});
-
-	let topListEl: HTMLElement | null = null;
-	let searchListEl: HTMLElement | null = null;
-
-	$effect(() => {
-		const idx = dropdownActiveIndex;
-		if (idx < 0) return;
-		if (idx < topCount && topListEl) {
-			(topListEl.querySelectorAll('button')[idx] as HTMLElement | undefined)?.scrollIntoView({ block: 'nearest' });
-		} else if (searchListEl) {
-			(searchListEl.querySelectorAll('button')[idx - topCount] as HTMLElement | undefined)?.scrollIntoView({ block: 'nearest' });
-		}
-	});
-
-	function handleDropdownKeydown(e: KeyboardEvent) {
-		if (e.key === 'ArrowDown') {
-			e.preventDefault();
-			dropdownActiveIndex = Math.min(dropdownActiveIndex + 1, allDropdownItems.length - 1);
-		} else if (e.key === 'ArrowUp') {
-			e.preventDefault();
-			dropdownActiveIndex = Math.max(dropdownActiveIndex - 1, -1);
-		} else if (e.key === 'Enter' && dropdownActiveIndex >= 0) {
-			e.preventDefault();
-			onSelectRecipe(allDropdownItems[dropdownActiveIndex].id);
-			dropdownActiveIndex = -1;
-		} else if (e.key === 'Escape') {
-			onCloseDropdown();
-		}
-	}
 
 	function squareLimit(node: HTMLElement) {
 		function update() {
@@ -195,40 +135,6 @@
 			{/if}
 		</div>
 
-		{#if openDropdown === slotKeyStr}
-			<div class="fixed z-[9999] w-72 rounded-xl shadow-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);" use:fixedDropdown>
-				<div class="p-2" style="border-bottom: 1px solid var(--surface-container-highest);">
-					<input
-						type="text"
-						placeholder="Buscar acomp..."
-						bind:value={searchQuery}
-						on:input={onSearch}
-						on:keydown={handleDropdownKeydown}
-						class="w-full text-sm px-2.5 py-1.5 rounded-lg focus:outline-none"
-						style="background: var(--surface-container-low); color: var(--text);"
-						use:focusOnMount
-					/>
-				</div>
-				<div class="max-h-64 overflow-y-auto" bind:this={searchListEl}>
-					{#if searchResults.length === 0}
-						<p class="text-xs px-3 py-3" style="color: var(--text-muted);">Sin resultados</p>
-					{:else}
-						{#each searchResults as r, i}
-							<button
-								on:click|stopPropagation={() => onSelectRecipe(r.id)}
-								class="dropdown-item block w-full text-left px-3 py-2 transition-colors"
-								style="border-bottom: 1px solid var(--surface-container-highest); color: var(--text); {dropdownActiveIndex === i ? 'background: var(--surface-container-low);' : ''}"
-							>
-								<p class="text-sm font-medium" style="color: var(--text);">{r.name}</p>
-								{#if r.tags}
-									<p class="text-xs mt-0.5" style="color: var(--text-muted);">{r.tags}</p>
-								{/if}
-							</button>
-						{/each}
-					{/if}
-				</div>
-			</div>
-		{/if}
 	</div>
 {:else}
 	<!-- Main recipe slot -->
@@ -311,54 +217,6 @@
 				</div>
 			</div>
 
-			<!-- Dropdown búsqueda receta -->
-			{#if openDropdown === slotKeyStr}
-				<div class="fixed z-[9999] w-72 rounded-xl shadow-2xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--surface-container-highest);" use:fixedDropdown>
-					<div class="p-2" style="border-bottom: 1px solid var(--surface-container-highest);">
-						<input
-							type="text"
-							placeholder="Buscar receta..."
-							bind:value={searchQuery}
-							on:input={onSearch}
-							on:keydown={handleDropdownKeydown}
-							class="w-full text-sm px-2.5 py-2 rounded-lg focus:outline-none"
-							style="background: var(--surface-container-low); color: var(--text);"
-							use:focusOnMount
-						/>
-					</div>
-					{#if topRecipes.length > 0 && !searchQuery}
-						<div class="px-3 py-2" bind:this={topListEl}
-							style="background: var(--surface-container-low); border-bottom: 1px solid var(--surface-container-highest);">
-							<p class="text-[10px] font-black uppercase tracking-tighter mb-1.5" style="color: var(--text-muted);">Top este día</p>
-							{#each topRecipes as r, i}
-								<button
-									on:click|stopPropagation={() => onSelectRecipe(r.id)}
-									class="dropdown-item-subtle block w-full text-left text-xs px-2 py-1.5 rounded-lg transition-colors font-medium"
-									style="color: var(--primary); {dropdownActiveIndex === i ? 'background: var(--surface-container);' : ''}"
-								>{r.name}</button>
-							{/each}
-						</div>
-					{/if}
-					<div class="max-h-64 overflow-y-auto" bind:this={searchListEl}>
-						{#if searchResults.length === 0}
-							<p class="text-xs px-3 py-3" style="color: var(--text-muted);">Sin resultados</p>
-						{:else}
-							{#each searchResults as r, i}
-								<button
-									on:click|stopPropagation={() => onSelectRecipe(r.id)}
-									class="dropdown-item block w-full text-left px-3 py-2.5 transition-colors"
-									style="border-bottom: 1px solid var(--surface-container-highest); color: var(--text); {dropdownActiveIndex === topCount + i ? 'background: var(--surface-container-low);' : ''}"
-								>
-									<p class="text-sm font-semibold" style="color: var(--text);">{r.name}</p>
-									{#if r.tags}
-										<p class="text-xs mt-0.5" style="color: var(--text-muted);">{r.tags}</p>
-									{/if}
-								</button>
-							{/each}
-						{/if}
-					</div>
-				</div>
-			{/if}
 		</div>
 
 		<!-- Tags requeridos del slot -->
@@ -398,12 +256,6 @@
 <style>
 	.select-none {
 		-webkit-touch-callout: none;
-	}
-	.dropdown-item:hover {
-		background: var(--surface-container-low);
-	}
-	.dropdown-item-subtle:hover {
-		background: var(--surface-container);
 	}
 	.slot-action-btn {
 		background: rgba(255, 255, 255, 0.92);

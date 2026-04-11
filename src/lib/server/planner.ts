@@ -68,7 +68,7 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 	const allRecipes = db.prepare('SELECT * FROM recipes').all() as Recipe[];
 
 	for (const slot of slotsToFill) {
-		const member = slot.member_id ? members.find(m => m.id === slot.member_id) : null;
+		const member = slot.member_id ? (members.find(m => m.id === slot.member_id) ?? null) : null;
 
 		let candidates = fillCandidates(slot, allRecipes, member, members, options, rules, tagCounts, weekKey, false);
 
@@ -110,6 +110,89 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 			tagCounts[tag] = (tagCounts[tag] || 0) + 1;
 		}
 	}
+}
+
+export function getDiscardedRecipes(
+	weekKey: string,
+	_weekday: number,
+	mealType: string,
+	isAcc: number,
+	_slotIndex: number,
+	currentSlots: SlotData[],
+	slotRequiredTags: string[] = []
+): { recipe: Recipe; reason: string }[] {
+	const db = getDb();
+	const rules = getAllRules();
+	const members = getAllMembers();
+	const options = getOptions();
+
+	const tagCounts: Record<string, number> = {};
+	for (const slot of currentSlots) {
+		if (slot.recipe && !slot.is_accompaniment) {
+			const tags = parseTags(slot.recipe.tags);
+			for (const tag of tags) {
+				tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+			}
+		}
+	}
+
+	const requiredTag = isAcc ? 'acompañamiento' : mealType;
+	const allRecipes = db.prepare('SELECT * FROM recipes').all() as Recipe[];
+	const result: { recipe: Recipe; reason: string }[] = [];
+
+	for (const recipe of allRecipes) {
+		const tags = parseTags(recipe.tags);
+
+		if (!tags.includes(requiredTag)) continue; // no es del tipo correcto, no listar
+
+		// Check each discard reason in order
+		let reason: string | null = null;
+
+		// Slot required tags (AND condition)
+		if (!reason && slotRequiredTags.length > 0) {
+			const missing = slotRequiredTags.find(rt => !tags.includes(rt.trim().toLowerCase()));
+			if (missing) reason = `no tiene el tag requerido "${missing}"`;
+		}
+
+		// Dietary restrictions
+		for (const m of members) {
+			const cannotEat = parseTags(m.cannot_eat);
+			const blocked = cannotEat.find(t => tags.includes(t));
+			if (blocked) {
+				reason = `restricción dietética (${blocked})`;
+				break;
+			}
+		}
+
+		if (!reason) {
+			// min_days
+			const minDays = recipe.min_days === -1 ? options.default_min_days : recipe.min_days;
+			if (minDays > 0 && getRecentRecipeIds(weekKey, recipe.id, minDays)) {
+				// Calculate approximate days since last plan
+				reason = `planificada recientemente (min. ${minDays} días)`;
+			}
+		}
+
+		if (!reason) {
+			// no_more_than rules
+			const noMoreThanRules = rules.filter((r: any) => r.direction === 'no_more_than');
+			for (const rule of noMoreThanRules) {
+				if (tags.includes(rule.tag)) {
+					const count = tagCounts[rule.tag] || 0;
+					if (count >= rule.times) {
+						reason = `regla no_more_than: ${rule.tag} (${count}/${rule.times})`;
+						break;
+					}
+				}
+			}
+		}
+
+		if (reason) {
+			result.push({ recipe, reason });
+		}
+	}
+
+	return result;
 }
 
 function fillCandidates(

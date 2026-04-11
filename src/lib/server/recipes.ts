@@ -92,6 +92,45 @@ export function getTopRecipesForSlot(weekday: number, mealType: string, limit = 
 	`).all(weekday, mealType, limit) as Recipe[];
 }
 
+export function getTopRecipesOverall(mealType: string, limit = 20): (Recipe & { freq: number })[] {
+	const db = getDb();
+	return db.prepare(`
+		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at, COUNT(*) as freq
+		FROM week_plans wp
+		JOIN recipes r ON r.id = wp.recipe_id
+		WHERE wp.meal_type = ? AND wp.is_accompaniment = 0
+		GROUP BY r.id
+		ORDER BY freq DESC
+		LIMIT ?
+	`).all(mealType, limit) as (Recipe & { freq: number })[];
+}
+
+export function getRecentRecipesForSlot(weekday: number, mealType: string, limit = 20): (Recipe & { last_week: string })[] {
+	const db = getDb();
+	return db.prepare(`
+		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at, MAX(wp.week_key) as last_week
+		FROM week_plans wp
+		JOIN recipes r ON r.id = wp.recipe_id
+		WHERE wp.weekday = ? AND wp.meal_type = ? AND wp.is_accompaniment = 0
+		GROUP BY r.id
+		ORDER BY last_week DESC
+		LIMIT ?
+	`).all(weekday, mealType, limit) as (Recipe & { last_week: string })[];
+}
+
+export function getOldestPlannedRecipes(mealType: string, limit = 20): (Recipe & { last_week: string | null })[] {
+	const db = getDb();
+	return db.prepare(`
+		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at, MAX(wp.week_key) as last_week
+		FROM recipes r
+		LEFT JOIN week_plans wp ON wp.recipe_id = r.id AND wp.meal_type = ? AND wp.is_accompaniment = 0
+		WHERE (',' || REPLACE(LOWER(r.tags), ', ', ',') || ',' LIKE '%,' || LOWER(?) || ',%')
+		GROUP BY r.id
+		ORDER BY last_week ASC NULLS FIRST
+		LIMIT ?
+	`).all(mealType, mealType, limit) as (Recipe & { last_week: string | null })[];
+}
+
 export function importPlantoeatRecipes(text: string): Recipe[] {
 	const blocks = text.split(/\n-{5,}\n/).filter(b => b.trim());
 	const created: Recipe[] = [];

@@ -7,6 +7,7 @@
 	import WeekHeader from '$lib/components/week/WeekHeader.svelte';
 	import ViolationBanner from '$lib/components/week/ViolationBanner.svelte';
 	import RecipeSlot from '$lib/components/week/RecipeSlot.svelte';
+	import RecipePickerModal from '$lib/components/week/RecipePickerModal.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 
 	let { data } = $props();
@@ -37,16 +38,10 @@
 		allTags = data.allTags;
 	});
 
-	function focusOnMount(node: HTMLInputElement) {
-		node.focus();
-	}
-
-	// Recipe search state per slot
-	let openDropdown = $state<string | null>(null);
-	let searchQuery = $state('');
-	let searchResults = $state<Recipe[]>([]);
-	let topRecipes = $state<Recipe[]>([]);
-	let searchTimeout: ReturnType<typeof setTimeout>;
+	// Recipe picker modal state
+	type PickerSlot = { weekday: number; mealType: string; slotIndex: number; isAcc: number };
+	let pickerOpen = $state(false);
+	let pickerSlot = $state<PickerSlot | null>(null);
 
 	// Drag & move state
 	type SlotCoord = { weekday: number; mealType: string; slotIndex: number; isAcc: number };
@@ -107,30 +102,9 @@
 		return `${weekday}-${mealType}-${slotIndex}-${isAcc}`;
 	}
 
-	function openSlotDropdown(weekday: number, mealType: string, slotIndex: number, isAcc: number) {
-		const key = slotKey(weekday, mealType, slotIndex, isAcc);
-		openDropdown = key;
-		searchQuery = '';
-		searchResults = recipes.filter(r => {
-			const tags = r.tags.split(',').map(t => t.trim().toLowerCase());
-			const requiredTag = isAcc ? 'acompañamiento' : mealType;
-			return tags.includes(requiredTag);
-		}).slice(0, 20);
-
-		fetch(`/api/recipes?q=&mealType=${mealType}&weekday=${weekday}`)
-			.then(r => r.json())
-			.then(data => { topRecipes = data.top || []; });
-	}
-
-	function handleSearch(weekday: number, mealType: string, isAcc: number) {
-		clearTimeout(searchTimeout);
-		searchTimeout = setTimeout(async () => {
-			const requiredTag = isAcc ? 'acompañamiento' : mealType;
-			const res = await fetch(`/api/recipes?q=${encodeURIComponent(searchQuery)}&mealType=${requiredTag}&weekday=${weekday}`);
-			const data = await res.json();
-			searchResults = data.recipes || [];
-			topRecipes = data.top || [];
-		}, 200);
+	function openRecipePicker(weekday: number, mealType: string, slotIndex: number, isAcc: number) {
+		pickerSlot = { weekday, mealType, slotIndex, isAcc };
+		pickerOpen = true;
 	}
 
 	function patchSlot(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipe: Recipe | null) {
@@ -156,7 +130,6 @@
 	}
 
 	async function selectRecipe(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipeId: number) {
-		openDropdown = null;
 		const prev = getSlot(weekday, mealType, slotIndex, isAcc)?.recipe ?? null;
 		patchSlot(weekday, mealType, slotIndex, isAcc, recipes.find(r => r.id === recipeId) ?? null);
 		try {
@@ -475,38 +448,6 @@
 		await setSlotTags(weekday, mealType, slotIdx, current.filter(t => t !== tag));
 	}
 
-	function closeDropdown() {
-		openDropdown = null;
-	}
-
-	function fixedDropdown(node: HTMLElement) {
-		const container = node.closest('.dropdown-container') as HTMLElement;
-		const trigger = container?.querySelector('button') as HTMLElement;
-
-		function reposition() {
-			if (!trigger) return;
-			const rect = trigger.getBoundingClientRect();
-			node.style.top = `${rect.bottom + 4}px`;
-			const nodeWidth = node.offsetWidth || 288;
-			let left = rect.left;
-			if (left + nodeWidth > window.innerWidth) {
-				left = Math.max(8, window.innerWidth - nodeWidth - 8);
-			}
-			node.style.left = `${left}px`;
-		}
-
-		requestAnimationFrame(reposition);
-		window.addEventListener('scroll', reposition, true);
-		window.addEventListener('resize', reposition);
-
-		return {
-			destroy() {
-				window.removeEventListener('scroll', reposition, true);
-				window.removeEventListener('resize', reposition);
-			}
-		};
-	}
-
 	// Helpers for creating slot callbacks
 	function makeSlotCallbacks(weekday: number, mealType: string, slotIdx: number, isAcc: number) {
 		const key = slotKey(weekday, mealType, slotIdx, isAcc);
@@ -515,9 +456,6 @@
 			onSelectRecipe: (recipeId: number) => selectRecipe(weekday, mealType, slotIdx, isAcc, recipeId),
 			onRemove: () => removeSlot(weekday, mealType, slotIdx, isAcc),
 			onRandom: () => randomSlot(weekday, mealType as 'comida' | 'cena', slotIdx, isAcc),
-			onOpenDropdown: () => openSlotDropdown(weekday, mealType, slotIdx, isAcc),
-			onCloseDropdown: closeDropdown,
-			onSearch: () => handleSearch(weekday, mealType, isAcc),
 			onAddTag: (tag: string) => addRequiredTag(weekday, mealType, slotIdx, tag),
 			onRemoveTag: (tag: string) => removeRequiredTag(weekday, mealType, slotIdx, tag),
 			onSetEditingTag: (k: string | null) => { editingTagKey = k; },
@@ -525,7 +463,6 @@
 				const slot = getSlot(weekday, mealType, slotIdx, isAcc);
 				if (!slot?.recipe) return;
 				dragSource = coord;
-				openDropdown = null;
 				e.dataTransfer!.effectAllowed = 'move';
 				e.dataTransfer!.setData('text/plain', key);
 			},
@@ -543,14 +480,13 @@
 					moveSource = null;
 					return;
 				}
-				openDropdown === key ? closeDropdown() : openSlotDropdown(weekday, mealType, slotIdx, isAcc);
+				openRecipePicker(weekday, mealType, slotIdx, isAcc);
 			},
 			onTouchStart: () => {
 				const slot = getSlot(weekday, mealType, slotIdx, isAcc);
 				if (!isTouchDevice || !slot?.recipe) return;
 				longPressTimer = setTimeout(() => {
 					moveSource = coord;
-					openDropdown = null;
 					longPressTimer = null;
 				}, 500);
 			},
@@ -561,10 +497,6 @@
 </script>
 
 <svelte:window
-	on:click={(e) => {
-		const target = e.target as HTMLElement;
-		if (!target.closest('.dropdown-container')) closeDropdown();
-	}}
 	on:keydown={(e) => { if (e.key === 'Escape') { moveSource = null; dragSource = null; } }}
 />
 
@@ -727,14 +659,12 @@
 										<RecipeSlot
 											{weekday} {mealType} {slotIdx}
 											{slot} slotKeyStr={key} {cfg} {allTags}
-											{openDropdown} bind:searchQuery {searchResults} {topRecipes}
 											isBusy={busySlots.has(key)}
 											isDragSource={!!dragSource && key === slotKey(dragSource.weekday, dragSource.mealType, dragSource.slotIndex, dragSource.isAcc)}
 											isDragOver={dragOver === key}
 											isMoveMode={!!moveSource}
 											{isTouchDevice}
 											{editingTagKey} {slotTags} {slotTagEditKey}
-											{focusOnMount} {fixedDropdown}
 											{...callbacks}
 										/>
 
@@ -749,13 +679,11 @@
 												<RecipeSlot
 													{weekday} {mealType} slotIdx={accSlotIdx} isAcc={1}
 													slot={accSlot} slotKeyStr={accKey} {cfg} {allTags}
-													{openDropdown} bind:searchQuery {searchResults} {topRecipes}
 													isDragSource={!!dragSource && accKey === slotKey(dragSource.weekday, dragSource.mealType, dragSource.slotIndex, dragSource.isAcc)}
 													isDragOver={dragOver === accKey}
 													isMoveMode={!!moveSource}
 													{isTouchDevice}
 													{editingTagKey}
-													{focusOnMount} {fixedDropdown}
 													{...accCallbacks}
 												/>
 											{/each}
@@ -769,9 +697,9 @@
 											{#each Array(cfg.accompaniment_per_slot) as _, aIdx}
 												{@const accSlot = getSlot(weekday, mealType, aIdx, 1)}
 												{@const accKey = slotKey(weekday, mealType, aIdx, 1) + '-slot'}
-												<div class="dropdown-container relative">
+												<div class="relative">
 													<button
-														on:click|stopPropagation={() => openDropdown === accKey ? closeDropdown() : openSlotDropdown(weekday, mealType, aIdx, 1)}
+														on:click|stopPropagation={() => openRecipePicker(weekday, mealType, aIdx, 1)}
 														class="w-full text-left text-[10px] transition-colors px-2 py-1.5 rounded-lg"
 														style="{accSlot?.recipe
 															? `background: var(--secondary-container); color: var(--secondary);`
@@ -800,6 +728,23 @@
 		{/if}
 		{/if}
 	</div>
+
+	{#if pickerSlot}
+		<RecipePickerModal
+			open={pickerOpen}
+			weekKey={weekKey}
+			weekday={pickerSlot.weekday}
+			mealType={pickerSlot.mealType}
+			slotIndex={pickerSlot.slotIndex}
+			isAcc={pickerSlot.isAcc}
+			{allTags}
+			onSelect={(id) => {
+				pickerOpen = false;
+				selectRecipe(pickerSlot!.weekday, pickerSlot!.mealType, pickerSlot!.slotIndex, pickerSlot!.isAcc, id);
+			}}
+			onClose={() => { pickerOpen = false; }}
+		/>
+	{/if}
 
 	{#if moveSource}
 		<div class="fixed bottom-0 left-0 right-0 z-50 px-4 py-3 flex items-center justify-between shadow-lg"
