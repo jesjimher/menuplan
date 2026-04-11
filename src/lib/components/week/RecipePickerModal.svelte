@@ -130,6 +130,26 @@
 		excludeTags = excludeTags.filter(t => t !== tag);
 	}
 
+	function applyFilters<T extends Recipe>(items: T[]): T[] {
+		return items.filter(r => {
+			if (searchQuery && !r.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+			const tags = r.tags.split(',').map(t => t.trim().toLowerCase());
+			if (searchTags.length > 0 && !searchTags.every(st => tags.includes(st))) return false;
+			if (excludeTags.length > 0 && excludeTags.some(et => tags.includes(et))) return false;
+			return true;
+		});
+	}
+
+	function applyFiltersDiscarded(items: Discarded[]): Discarded[] {
+		return items.filter(d => {
+			if (searchQuery && !d.recipe.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+			const tags = d.recipe.tags.split(',').map(t => t.trim().toLowerCase());
+			if (searchTags.length > 0 && !searchTags.every(st => tags.includes(st))) return false;
+			if (excludeTags.length > 0 && excludeTags.some(et => tags.includes(et))) return false;
+			return true;
+		});
+	}
+
 	function handleSelect(id: number) {
 		onSelect(id);
 	}
@@ -147,11 +167,14 @@
 		{ id: 'topDay',    label: 'Top este día' },
 		{ id: 'topAll',    label: 'Top general' },
 		{ id: 'recent',    label: 'Más recientes' },
-		{ id: 'oldest',    label: 'Sin planificar' },
+		{ id: 'oldest',    label: 'Menos planificadas' },
 		{ id: 'discarded', label: 'Descartadas' },
 	];
 
+	let searchInputEl: HTMLInputElement | null = null;
+
 	function focusOnMount(node: HTMLInputElement) {
+		searchInputEl = node;
 		// rAF ensures the element is visible before focusing (modal transition)
 		requestAnimationFrame(() => node.focus());
 	}
@@ -189,59 +212,60 @@
 			{#each TABS as tab}
 				<button
 					class="tab-btn {activeTab === tab.id ? 'tab-active' : ''}"
-					onclick={() => { activeTab = tab.id; }}
+					onclick={() => { activeTab = tab.id; requestAnimationFrame(() => searchInputEl?.focus()); }}
 				>{tab.label}</button>
 			{/each}
+		</div>
+
+		<!-- Shared filter bar -->
+		<div class="filter-bar">
+			<input
+				type="text"
+				placeholder="Buscar por nombre..."
+				bind:value={searchQuery}
+				class="search-input"
+				style="background: var(--surface-container-low); color: var(--text); border: 1px solid var(--border);"
+				use:focusOnMount
+			/>
+			<div class="tag-filters-row">
+				<div class="tag-filter-area">
+					<span class="tag-filter-label">Con:</span>
+					{#each searchTags as tag}
+						<span class="search-tag-badge search-tag-include">
+							{tag}
+							<button onclick={() => removeSearchTag(tag)} aria-label="Quitar tag {tag}">&times;</button>
+						</span>
+					{/each}
+					<TagInput
+						bind:value={searchTagInput}
+						tags={allTags.filter(t => !searchTags.includes(t) && !excludeTags.includes(t))}
+						placeholder="tag..."
+						class="tag-filter-input"
+						onchange={addSearchTag}
+					/>
+				</div>
+				<div class="tag-filter-area">
+					<span class="tag-filter-label">Sin:</span>
+					{#each excludeTags as tag}
+						<span class="search-tag-badge search-tag-exclude">
+							{tag}
+							<button onclick={() => removeExcludeTag(tag)} aria-label="Quitar tag {tag}">&times;</button>
+						</span>
+					{/each}
+					<TagInput
+						bind:value={excludeTagInput}
+						tags={allTags.filter(t => !searchTags.includes(t) && !excludeTags.includes(t))}
+						placeholder="tag..."
+						class="tag-filter-input"
+						onchange={addExcludeTag}
+					/>
+				</div>
+			</div>
 		</div>
 
 		<!-- Content -->
 		<div class="modal-body">
 			{#if activeTab === 'search'}
-				<!-- Search controls -->
-				<div class="search-controls">
-					<input
-						type="text"
-						placeholder="Buscar por nombre..."
-						bind:value={searchQuery}
-						class="search-input"
-						style="background: var(--surface-container-low); color: var(--text); border: 1px solid var(--border);"
-						use:focusOnMount
-					/>
-					<div class="tag-filters-row">
-						<div class="tag-filter-area">
-							<span class="tag-filter-label">Con:</span>
-							{#each searchTags as tag}
-								<span class="search-tag-badge search-tag-include">
-									{tag}
-									<button onclick={() => removeSearchTag(tag)} aria-label="Quitar tag {tag}">&times;</button>
-								</span>
-							{/each}
-							<TagInput
-								bind:value={searchTagInput}
-								tags={allTags.filter(t => !searchTags.includes(t) && !excludeTags.includes(t))}
-								placeholder="tag..."
-								class="tag-filter-input"
-								onchange={addSearchTag}
-							/>
-						</div>
-						<div class="tag-filter-area">
-							<span class="tag-filter-label">Sin:</span>
-							{#each excludeTags as tag}
-								<span class="search-tag-badge search-tag-exclude">
-									{tag}
-									<button onclick={() => removeExcludeTag(tag)} aria-label="Quitar tag {tag}">&times;</button>
-								</span>
-							{/each}
-							<TagInput
-								bind:value={excludeTagInput}
-								tags={allTags.filter(t => !searchTags.includes(t) && !excludeTags.includes(t))}
-								placeholder="tag..."
-								class="tag-filter-input"
-								onchange={addExcludeTag}
-							/>
-						</div>
-					</div>
-				</div>
 				<div class="recipe-list">
 					{#if searchResults.length === 0}
 						<p class="empty-msg">Sin resultados</p>
@@ -255,9 +279,7 @@
 								{/if}
 								<div class="recipe-info">
 									<span class="recipe-name">{r.name}</span>
-									{#if r.tags}
-										<span class="recipe-tags">{r.tags}</span>
-									{/if}
+									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
 								</div>
 							</button>
 						{/each}
@@ -265,13 +287,14 @@
 				</div>
 
 			{:else if activeTab === 'topDay'}
+				{@const filtered = applyFilters(topForDay)}
 				<div class="recipe-list">
 					{#if pickerLoading}
 						<p class="empty-msg">Cargando...</p>
-					{:else if topForDay.length === 0}
-						<p class="empty-msg">Sin datos de planificación para este día</p>
+					{:else if filtered.length === 0}
+						<p class="empty-msg">Sin resultados</p>
 					{:else}
-						{#each topForDay as r}
+						{#each filtered as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
 								{#if r.image_type}
 									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
@@ -280,9 +303,7 @@
 								{/if}
 								<div class="recipe-info">
 									<span class="recipe-name">{r.name}</span>
-									{#if r.tags}
-										<span class="recipe-tags">{r.tags}</span>
-									{/if}
+									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
 								</div>
 								<span class="recipe-badge">{r.freq}×</span>
 							</button>
@@ -291,13 +312,14 @@
 				</div>
 
 			{:else if activeTab === 'topAll'}
+				{@const filtered = applyFilters(topOverall)}
 				<div class="recipe-list">
 					{#if pickerLoading}
 						<p class="empty-msg">Cargando...</p>
-					{:else if topOverall.length === 0}
-						<p class="empty-msg">Sin datos de planificación</p>
+					{:else if filtered.length === 0}
+						<p class="empty-msg">Sin resultados</p>
 					{:else}
-						{#each topOverall as r}
+						{#each filtered as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
 								{#if r.image_type}
 									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
@@ -306,9 +328,7 @@
 								{/if}
 								<div class="recipe-info">
 									<span class="recipe-name">{r.name}</span>
-									{#if r.tags}
-										<span class="recipe-tags">{r.tags}</span>
-									{/if}
+									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
 								</div>
 								<span class="recipe-badge">{r.freq}×</span>
 							</button>
@@ -317,13 +337,14 @@
 				</div>
 
 			{:else if activeTab === 'recent'}
+				{@const filtered = applyFilters(recentForDay)}
 				<div class="recipe-list">
 					{#if pickerLoading}
 						<p class="empty-msg">Cargando...</p>
-					{:else if recentForDay.length === 0}
-						<p class="empty-msg">Sin datos de planificación para este día</p>
+					{:else if filtered.length === 0}
+						<p class="empty-msg">Sin resultados</p>
 					{:else}
-						{#each recentForDay as r}
+						{#each filtered as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
 								{#if r.image_type}
 									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
@@ -332,9 +353,7 @@
 								{/if}
 								<div class="recipe-info">
 									<span class="recipe-name">{r.name}</span>
-									{#if r.tags}
-										<span class="recipe-tags">{r.tags}</span>
-									{/if}
+									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
 								</div>
 								<span class="recipe-badge recipe-badge-muted">{weekLabel(r.last_week)}</span>
 							</button>
@@ -343,13 +362,14 @@
 				</div>
 
 			{:else if activeTab === 'oldest'}
+				{@const filtered = applyFilters(oldestPlanned)}
 				<div class="recipe-list">
 					{#if pickerLoading}
 						<p class="empty-msg">Cargando...</p>
-					{:else if oldestPlanned.length === 0}
-						<p class="empty-msg">Sin recetas</p>
+					{:else if filtered.length === 0}
+						<p class="empty-msg">Sin resultados</p>
 					{:else}
-						{#each oldestPlanned as r}
+						{#each filtered as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
 								{#if r.image_type}
 									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
@@ -358,9 +378,7 @@
 								{/if}
 								<div class="recipe-info">
 									<span class="recipe-name">{r.name}</span>
-									{#if r.tags}
-										<span class="recipe-tags">{r.tags}</span>
-									{/if}
+									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
 								</div>
 								<span class="recipe-badge recipe-badge-muted">{weekLabel(r.last_week)}</span>
 							</button>
@@ -369,13 +387,14 @@
 				</div>
 
 			{:else if activeTab === 'discarded'}
+				{@const filtered = applyFiltersDiscarded(discarded)}
 				<div class="recipe-list">
 					{#if pickerLoading}
 						<p class="empty-msg">Cargando...</p>
-					{:else if discarded.length === 0}
+					{:else if filtered.length === 0}
 						<p class="empty-msg">Ninguna receta descartada</p>
 					{:else}
-						{#each discarded as d}
+						{#each filtered as d}
 							<button class="recipe-row recipe-row-discarded" onclick={() => handleSelect(d.recipe.id)}>
 								{#if d.recipe.image_type}
 									<img src="/api/recipes/{d.recipe.id}/image" alt={d.recipe.name} class="recipe-thumb recipe-thumb-dim" />
@@ -500,7 +519,7 @@
 		flex-direction: column;
 	}
 
-	.search-controls {
+	.filter-bar {
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
