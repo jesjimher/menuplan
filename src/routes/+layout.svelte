@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { sidebarOpen, sidebarCollapsed } from '$lib/stores/ui.js';
 	import type { Options } from '$lib/types/index.js';
@@ -10,7 +11,7 @@
 
 	let { data } = $props<{ data: LayoutData }>();
 
-	$effect(() => {
+	onMount(() => {
 		if (data.options?.sidebar_collapsed_by_default !== undefined) {
 			sidebarCollapsed.set(data.options.sidebar_collapsed_by_default);
 		}
