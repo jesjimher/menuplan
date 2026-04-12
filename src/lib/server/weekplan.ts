@@ -66,8 +66,8 @@ export function getWeekData(weekKey: string): WeekData {
 	const configs: Record<number, DayConfig> = {};
 	for (let d = 1; d <= 7; d++) {
 		configs[d] = {
-			comida: { recipe_count: options.meals_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tags: [], disabled: false, disabled_comment: null },
-			cena: { recipe_count: options.dinners_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tags: [], disabled: false, disabled_comment: null }
+			comida: { recipe_count: options.meals_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tags: [], disabled: false, disabled_comment: null, note: null },
+			cena: { recipe_count: options.dinners_per_day, accompaniment_per_recipe: options.side_dishes_per_recipe, accompaniment_per_slot: options.side_dishes_per_slot, required_tags: [], disabled: false, disabled_comment: null, note: null }
 		};
 	}
 
@@ -79,7 +79,8 @@ export function getWeekData(weekKey: string): WeekData {
 			accompaniment_per_slot: cfg.accompaniment_per_slot,
 			required_tags: parseRequiredTags(cfg.required_tag),
 			disabled: !!cfg.disabled,
-			disabled_comment: cfg.disabled_comment ?? null
+			disabled_comment: cfg.disabled_comment ?? null,
+			note: cfg.note ?? null
 		};
 	}
 
@@ -129,12 +130,12 @@ export function copyPreviousWeek(weekKey: string, previousWeekKey: string): void
 
 	const configs = db.prepare('SELECT * FROM week_day_config WHERE week_key = ?').all(previousWeekKey) as WeekDayConfig[];
 	const insertConfig = db.prepare(`
-		INSERT OR IGNORE INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, disabled, disabled_comment)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT OR IGNORE INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, disabled, disabled_comment, note)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`);
 
 	for (const cfg of configs) {
-		insertConfig.run(weekKey, cfg.weekday, cfg.meal_type, cfg.recipe_count, cfg.accompaniment_per_recipe, cfg.accompaniment_per_slot, cfg.required_tag ?? null, cfg.disabled ?? 0, cfg.disabled_comment ?? null);
+		insertConfig.run(weekKey, cfg.weekday, cfg.meal_type, cfg.recipe_count, cfg.accompaniment_per_recipe, cfg.accompaniment_per_slot, cfg.required_tag ?? null, cfg.disabled ?? 0, cfg.disabled_comment ?? null, cfg.note ?? null);
 	}
 }
 
@@ -188,7 +189,8 @@ export function updateDayConfig(weekKey: string, weekday: number, mealType: stri
 				accompaniment_per_slot = ?,
 				required_tag = ?,
 				disabled = ?,
-				disabled_comment = ?
+				disabled_comment = ?,
+				note = ?
 			WHERE week_key = ? AND weekday = ? AND meal_type = ?
 		`).run(
 			config.recipe_count ?? existing.recipe_count,
@@ -197,13 +199,14 @@ export function updateDayConfig(weekKey: string, weekday: number, mealType: stri
 			'required_tag' in config ? config.required_tag ?? null : existing.required_tag ?? null,
 			'disabled' in config ? (config.disabled ? 1 : 0) : existing.disabled,
 			'disabled_comment' in config ? config.disabled_comment ?? null : existing.disabled_comment ?? null,
+			'note' in config ? config.note ?? null : existing.note ?? null,
 			weekKey, weekday, mealType
 		);
 	} else {
 		const defaultRecipeCount = mealType === 'comida' ? options.meals_per_day : options.dinners_per_day;
 		db.prepare(`
-			INSERT INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, disabled, disabled_comment)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, disabled, disabled_comment, note)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`).run(
 			weekKey, weekday, mealType,
 			config.recipe_count ?? defaultRecipeCount,
@@ -211,7 +214,8 @@ export function updateDayConfig(weekKey: string, weekday: number, mealType: stri
 			config.accompaniment_per_slot ?? options.side_dishes_per_slot,
 			config.required_tag ?? null,
 			config.disabled ? 1 : 0,
-			config.disabled_comment ?? null
+			config.disabled_comment ?? null,
+			config.note ?? null
 		);
 	}
 }

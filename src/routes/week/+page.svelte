@@ -95,7 +95,7 @@
 	}
 
 	function getDayConfig(weekday: number, mealType: 'comida' | 'cena') {
-		return weekData?.configs[weekday]?.[mealType] ?? { recipe_count: 1, accompaniment_per_recipe: 1, accompaniment_per_slot: 0, required_tags: [] };
+		return weekData?.configs[weekday]?.[mealType] ?? { recipe_count: 1, accompaniment_per_recipe: 1, accompaniment_per_slot: 0, required_tags: [], disabled: false, disabled_comment: null, note: null };
 	}
 
 	function slotKey(weekday: number, mealType: string, slotIndex: number, isAcc: number) {
@@ -393,6 +393,14 @@
 				body: JSON.stringify({ weekKey, weekday, meal_type: 'cena', disabled: nowDisabled, disabled_comment: sharedComment })
 			})
 		]);
+	}
+
+	function setMealNote(weekday: number, mealType: string, note: string) {
+		fetch('/api/week/config', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, note: note || null })
+		});
 	}
 
 	async function setDayComment(weekday: number, comment: string) {
@@ -713,11 +721,26 @@
 											{/each}
 										</div>
 									{/if}
-								</div>
-							{/if}
 							</div>
-						{/each}
+							<!-- Nota de franja -->
+							<div class="px-2.5 pb-2 shrink-0 flex items-baseline gap-1"
+								on:click={(e) => (e.currentTarget.querySelector('[contenteditable]') as HTMLElement)?.focus()}>
+								<span class="text-[9px] font-black uppercase tracking-widest shrink-0" style="color: var(--text-muted); opacity: 0.5;">NOTA:</span>
+								<div
+									contenteditable="true"
+									role="textbox"
+									aria-multiline="true"
+									aria-label="Nota de {mealType}"
+									on:blur={(e) => setMealNote(weekday, mealType, (e.currentTarget as HTMLDivElement).innerText.trim())}
+									data-placeholder="..."
+									class="meal-note flex-1 text-[10px] italic focus:outline-none px-1 py-0.5 rounded focus:bg-[var(--surface)] cursor-text"
+									style="color: var(--text-muted);"
+								>{cfg.note ?? ''}</div>
+							</div>
 						{/if}
+						</div>
+					{/each}
+					{/if}
 					</div>
 				{/each}
 			</div>
@@ -775,6 +798,11 @@
 	.disabled-reason:empty::before {
 		content: attr(data-placeholder);
 		color: var(--text-muted);
+		pointer-events: none;
+	}
+	.meal-note:empty::before {
+		content: attr(data-placeholder);
+		color: var(--border);
 		pointer-events: none;
 	}
 </style>

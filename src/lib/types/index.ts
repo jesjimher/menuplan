@@ -45,6 +45,7 @@ export interface WeekDayConfig {
 	required_tag: string | null;
 	disabled: number;
 	disabled_comment: string | null;
+	note: string | null;
 }
 
 export interface Options {
@@ -72,6 +73,7 @@ export interface MealConfig {
 	required_tags: string[][];
 	disabled: boolean;
 	disabled_comment: string | null;
+	note: string | null;
 }
 
 export interface DayConfig {

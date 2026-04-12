@@ -14,6 +14,7 @@ export async function POST({ request }) {
 			};
 			if ('disabled' in body) cfg.disabled = body.disabled;
 			if ('disabled_comment' in body) cfg.disabled_comment = body.disabled_comment;
+			if ('note' in body) cfg.note = body.note;
 			updateDayConfig(body.weekKey, body.weekday, body.meal_type, cfg as any);
 		}
 		return json({ ok: true });

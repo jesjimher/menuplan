@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS week_day_config (
     required_tag               TEXT    DEFAULT NULL,
     disabled                   INTEGER NOT NULL DEFAULT 0,
     disabled_comment           TEXT    DEFAULT NULL,
+    note                       TEXT    DEFAULT NULL,
     UNIQUE(week_key, weekday, meal_type)
 );
 
@@ -84,6 +85,7 @@ export function getDb(): Database.Database {
 		try { db.exec("ALTER TABLE week_day_config ADD COLUMN disabled_comment TEXT DEFAULT NULL"); } catch { /* already exists */ }
 		try { db.exec("ALTER TABLE recipes ADD COLUMN image_data BLOB DEFAULT NULL"); } catch { /* already exists */ }
 		try { db.exec("ALTER TABLE recipes ADD COLUMN image_type TEXT DEFAULT NULL"); } catch { /* already exists */ }
+		try { db.exec("ALTER TABLE week_day_config ADD COLUMN note TEXT DEFAULT NULL"); } catch { /* already exists */ }
 	}
 	return db;
 }
