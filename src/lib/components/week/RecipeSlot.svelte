@@ -37,6 +37,7 @@
 		onTouchStart,
 		onTouchEnd,
 		onTouchMove,
+		onDeleteSlot,
 	}: {
 		weekday: number;
 		mealType: string;
@@ -69,6 +70,7 @@
 		onTouchStart: () => void;
 		onTouchEnd: () => void;
 		onTouchMove: () => void;
+		onDeleteSlot?: () => void;
 	} = $props();
 
 	function squareLimit(node: HTMLElement) {
@@ -138,7 +140,16 @@
 	</div>
 {:else}
 	<!-- Main recipe slot -->
-	<div class="flex-1 flex flex-col" use:squareLimit>
+	<div class="flex-1 flex flex-col relative" use:squareLimit>
+		{#if onDeleteSlot}
+			<button
+				on:click|stopPropagation={onDeleteSlot}
+				class="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full z-20 transition-opacity opacity-30 hover:opacity-100"
+				style="background: var(--error); color: white;"
+				aria-label="Eliminar slot"
+				title="Eliminar este slot"
+			><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-2.5 h-2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+		{/if}
 		<div class="dropdown-container relative flex-1 flex flex-col"
 			style:box-shadow={isDragOver ? '0 0 0 2px var(--primary)' : undefined}
 			style:outline={isMoveMode ? '2px dashed var(--primary)' : undefined}

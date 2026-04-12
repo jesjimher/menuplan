@@ -592,25 +592,11 @@
 								style="{isToday ? 'background: var(--primary-light);' : ''} grid-column: {i+2}; grid-row: {j+2};">
 
 								<!-- Encabezado de franja -->
-								<div class="flex items-center gap-1 px-2.5 py-2 border-b lg:justify-center"
-									style="border-color: var(--border);">
-									<span class="flex-1 lg:hidden text-[10px] font-black uppercase tracking-tighter"
+								<div class="flex items-center px-2.5 pt-2 lg:hidden">
+									<span class="text-[10px] font-black uppercase tracking-tighter"
 										style="color: {cfg.disabled ? 'var(--text-muted)' : (isComida ? 'var(--comida-accent)' : 'var(--cena-accent)')}; {cfg.disabled ? 'text-decoration: line-through; opacity: 0.5;' : ''}">
 										{isComida ? 'COMIDA' : 'CENA'}
 									</span>
-									<button
-										on:click={() => decrementMealCount(weekday, mealType)}
-										disabled={cfg.disabled}
-										class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60 disabled:opacity-25 disabled:cursor-not-allowed disabled:pointer-events-none"
-										style="color: var(--text-muted);"
-									>&minus;</button>
-									<span class="text-xs w-4 text-center tabular-nums"
-										style="color: var(--text-muted);">{cfg.disabled ? 0 : cfg.recipe_count}</span>
-									<button
-										on:click={() => incrementMealCount(weekday, mealType)}
-										class="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity hover:opacity-60"
-										style="color: var(--text-muted);"
-									>+</button>
 								</div>
 
 								{#if cfg.disabled}
@@ -631,6 +617,19 @@
 											>{cfg.disabled_comment ?? ''}</div>
 											{/key}
 										</div>
+									</div>
+									<!-- Botones añadir cuando no hay slots -->
+									<div class="flex gap-1.5 px-2 pb-2 shrink-0">
+										<button
+											on:click={() => incrementMealCount(weekday, mealType)}
+											class="flex-1 text-[10px] font-semibold py-1.5 px-2 rounded-lg transition-all hover:opacity-80"
+											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
+										>+ plato</button>
+										<button
+											on:click={() => updateConfig(weekday, mealType, 'accompaniment_per_slot', cfg.accompaniment_per_slot + 1)}
+											class="flex-1 text-[10px] font-semibold py-1.5 px-2 rounded-lg transition-all hover:opacity-80"
+											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
+										>+ acomp.</button>
 									</div>
 								{:else}
 
@@ -653,6 +652,7 @@
 											{isTouchDevice}
 											{editingTagKey} {slotTags} {slotTagEditKey}
 											{...callbacks}
+											onDeleteSlot={() => decrementMealCount(weekday, mealType)}
 										/>
 
 										<!-- Acompañamientos por receta -->
@@ -683,23 +683,54 @@
 											style="border-top: 1px solid var(--surface-container-highest);">
 											{#each Array(cfg.accompaniment_per_slot) as _, aIdx}
 												{@const accSlot = getSlot(weekday, mealType, aIdx, 1)}
-												{@const accKey = slotKey(weekday, mealType, aIdx, 1) + '-slot'}
-												<div class="relative">
+												<div class="relative group/accslot">
 													<button
 														on:click|stopPropagation={() => openRecipePicker(weekday, mealType, aIdx, 1)}
-														class="w-full text-left text-[10px] transition-colors px-2 py-1.5 rounded-lg"
+														class="w-full text-left text-[10px] transition-colors px-2 py-1.5 pr-12 rounded-lg"
 														style="{accSlot?.recipe
 															? `background: var(--secondary-container); color: var(--secondary);`
 															: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
 													>
 														<span class="{accSlot?.recipe ? 'font-semibold' : 'italic'}">
-															{accSlot?.recipe?.name ?? '+ acomp. franja'}
+															{accSlot?.recipe?.name ?? 'acompañamiento'}
 														</span>
 													</button>
+													<div class="absolute top-1/2 right-1.5 -translate-y-1/2 flex gap-1 opacity-0 group-hover/accslot:opacity-100 transition-opacity">
+														{#if accSlot?.recipe}
+															<button
+																on:click|stopPropagation={() => removeSlot(weekday, mealType, aIdx, 1)}
+																class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm text-xs font-bold"
+																style="background: rgba(255,255,255,0.92); color: var(--error); box-shadow: 0 2px 5px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(0,0,0,0.22);"
+																aria-label="Quitar receta"
+																title="Quitar receta"
+															>&times;</button>
+														{/if}
+														<button
+															on:click|stopPropagation={() => updateConfig(weekday, mealType, 'accompaniment_per_slot', Math.max(0, cfg.accompaniment_per_slot - 1))}
+															class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors"
+															style="background: var(--error); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.35);"
+															aria-label="Eliminar acompañamiento"
+															title="Eliminar acompañamiento"
+														><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+													</div>
 												</div>
 											{/each}
 										</div>
 									{/if}
+
+									<!-- Botones añadir justo después del último slot -->
+									<div class="flex gap-1.5 pt-2 shrink-0">
+										<button
+											on:click={() => incrementMealCount(weekday, mealType)}
+											class="flex-1 text-[10px] font-semibold py-1.5 px-2 rounded-lg transition-all hover:opacity-80"
+											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
+										>+ plato</button>
+										<button
+											on:click={() => updateConfig(weekday, mealType, 'accompaniment_per_slot', cfg.accompaniment_per_slot + 1)}
+											class="flex-1 text-[10px] font-semibold py-1.5 px-2 rounded-lg transition-all hover:opacity-80"
+											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
+										>+ acomp.</button>
+									</div>
 							</div>
 							<!-- Nota de franja -->
 							<div class="px-2.5 pb-2 shrink-0 flex items-baseline gap-1"
