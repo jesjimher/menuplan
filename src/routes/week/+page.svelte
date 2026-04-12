@@ -568,6 +568,7 @@
 									<div class="flex-1 flex items-center justify-center rounded-xl px-3 py-2 cursor-text"
 									on:click={(e) => (e.currentTarget.querySelector('[contenteditable]') as HTMLElement)?.focus()}
 										style="background: var(--surface); border: 2px dashed var(--border);">
+										{#key weekKey}
 										<div
 											contenteditable="true"
 											role="textbox"
@@ -578,6 +579,7 @@
 											class="disabled-reason w-full text-center text-xs italic focus:outline-none"
 											style="color: var(--text-secondary);"
 										>{dayComidaCfg?.disabled_comment ?? ''}</div>
+									{/key}
 									</div>
 								</div>
 							</div>
@@ -616,6 +618,7 @@
 										<div class="flex-1 flex items-center justify-center rounded-xl px-3 py-2 cursor-text"
 									on:click={(e) => (e.currentTarget.querySelector('[contenteditable]') as HTMLElement)?.focus()}
 											style="background: var(--surface); border: 2px dashed var(--border);">
+											{#key weekKey}
 											<div
 												contenteditable="true"
 												role="textbox"
@@ -626,6 +629,7 @@
 												class="disabled-reason w-full text-center text-xs italic focus:outline-none"
 												style="color: var(--text-secondary);"
 											>{cfg.disabled_comment ?? ''}</div>
+											{/key}
 										</div>
 									</div>
 								{:else}
@@ -701,6 +705,7 @@
 							<div class="px-2.5 pb-2 shrink-0 flex items-baseline gap-1"
 								on:click={(e) => (e.currentTarget.querySelector('[contenteditable]') as HTMLElement)?.focus()}>
 								<span class="text-[9px] font-black uppercase tracking-widest shrink-0" style="color: var(--text-muted); opacity: 0.5;">NOTA:</span>
+								{#key weekKey}
 								<div
 									contenteditable="true"
 									role="textbox"
@@ -711,6 +716,7 @@
 									class="meal-note flex-1 text-[10px] italic focus:outline-none px-1 py-0.5 rounded focus:bg-[var(--surface)] cursor-text"
 									style="color: var(--text-muted);"
 								>{cfg.note ?? ''}</div>
+								{/key}
 							</div>
 						{/if}
 						</div>
