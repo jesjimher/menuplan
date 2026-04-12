@@ -344,19 +344,7 @@
 		}
 	}
 
-	async function setDisabledComment(weekday: number, mealType: string, comment: string) {
-		if (!weekData) return;
-		const cfg = weekData.configs[weekday]?.[mealType as 'comida' | 'cena'];
-		weekData = {
-			...weekData,
-			configs: {
-				...weekData.configs,
-				[weekday]: {
-					...weekData.configs[weekday],
-					[mealType]: { ...cfg, disabled_comment: comment }
-				}
-			}
-		};
+	function setDisabledComment(weekday: number, mealType: string, comment: string) {
 		fetch('/api/week/config', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -403,20 +391,7 @@
 		});
 	}
 
-	async function setDayComment(weekday: number, comment: string) {
-		if (!weekData) return;
-		const comidaCfg = weekData.configs[weekday]?.comida;
-		const cenaCfg = weekData.configs[weekday]?.cena;
-		weekData = {
-			...weekData,
-			configs: {
-				...weekData.configs,
-				[weekday]: {
-					comida: { ...comidaCfg, disabled_comment: comment },
-					cena: { ...cenaCfg, disabled_comment: comment }
-				}
-			}
-		};
+	function setDayComment(weekday: number, comment: string) {
 		fetch('/api/week/config', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -598,7 +573,7 @@
 											role="textbox"
 											aria-multiline="true"
 											aria-label="Motivo de desactivación del día"
-											on:blur={(e) => setDayComment(weekday, (e.currentTarget as HTMLDivElement).innerText.trim())}
+											on:blur={(e) => { const el = e.currentTarget as HTMLDivElement; const t = el.innerText.trim(); if (!t) el.innerHTML = ''; setDayComment(weekday, t); }}
 											data-placeholder="Motivo (ej. Vacaciones en París)..."
 											class="disabled-reason w-full text-center text-xs italic focus:outline-none"
 											style="color: var(--text-secondary);"
@@ -646,7 +621,7 @@
 												role="textbox"
 												aria-multiline="true"
 												aria-label="Motivo de desactivación de {mealType}"
-												on:blur={(e) => setDisabledComment(weekday, mealType, (e.currentTarget as HTMLDivElement).innerText.trim())}
+												on:blur={(e) => { const el = e.currentTarget as HTMLDivElement; const t = el.innerText.trim(); if (!t) el.innerHTML = ''; setDisabledComment(weekday, mealType, t); }}
 												data-placeholder="Motivo (ej. Cenamos fuera)..."
 												class="disabled-reason w-full text-center text-xs italic focus:outline-none"
 												style="color: var(--text-secondary);"
@@ -731,7 +706,7 @@
 									role="textbox"
 									aria-multiline="true"
 									aria-label="Nota de {mealType}"
-									on:blur={(e) => setMealNote(weekday, mealType, (e.currentTarget as HTMLDivElement).innerText.trim())}
+									on:blur={(e) => { const el = e.currentTarget as HTMLDivElement; const t = el.innerText.trim(); if (!t) el.innerHTML = ''; setMealNote(weekday, mealType, t); }}
 									data-placeholder="..."
 									class="meal-note flex-1 text-[10px] italic focus:outline-none px-1 py-0.5 rounded focus:bg-[var(--surface)] cursor-text"
 									style="color: var(--text-muted);"
@@ -800,9 +775,15 @@
 		color: var(--text-muted);
 		pointer-events: none;
 	}
+	.disabled-reason:focus::before {
+		content: none;
+	}
 	.meal-note:empty::before {
 		content: attr(data-placeholder);
 		color: var(--border);
 		pointer-events: none;
+	}
+	.meal-note:focus::before {
+		content: none;
 	}
 </style>
