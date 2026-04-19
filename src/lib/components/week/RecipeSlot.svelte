@@ -122,7 +122,7 @@
 					: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
 			>
 				<span class="leading-snug {slot?.recipe ? 'font-semibold' : 'italic'}">
-					{slot?.recipe?.name ?? '+ acomp.'}
+					{slot?.recipe?.name ?? 'Elegir acompañamiento'}
 				</span>
 			</button>
 			{#if slot?.recipe}
@@ -189,7 +189,7 @@
 							<svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
 								<path d="M12 4.5v15m7.5-7.5h-15"/>
 							</svg>
-							<span class="empty-text">Añadir receta</span>
+							<span class="empty-text">Elegir receta</span>
 						</div>
 					{/if}
 				</button>

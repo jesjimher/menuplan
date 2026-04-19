@@ -606,7 +606,7 @@
 								<div class="px-2.5 py-3 flex-1 flex flex-col">
 									<div class="flex-1 flex items-center justify-center rounded-xl px-3 py-2 cursor-text"
 									on:click={(e) => (e.currentTarget.querySelector('[contenteditable]') as HTMLElement)?.focus()}
-										style="background: var(--surface); border: 2px dashed var(--border);">
+										style="background: var(--surface-container-highest); border: none;">
 										{#key weekKey}
 										<div
 											contenteditable="true"
@@ -615,8 +615,8 @@
 											aria-label="Motivo de desactivación del día"
 											on:blur={(e) => { const el = e.currentTarget as HTMLDivElement; const t = el.innerText.trim(); if (!t) el.innerHTML = ''; setDayComment(weekday, t); }}
 											data-placeholder="Motivo (ej. Vacaciones en París)..."
-											class="disabled-reason w-full text-center text-xs italic focus:outline-none"
-											style="color: var(--text-secondary);"
+											class="disabled-reason w-full text-center text-sm focus:outline-none"
+											style="color: var(--text);"
 										>{dayComidaCfg?.disabled_comment ?? ''}</div>
 									{/key}
 									</div>
@@ -642,7 +642,7 @@
 									<div class="px-2.5 pb-2.5 pt-2 flex-1 flex flex-col">
 										<div class="flex-1 flex items-center justify-center rounded-xl px-3 py-2 cursor-text"
 									on:click={(e) => (e.currentTarget.querySelector('[contenteditable]') as HTMLElement)?.focus()}
-											style="background: var(--surface); border: 2px dashed var(--border);">
+											style="background: var(--surface-container-highest); border: none;">
 											{#key weekKey}
 											<div
 												contenteditable="true"
@@ -651,8 +651,8 @@
 												aria-label="Motivo de desactivación de {mealType}"
 												on:blur={(e) => { const el = e.currentTarget as HTMLDivElement; const t = el.innerText.trim(); if (!t) el.innerHTML = ''; setDisabledComment(weekday, mealType, t); }}
 												data-placeholder="Motivo (ej. Cenamos fuera)..."
-												class="disabled-reason w-full text-center text-xs italic focus:outline-none"
-												style="color: var(--text-secondary);"
+												class="disabled-reason w-full text-center text-sm focus:outline-none"
+												style="color: var(--text);"
 											>{cfg.disabled_comment ?? ''}</div>
 											{/key}
 										</div>
@@ -731,7 +731,7 @@
 															: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
 													>
 														<span class="{accSlot?.recipe ? 'font-semibold' : 'italic'}">
-															{accSlot?.recipe?.name ?? 'acompañamiento'}
+															{accSlot?.recipe?.name ?? 'Elegir acompañamiento'}
 														</span>
 													</button>
 													<div class="absolute top-1/2 right-1.5 -translate-y-1/2 flex gap-1 opacity-0 group-hover/accslot:opacity-100 transition-opacity">
@@ -783,8 +783,8 @@
 									aria-label="Nota de {mealType}"
 									on:blur={(e) => { const el = e.currentTarget as HTMLDivElement; const t = el.innerText.trim(); if (!t) el.innerHTML = ''; setMealNote(weekday, mealType, t); }}
 									data-placeholder="..."
-									class="meal-note flex-1 text-[10px] italic focus:outline-none px-1 py-0.5 rounded focus:bg-[var(--surface)] cursor-text"
-									style="color: var(--text-muted);"
+									class="meal-note flex-1 text-[11px] focus:outline-none px-1 py-0.5 rounded focus:bg-[var(--surface)] cursor-text"
+									style="color: var(--text); font-weight: 600;"
 								>{cfg.note ?? ''}</div>
 								{/key}
 							</div>
@@ -872,9 +872,14 @@
 	.select-none {
 		-webkit-touch-callout: none;
 	}
+	.disabled-reason {
+		font-weight: 600;
+	}
 	.disabled-reason:empty::before {
 		content: attr(data-placeholder);
 		color: var(--text-muted);
+		font-weight: 400;
+		font-style: italic;
 		pointer-events: none;
 	}
 	.disabled-reason:focus::before {
@@ -882,7 +887,9 @@
 	}
 	.meal-note:empty::before {
 		content: attr(data-placeholder);
-		color: var(--border);
+		color: var(--text-muted);
+		font-weight: 400;
+		font-style: italic;
 		pointer-events: none;
 	}
 	.meal-note:focus::before {
