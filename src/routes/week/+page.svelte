@@ -658,15 +658,15 @@
 										</div>
 									</div>
 									<!-- Botones añadir cuando no hay slots -->
-									<div class="flex gap-1.5 px-2 pb-2 shrink-0">
+									<div class="flex gap-1.5 px-2 pb-2 shrink-0 justify-center">
 										<button
 											on:click={() => incrementMealCount(weekday, mealType)}
-											class="flex-1 text-[10px] font-semibold py-1.5 px-2 rounded-lg transition-all hover:opacity-80"
+											class="text-[10px] font-semibold py-1.5 px-3 rounded-lg transition-all hover:opacity-80"
 											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
 										>+ plato</button>
 										<button
 											on:click={() => updateConfig(weekday, mealType, 'accompaniment_per_slot', cfg.accompaniment_per_slot + 1)}
-											class="flex-1 text-[10px] font-semibold py-1.5 px-2 rounded-lg transition-all hover:opacity-80"
+											class="text-[10px] font-semibold py-1.5 px-3 rounded-lg transition-all hover:opacity-80"
 											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
 										>+ acomp.</button>
 									</div>
@@ -758,15 +758,15 @@
 									{/if}
 
 									<!-- Botones añadir justo después del último slot -->
-									<div class="flex gap-1.5 pt-2 shrink-0">
+									<div class="flex gap-1.5 pt-2 shrink-0 justify-center">
 										<button
 											on:click={() => incrementMealCount(weekday, mealType)}
-											class="flex-1 text-[10px] font-semibold py-1.5 px-2 rounded-lg transition-all hover:opacity-80"
+											class="text-[10px] font-semibold py-1.5 px-3 rounded-lg transition-all hover:opacity-80"
 											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
 										>+ plato</button>
 										<button
 											on:click={() => updateConfig(weekday, mealType, 'accompaniment_per_slot', cfg.accompaniment_per_slot + 1)}
-											class="flex-1 text-[10px] font-semibold py-1.5 px-2 rounded-lg transition-all hover:opacity-80"
+											class="text-[10px] font-semibold py-1.5 px-3 rounded-lg transition-all hover:opacity-80"
 											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
 										>+ acomp.</button>
 									</div>
