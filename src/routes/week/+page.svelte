@@ -22,6 +22,18 @@
 	let editingTagKey = $state<string | null>(null);
 	let errorMsg = $state<string | null>(null);
 	let errorTimeout: ReturnType<typeof setTimeout>;
+	let selectedDay = $state(1);
+
+	$effect(() => {
+		const currentWeek = getWeekKey();
+		if (weekKey === currentWeek) {
+			const now = new Date();
+			const jsDay = now.getDay();
+			selectedDay = jsDay === 0 ? 7 : jsDay;
+		} else {
+			selectedDay = 1;
+		}
+	});
 
 	function showError(msg: string) {
 		errorMsg = msg;
@@ -49,6 +61,8 @@
 	let dragOver = $state<string | null>(null);
 	let moveSource = $state<SlotCoord | null>(null);
 	let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+	let dayLongPressTimer: ReturnType<typeof setTimeout> | null = null;
+	let dayDisableConfirm = $state<number | null>(null);
 	let isTouchDevice = false;
 
 	let weekDates = $derived(getWeekDates(weekKey));
@@ -58,14 +72,6 @@
 
 	onMount(() => {
 		isTouchDevice = 'ontouchstart' in window;
-
-		// On mobile, auto-scroll to today if viewing the current week
-		if (window.innerWidth < 640 && weekKey === getWeekKey()) {
-			const today = new Date();
-			const jsDay = today.getDay(); // 0=Sun, 1=Mon...6=Sat
-			const isoWeekday = jsDay === 0 ? 7 : jsDay; // 1=Mon...7=Sun
-			document.getElementById(`day-${isoWeekday}`)?.scrollIntoView({ block: 'start' });
-		}
 	});
 
 	function prevWeek() {
@@ -480,7 +486,7 @@
 </script>
 
 <svelte:window
-	on:keydown={(e) => { if (e.key === 'Escape') { moveSource = null; dragSource = null; } }}
+	on:keydown={(e) => { if (e.key === 'Escape') { moveSource = null; dragSource = null; dayDisableConfirm = null; } }}
 />
 
 <div class="flex flex-col h-full" style="background: var(--background);">
@@ -504,6 +510,39 @@
 			<button on:click={() => errorMsg = null} class="ml-2 font-bold hover:opacity-70">&times;</button>
 		</div>
 	{/if}
+
+	<!-- Selector de día (solo móvil) -->
+	<div class="sm:hidden flex gap-1.5 px-3 pt-3 pb-1 shrink-0">
+		{#each [1,2,3,4,5,6,7] as weekday, i}
+			{@const date = weekDates[i]}
+			{@const isSelected = weekday === selectedDay}
+			{@const isToday = date != null && date.getTime() === todayUTC.getTime()}
+			{@const isDisabled = weekData?.configs[weekday]?.comida?.disabled && weekData?.configs[weekday]?.cena?.disabled}
+			<button
+				on:click={() => selectedDay = weekday}
+				on:touchstart|passive={() => {
+					dayLongPressTimer = setTimeout(() => {
+						selectedDay = weekday;
+						dayDisableConfirm = weekday;
+						dayLongPressTimer = null;
+					}, 500);
+				}}
+				on:touchend={() => { if (dayLongPressTimer) { clearTimeout(dayLongPressTimer); dayLongPressTimer = null; } }}
+				on:touchmove={() => { if (dayLongPressTimer) { clearTimeout(dayLongPressTimer); dayLongPressTimer = null; } }}
+				class="flex-1 flex flex-col items-center py-2 px-1 rounded-xl text-center transition-all min-w-0"
+				style="{isSelected
+					? 'background: var(--primary); color: var(--primary-light);'
+					: isToday
+						? 'background: var(--primary-light); color: var(--primary); border: 1.5px solid var(--primary);'
+						: 'background: var(--surface); color: var(--text-secondary);'}"
+			>
+				<span class="text-[9px] font-bold uppercase leading-none">{WEEKDAY_NAMES[i].slice(0, 3)}</span>
+				{#if date}
+					<span class="text-sm font-black leading-none mt-0.5 {isDisabled ? 'line-through opacity-40' : ''}">{date.getUTCDate()}</span>
+				{/if}
+			</button>
+		{/each}
+	</div>
 
 	<!-- Grid semanal -->
 	<div class="flex-1 overflow-hidden flex flex-col min-h-0">
@@ -533,11 +572,11 @@
 					{@const dayCenaCfg = weekData?.configs[weekday]?.cena}
 					{@const dayFullyDisabled = dayComidaCfg?.disabled && dayCenaCfg?.disabled}
 
-					<div id="day-{weekday}" class="rounded-2xl overflow-hidden flex flex-col lg:contents"
+					<div id="day-{weekday}" class="rounded-2xl overflow-hidden flex flex-col lg:contents {weekday !== selectedDay ? 'max-sm:hidden' : ''}"
 						style="{isToday ? 'background: var(--primary-light);' : ''}">
 
 						<!-- Cabecera del día -->
-						<div class="px-2 pt-4 pb-2 shrink-0 text-center"
+						<div class="max-sm:hidden px-2 pt-4 pb-2 shrink-0 text-center"
 							style="grid-column: {i+2}; grid-row: 1; background: {isToday ? 'var(--primary-light)' : 'var(--background)'}; {isToday ? 'border-top: 3px solid var(--primary);' : ''}">
 							<div class="flex flex-col items-center">
 								<div class="flex items-center gap-1">
@@ -779,6 +818,32 @@
 			}}
 			onClose={() => { pickerOpen = false; }}
 		/>
+	{/if}
+
+	{#if dayDisableConfirm !== null}
+		{@const confirmDay = dayDisableConfirm}
+		{@const confirmName = WEEKDAY_NAMES[(confirmDay - 1)]}
+		{@const alreadyDisabled = weekData?.configs[confirmDay]?.comida?.disabled && weekData?.configs[confirmDay]?.cena?.disabled}
+		<div class="fixed bottom-0 left-0 right-0 z-50 px-4 py-3 flex items-center justify-between shadow-lg"
+			style="background: var(--error); color: white;">
+			<span class="text-sm font-bold">
+				{alreadyDisabled ? `¿Volver a planificar ${confirmName}?` : `¿No planificar ${confirmName}?`}
+			</span>
+			<div class="flex gap-2">
+				<button
+					on:click={() => { disableDay(confirmDay); dayDisableConfirm = null; }}
+					class="text-sm font-bold px-3 py-1 rounded-full"
+					style="background: rgba(255,255,255,0.25);">
+					Sí
+				</button>
+				<button
+					on:click={() => dayDisableConfirm = null}
+					class="text-sm font-bold px-3 py-1 rounded-full"
+					style="background: rgba(0,0,0,0.15);">
+					Cancelar
+				</button>
+			</div>
+		</div>
 	{/if}
 
 	{#if moveSource}
