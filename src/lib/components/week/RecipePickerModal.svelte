@@ -47,6 +47,8 @@
 	let oldestPlanned = $state<RecipeWithWeek[]>([]);
 	let discarded = $state<Discarded[]>([]);
 	let pickerLoading = $state(false);
+	let pickerError = $state<string | null>(null);
+	let pickerAbort: AbortController | null = null;
 
 	$effect(() => {
 		if (!open) return;
@@ -62,7 +64,12 @@
 	});
 
 	async function loadPickerData() {
+		pickerAbort?.abort();
+		const ctrl = new AbortController();
+		pickerAbort = ctrl;
+		const timeoutId = setTimeout(() => ctrl.abort(), 15000);
 		pickerLoading = true;
+		pickerError = null;
 		try {
 			const params = new URLSearchParams({
 				weekKey,
@@ -71,16 +78,32 @@
 				slotIndex: String(slotIndex),
 				isAcc: String(isAcc),
 			});
-			const res = await fetch(`/api/recipes/picker?${params}`);
-			if (!res.ok) return;
+			const res = await fetch(`/api/recipes/picker?${params}`, { signal: ctrl.signal });
+			if (!res.ok) {
+				pickerError = `Error ${res.status} al cargar recetas`;
+				return;
+			}
 			const data = await res.json();
 			topForDay = data.topForDay ?? [];
 			topOverall = data.topOverall ?? [];
 			recentForDay = data.recentForDay ?? [];
 			oldestPlanned = data.oldestPlanned ?? [];
 			discarded = data.discarded ?? [];
+		} catch (e) {
+			if (e instanceof DOMException && e.name === 'AbortError') {
+				// If it was our timeout (controller still current), surface a message.
+				// If it was superseded by a new load, stay silent.
+				if (pickerAbort === ctrl) pickerError = 'La carga ha tardado demasiado';
+				else return;
+			} else {
+				pickerError = 'Error de conexión al cargar recetas';
+			}
 		} finally {
-			pickerLoading = false;
+			clearTimeout(timeoutId);
+			if (pickerAbort === ctrl) {
+				pickerLoading = false;
+				pickerAbort = null;
+			}
 		}
 	}
 
@@ -291,6 +314,11 @@
 				<div class="recipe-list">
 					{#if pickerLoading}
 						<p class="empty-msg">Cargando...</p>
+					{:else if pickerError}
+						<div class="error-msg">
+							<p>{pickerError}</p>
+							<button class="retry-btn" onclick={loadPickerData}>Reintentar</button>
+						</div>
 					{:else if filtered.length === 0}
 						<p class="empty-msg">Sin resultados</p>
 					{:else}
@@ -316,6 +344,11 @@
 				<div class="recipe-list">
 					{#if pickerLoading}
 						<p class="empty-msg">Cargando...</p>
+					{:else if pickerError}
+						<div class="error-msg">
+							<p>{pickerError}</p>
+							<button class="retry-btn" onclick={loadPickerData}>Reintentar</button>
+						</div>
 					{:else if filtered.length === 0}
 						<p class="empty-msg">Sin resultados</p>
 					{:else}
@@ -341,6 +374,11 @@
 				<div class="recipe-list">
 					{#if pickerLoading}
 						<p class="empty-msg">Cargando...</p>
+					{:else if pickerError}
+						<div class="error-msg">
+							<p>{pickerError}</p>
+							<button class="retry-btn" onclick={loadPickerData}>Reintentar</button>
+						</div>
 					{:else if filtered.length === 0}
 						<p class="empty-msg">Sin resultados</p>
 					{:else}
@@ -366,6 +404,11 @@
 				<div class="recipe-list">
 					{#if pickerLoading}
 						<p class="empty-msg">Cargando...</p>
+					{:else if pickerError}
+						<div class="error-msg">
+							<p>{pickerError}</p>
+							<button class="retry-btn" onclick={loadPickerData}>Reintentar</button>
+						</div>
 					{:else if filtered.length === 0}
 						<p class="empty-msg">Sin resultados</p>
 					{:else}
@@ -391,6 +434,11 @@
 				<div class="recipe-list">
 					{#if pickerLoading}
 						<p class="empty-msg">Cargando...</p>
+					{:else if pickerError}
+						<div class="error-msg">
+							<p>{pickerError}</p>
+							<button class="retry-btn" onclick={loadPickerData}>Reintentar</button>
+						</div>
 					{:else if filtered.length === 0}
 						<p class="empty-msg">Ninguna receta descartada</p>
 					{:else}
@@ -622,6 +670,31 @@
 		padding: 2rem;
 		font-size: 0.85rem;
 		color: var(--text-muted);
+	}
+
+	.error-msg {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 2rem 1rem;
+		font-size: 0.85rem;
+		color: var(--error, #c0392b);
+		text-align: center;
+	}
+
+	.retry-btn {
+		padding: 0.4rem 1rem;
+		border-radius: 999px;
+		font-size: 0.8rem;
+		font-weight: 600;
+		background: var(--primary);
+		color: white;
+		transition: opacity 0.15s;
+	}
+
+	.retry-btn:hover {
+		opacity: 0.88;
 	}
 
 	.recipe-row {

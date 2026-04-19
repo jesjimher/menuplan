@@ -45,6 +45,12 @@ CREATE TABLE IF NOT EXISTS week_plans (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_week_plans_unique
     ON week_plans(week_key, weekday, meal_type, is_accompaniment, slot_index, COALESCE(member_id, -1));
 
+CREATE INDEX IF NOT EXISTS idx_week_plans_recipe_id
+    ON week_plans(recipe_id);
+
+CREATE INDEX IF NOT EXISTS idx_week_plans_weekday_meal
+    ON week_plans(weekday, meal_type, is_accompaniment);
+
 CREATE TABLE IF NOT EXISTS week_day_config (
     id                         INTEGER PRIMARY KEY AUTOINCREMENT,
     week_key                   TEXT    NOT NULL,

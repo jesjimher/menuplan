@@ -140,6 +140,29 @@ export function getDiscardedRecipes(
 	const allRecipes = db.prepare('SELECT * FROM recipes').all() as Recipe[];
 	const result: { recipe: Recipe; reason: string }[] = [];
 
+	// Batch: fetch the most recent week_key per recipe in a single query
+	// (replaces an N+1 loop of per-recipe queries).
+	const lastWeekRows = db.prepare(`
+		SELECT recipe_id, MAX(week_key) as last_week
+		FROM week_plans
+		WHERE recipe_id IS NOT NULL AND week_key <= ?
+		GROUP BY recipe_id
+	`).all(weekKey) as { recipe_id: number; last_week: string }[];
+	const lastWeekByRecipe = new Map<number, string>();
+	for (const r of lastWeekRows) lastWeekByRecipe.set(r.recipe_id, r.last_week);
+
+	const [curYear, curWeekStr] = weekKey.split('-W');
+	const curYW = parseInt(curYear) * 52 + parseInt(curWeekStr);
+	function plannedWithin(recipeId: number, minDays: number): boolean {
+		const lw = lastWeekByRecipe.get(recipeId);
+		if (!lw) return false;
+		if (lw === weekKey) return true;
+		const [py, pw] = lw.split('-W');
+		const weekDiff = curYW - (parseInt(py) * 52 + parseInt(pw));
+		const dayDiff = weekDiff * 7 + 4; // approximate, matches legacy getRecentRecipeIds
+		return dayDiff < minDays;
+	}
+
 	for (const recipe of allRecipes) {
 		const tags = parseTags(recipe.tags);
 
@@ -167,8 +190,7 @@ export function getDiscardedRecipes(
 		if (!reason) {
 			// min_days
 			const minDays = recipe.min_days === -1 ? options.default_min_days : recipe.min_days;
-			if (minDays > 0 && getRecentRecipeIds(weekKey, recipe.id, minDays)) {
-				// Calculate approximate days since last plan
+			if (minDays > 0 && plannedWithin(recipe.id, minDays)) {
 				reason = `planificada recientemente (min. ${minDays} días)`;
 			}
 		}
