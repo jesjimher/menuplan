@@ -57,7 +57,7 @@
 		excludeTags = [];
 		excludeTagInput = '';
 		searchResults = [];
-		activeTab = 'search';
+		activeTab = 'topDay';
 		loadPickerData();
 	});
 
