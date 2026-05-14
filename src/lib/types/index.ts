@@ -1,3 +1,6 @@
+export type MealType = 'comida' | 'cena';
+export const MEAL_TYPES: readonly MealType[] = ['comida', 'cena'] as const;
+
 export interface Recipe {
 	id: number;
 	name: string;
@@ -27,7 +30,7 @@ export interface WeekPlan {
 	id: number;
 	week_key: string;
 	weekday: number;
-	meal_type: 'comida' | 'cena';
+	meal_type: MealType;
 	slot_index: number;
 	is_accompaniment: number;
 	recipe_id: number | null;
@@ -38,7 +41,7 @@ export interface WeekDayConfig {
 	id: number;
 	week_key: string;
 	weekday: number;
-	meal_type: 'comida' | 'cena';
+	meal_type: MealType;
 	recipe_count: number;
 	accompaniment_per_recipe: number;
 	accompaniment_per_slot: number;
@@ -61,7 +64,7 @@ export interface Schedule {
 	id: number;
 	recipe_id: number;
 	weekday: number;
-	meal_type: 'comida' | 'cena';
+	meal_type: MealType;
 	slot_index: number;
 	is_accompaniment: number;
 	every_n_weeks: number;
@@ -76,7 +79,7 @@ export interface ScheduleWithRecipe extends Schedule {
 
 export interface SlotData {
 	weekday: number;
-	meal_type: 'comida' | 'cena';
+	meal_type: MealType;
 	slot_index: number;
 	is_accompaniment: number;
 	recipe: Recipe | null;

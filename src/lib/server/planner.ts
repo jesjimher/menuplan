@@ -1,51 +1,38 @@
 import { getDb } from '$lib/db/index.js';
-import type { Recipe, Member, SlotData } from '$lib/types/index.js';
+import type { Recipe, Member, SlotData, Options, Rule, MealType } from '$lib/types/index.js';
 import { parseTags } from '$lib/utils/parseTags.js';
+import { weekKeyToIndex } from '$lib/utils/dates.js';
 import { getAllRules } from './rules.js';
 import { getAllMembers } from './members.js';
 import { getOptions } from './options.js';
 import { assignRecipe } from './weekplan.js';
 
+// Heurística: asumimos que la receta fue planificada a mitad de la semana anterior
+const MIDWEEK_DAY_OFFSET = 4;
+const MIN_DAYS_RELAXATION_FACTOR = 0.5;
+
 interface SlotToFill {
 	weekday: number;
-	meal_type: 'comida' | 'cena';
+	meal_type: MealType;
 	slot_index: number;
 	is_accompaniment: number;
 	member_id: number | null;
 	required_tags?: string[];
 }
 
-function getRecentRecipeIds(weekKey: string, recipeId: number, minDays: number): boolean {
-	const db = getDb();
-
-	// Parse weekKey to find recent weeks
-	const [year, weekStr] = weekKey.split('-W');
-	const weekNum = parseInt(weekStr);
-
-	// Get all plans from current week + minDays worth of history
-	// We'll check by counting days from the current week
-	const recentPlans = db.prepare(`
-		SELECT DISTINCT wp.recipe_id, wp.week_key, wp.weekday
-		FROM week_plans wp
-		WHERE wp.recipe_id = ? AND wp.week_key <= ?
-		ORDER BY wp.week_key DESC, wp.weekday DESC
-		LIMIT 100
-	`).all(recipeId, weekKey) as { recipe_id: number; week_key: string; weekday: number }[];
-
-	if (recentPlans.length === 0) return false;
-
-	// Check if any occurrence is within minDays
-	// Approximate: check last few weeks
-	for (const plan of recentPlans) {
-		if (plan.week_key === weekKey) return true;
-		const [py, pw] = plan.week_key.split('-W');
-		const weekDiff = parseInt(year) * 52 + weekNum - (parseInt(py) * 52 + parseInt(pw));
-		const dayDiff = weekDiff * 7 + 4; // approximate
-		if (dayDiff < minDays) return true;
-		if (dayDiff >= minDays) break;
-	}
-
-	return false;
+function wasPlannedRecently(
+	recipeId: number,
+	minDays: number,
+	lastWeekByRecipe: Map<number, string>,
+	weekKey: string,
+	currentWeekIdx: number
+): boolean {
+	const lw = lastWeekByRecipe.get(recipeId);
+	if (!lw) return false;
+	if (lw === weekKey) return true;
+	const weekDiff = currentWeekIdx - weekKeyToIndex(lw);
+	const dayDiff = weekDiff * 7 + MIDWEEK_DAY_OFFSET;
+	return dayDiff < minDays;
 }
 
 export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], currentSlots: SlotData[]): void {
@@ -53,6 +40,18 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 	const rules = getAllRules();
 	const members = getAllMembers();
 	const options = getOptions();
+
+	// Batch: última semana planificada por receta (evita N+1)
+	const lastWeekRows = db.prepare(`
+		SELECT recipe_id, MAX(week_key) AS last_week
+		FROM week_plans
+		WHERE recipe_id IS NOT NULL AND week_key <= ?
+		GROUP BY recipe_id
+	`).all(weekKey) as { recipe_id: number; last_week: string }[];
+	const lastWeekByRecipe = new Map<number, string>();
+	for (const r of lastWeekRows) lastWeekByRecipe.set(r.recipe_id, r.last_week);
+
+	const currentWeekIdx = weekKeyToIndex(weekKey);
 
 	// Count current tag occurrences
 	const tagCounts: Record<string, number> = {};
@@ -67,49 +66,49 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 
 	const allRecipes = db.prepare('SELECT * FROM recipes').all() as Recipe[];
 
-	for (const slot of slotsToFill) {
-		const member = slot.member_id ? (members.find(m => m.id === slot.member_id) ?? null) : null;
+	db.transaction(() => {
+		for (const slot of slotsToFill) {
+			const member = slot.member_id ? (members.find(m => m.id === slot.member_id) ?? null) : null;
 
-		let candidates = fillCandidates(slot, allRecipes, member, members, options, rules, tagCounts, weekKey, false);
+			let candidates = fillCandidates(slot, allRecipes, member, members, options, rules, tagCounts, weekKey, lastWeekByRecipe, currentWeekIdx, false);
 
-		if (candidates.length === 0) {
-			// Relax min_days by 50%
-			candidates = fillCandidates(slot, allRecipes, member, members, options, rules, tagCounts, weekKey, true);
-		}
+			if (candidates.length === 0) {
+				candidates = fillCandidates(slot, allRecipes, member, members, options, rules, tagCounts, weekKey, lastWeekByRecipe, currentWeekIdx, true);
+			}
 
-		// Apply required_tags filter (only for main dishes, AND condition)
-		if (!slot.is_accompaniment && slot.required_tags && slot.required_tags.length > 0) {
-			const rts = slot.required_tags.map(t => t.trim().toLowerCase());
-			const filtered = candidates.filter(r => {
-				const recipeTags = parseTags(r.tags);
-				return rts.every(rt => recipeTags.includes(rt));
+			// Filtro de required_tags (AND condition, solo platos principales)
+			if (!slot.is_accompaniment && slot.required_tags && slot.required_tags.length > 0) {
+				const rts = slot.required_tags.map(t => t.trim().toLowerCase());
+				const filtered = candidates.filter(r => {
+					const recipeTags = parseTags(r.tags);
+					return rts.every(rt => recipeTags.includes(rt));
+				});
+				if (filtered.length > 0) candidates = filtered;
+			}
+
+			if (candidates.length === 0) continue;
+
+			// Priorizar recetas que ayuden a reglas at_least
+			const atLeastRules = rules.filter(r => r.direction === 'at_least');
+			const helping = candidates.filter(r => {
+				const tags = parseTags(r.tags);
+				return atLeastRules.some(rule => {
+					const count = tagCounts[rule.tag] || 0;
+					return count < rule.times && tags.includes(rule.tag);
+				});
 			});
-			if (filtered.length > 0) candidates = filtered;
+
+			const pool = helping.length > 0 ? helping : candidates;
+			const chosen = pool[Math.floor(Math.random() * pool.length)];
+
+			assignRecipe(weekKey, slot.weekday, slot.meal_type, slot.slot_index, slot.is_accompaniment, chosen.id, slot.member_id);
+
+			const tags = parseTags(chosen.tags);
+			for (const tag of tags) {
+				tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+			}
 		}
-
-		if (candidates.length === 0) continue;
-
-		// Prioritize recipes that help at_least rules
-		const atLeastRules = rules.filter(r => r.direction === 'at_least');
-		const helping = candidates.filter(r => {
-			const tags = parseTags(r.tags);
-			return atLeastRules.some(rule => {
-				const count = tagCounts[rule.tag] || 0;
-				return count < rule.times && tags.includes(rule.tag);
-			});
-		});
-
-		const pool = helping.length > 0 ? helping : candidates;
-		const chosen = pool[Math.floor(Math.random() * pool.length)];
-
-		assignRecipe(weekKey, slot.weekday, slot.meal_type, slot.slot_index, slot.is_accompaniment, chosen.id, slot.member_id);
-
-		// Update tag counts
-		const tags = parseTags(chosen.tags);
-		for (const tag of tags) {
-			tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-		}
-	}
+	})();
 }
 
 export function getDiscardedRecipes(
@@ -140,8 +139,7 @@ export function getDiscardedRecipes(
 	const allRecipes = db.prepare('SELECT * FROM recipes').all() as Recipe[];
 	const result: { recipe: Recipe; reason: string }[] = [];
 
-	// Batch: fetch the most recent week_key per recipe in a single query
-	// (replaces an N+1 loop of per-recipe queries).
+	// Batch: última semana por receta
 	const lastWeekRows = db.prepare(`
 		SELECT recipe_id, MAX(week_key) as last_week
 		FROM week_plans
@@ -151,44 +149,36 @@ export function getDiscardedRecipes(
 	const lastWeekByRecipe = new Map<number, string>();
 	for (const r of lastWeekRows) lastWeekByRecipe.set(r.recipe_id, r.last_week);
 
-	const [curYear, curWeekStr] = weekKey.split('-W');
-	const curYW = parseInt(curYear) * 52 + parseInt(curWeekStr);
+	const currentWeekIdx = weekKeyToIndex(weekKey);
+
 	function plannedWithin(recipeId: number, minDays: number): boolean {
-		const lw = lastWeekByRecipe.get(recipeId);
-		if (!lw) return false;
-		if (lw === weekKey) return true;
-		const [py, pw] = lw.split('-W');
-		const weekDiff = curYW - (parseInt(py) * 52 + parseInt(pw));
-		const dayDiff = weekDiff * 7 + 4; // approximate, matches legacy getRecentRecipeIds
-		return dayDiff < minDays;
+		return wasPlannedRecently(recipeId, minDays, lastWeekByRecipe, weekKey, currentWeekIdx);
 	}
 
 	for (const recipe of allRecipes) {
 		const tags = parseTags(recipe.tags);
 
-		if (!tags.includes(requiredTag)) continue; // no es del tipo correcto, no listar
+		if (!tags.includes(requiredTag)) continue;
 
-		// Check each discard reason in order
 		let reason: string | null = null;
 
-		// Slot required tags (AND condition)
 		if (!reason && slotRequiredTags.length > 0) {
 			const missing = slotRequiredTags.find(rt => !tags.includes(rt.trim().toLowerCase()));
 			if (missing) reason = `no tiene el tag requerido "${missing}"`;
 		}
 
-		// Dietary restrictions
-		for (const m of members) {
-			const cannotEat = parseTags(m.cannot_eat);
-			const blocked = cannotEat.find(t => tags.includes(t));
-			if (blocked) {
-				reason = `restricción dietética (${blocked})`;
-				break;
+		if (!reason) {
+			for (const m of members) {
+				const cannotEat = parseTags(m.cannot_eat);
+				const blocked = cannotEat.find(t => tags.includes(t));
+				if (blocked) {
+					reason = `restricción dietética (${blocked})`;
+					break;
+				}
 			}
 		}
 
 		if (!reason) {
-			// min_days
 			const minDays = recipe.min_days === -1 ? options.default_min_days : recipe.min_days;
 			if (minDays > 0 && plannedWithin(recipe.id, minDays)) {
 				reason = `planificada recientemente (min. ${minDays} días)`;
@@ -196,8 +186,7 @@ export function getDiscardedRecipes(
 		}
 
 		if (!reason) {
-			// no_more_than rules
-			const noMoreThanRules = rules.filter((r: any) => r.direction === 'no_more_than');
+			const noMoreThanRules = rules.filter(r => r.direction === 'no_more_than');
 			for (const rule of noMoreThanRules) {
 				if (tags.includes(rule.tag)) {
 					const count = tagCounts[rule.tag] || 0;
@@ -222,10 +211,12 @@ function fillCandidates(
 	allRecipes: Recipe[],
 	member: Member | null,
 	allMembers: Member[],
-	options: any,
-	rules: any[],
+	options: Options,
+	rules: Rule[],
 	tagCounts: Record<string, number>,
 	weekKey: string,
+	lastWeekByRecipe: Map<number, string>,
+	currentWeekIdx: number,
 	relaxMinDays: boolean
 ): Recipe[] {
 	const requiredTag = slot.is_accompaniment ? 'acompañamiento' : slot.meal_type;
@@ -233,23 +224,19 @@ function fillCandidates(
 	return allRecipes.filter(recipe => {
 		const tags = parseTags(recipe.tags);
 
-		// Must have the right meal type tag
 		if (!tags.includes(requiredTag)) return false;
 
-		// Hard dietary restrictions
 		const applicableMembers = member ? [member] : allMembers;
 		for (const m of applicableMembers) {
 			const cannotEat = parseTags(m.cannot_eat);
 			if (cannotEat.some(t => tags.includes(t))) return false;
 		}
 
-		// min_days filter
 		const minDays = recipe.min_days === -1 ? options.default_min_days : recipe.min_days;
-		const effectiveMinDays = relaxMinDays ? Math.floor(minDays * 0.5) : minDays;
-		if (effectiveMinDays > 0 && getRecentRecipeIds(weekKey, recipe.id, effectiveMinDays)) return false;
+		const effectiveMinDays = relaxMinDays ? Math.floor(minDays * MIN_DAYS_RELAXATION_FACTOR) : minDays;
+		if (effectiveMinDays > 0 && wasPlannedRecently(recipe.id, effectiveMinDays, lastWeekByRecipe, weekKey, currentWeekIdx)) return false;
 
-		// no_more_than rules
-		const noMoreThanRules = rules.filter((r: any) => r.direction === 'no_more_than');
+		const noMoreThanRules = rules.filter(r => r.direction === 'no_more_than');
 		for (const rule of noMoreThanRules) {
 			if (tags.includes(rule.tag)) {
 				const count = tagCounts[rule.tag] || 0;

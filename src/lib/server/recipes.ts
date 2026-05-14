@@ -3,6 +3,10 @@ import type { Recipe } from '$lib/types/index.js';
 import { buildSafeUpdate } from './utils.js';
 
 const RECIPE_COLS = 'id, name, description, tags, min_days, image_type, created_at';
+const DEFAULT_TOP_FOR_SLOT_LIMIT = 3;
+const DEFAULT_TOP_OVERALL_LIMIT = 20;
+const DEFAULT_RECENT_LIMIT = 20;
+const DEFAULT_SEARCH_LIMIT = 50;
 
 export function getAllRecipes(): Recipe[] {
 	const db = getDb();
@@ -65,7 +69,7 @@ export function searchRecipes(q: string, mealType?: string): Recipe[] {
 		params.push(mealType);
 	}
 
-	query += ' ORDER BY name ASC LIMIT 50';
+	query += ` ORDER BY name ASC LIMIT ${DEFAULT_SEARCH_LIMIT}`;
 	return db.prepare(query).all(...params) as Recipe[];
 }
 
@@ -79,7 +83,7 @@ export function getAllTags(): string[] {
 	return Array.from(tagSet).sort();
 }
 
-export function getTopRecipesForSlot(weekday: number, mealType: string, limit = 3): Recipe[] {
+export function getTopRecipesForSlot(weekday: number, mealType: string, limit = DEFAULT_TOP_FOR_SLOT_LIMIT): Recipe[] {
 	const db = getDb();
 	return db.prepare(`
 		SELECT r.*, COUNT(*) as freq
@@ -92,7 +96,7 @@ export function getTopRecipesForSlot(weekday: number, mealType: string, limit = 
 	`).all(weekday, mealType, limit) as Recipe[];
 }
 
-export function getTopRecipesOverall(mealType: string, limit = 20): (Recipe & { freq: number })[] {
+export function getTopRecipesOverall(mealType: string, limit = DEFAULT_TOP_OVERALL_LIMIT): (Recipe & { freq: number })[] {
 	const db = getDb();
 	return db.prepare(`
 		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at, COUNT(*) as freq
@@ -105,7 +109,7 @@ export function getTopRecipesOverall(mealType: string, limit = 20): (Recipe & { 
 	`).all(mealType, limit) as (Recipe & { freq: number })[];
 }
 
-export function getRecentRecipesForSlot(weekday: number, mealType: string, limit = 20): (Recipe & { last_week: string | null })[] {
+export function getRecentRecipesForSlot(weekday: number, mealType: string, limit = DEFAULT_RECENT_LIMIT): (Recipe & { last_week: string | null })[] {
 	const db = getDb();
 	return db.prepare(`
 		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at,
@@ -123,7 +127,7 @@ export function getRecentRecipesForSlot(weekday: number, mealType: string, limit
 	`).all(weekday, mealType, mealType, limit) as (Recipe & { last_week: string | null })[];
 }
 
-export function getOldestPlannedRecipes(mealType: string, limit = 20): (Recipe & { last_week: string | null })[] {
+export function getOldestPlannedRecipes(mealType: string, limit = DEFAULT_RECENT_LIMIT): (Recipe & { last_week: string | null })[] {
 	const db = getDb();
 	return db.prepare(`
 		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at, MAX(wp.week_key) as last_week

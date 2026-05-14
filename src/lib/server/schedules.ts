@@ -1,27 +1,51 @@
 import { getDb } from '$lib/db/index.js';
 import { weekKeyToIndex } from '$lib/utils/dates.js';
-import type { Schedule, ScheduleWithRecipe } from '$lib/types/index.js';
+import type { Schedule, ScheduleWithRecipe, MealType } from '$lib/types/index.js';
+import { mapRowToRecipe } from './mappers.js';
+import Database from 'better-sqlite3';
 
-function rowToScheduleWithRecipe(s: any, exceptions: string[]): ScheduleWithRecipe {
+interface ScheduleRow {
+	id: number;
+	recipe_id: number;
+	weekday: number;
+	meal_type: MealType;
+	slot_index: number;
+	is_accompaniment: number;
+	every_n_weeks: number;
+	anchor_week_key: string;
+	created_at: string;
+	r_id: number;
+	r_name: string;
+	r_description: string;
+	r_tags: string;
+	r_min_days: number;
+	r_image_type: string | null;
+	r_created_at: string;
+}
+
+function loadAllExceptions(db: Database.Database): Map<number, string[]> {
+	const rows = db.prepare('SELECT schedule_id, week_key FROM schedule_exceptions').all() as { schedule_id: number; week_key: string }[];
+	const map = new Map<number, string[]>();
+	for (const r of rows) {
+		const list = map.get(r.schedule_id) ?? [];
+		list.push(r.week_key);
+		map.set(r.schedule_id, list);
+	}
+	return map;
+}
+
+function rowToScheduleWithRecipe(s: ScheduleRow, exceptions: string[]): ScheduleWithRecipe {
 	return {
 		id: s.id,
 		recipe_id: s.recipe_id,
 		weekday: s.weekday,
-		meal_type: s.meal_type,
+		meal_type: s.meal_type as MealType,
 		slot_index: s.slot_index,
 		is_accompaniment: s.is_accompaniment,
 		every_n_weeks: s.every_n_weeks,
 		anchor_week_key: s.anchor_week_key,
 		created_at: s.created_at,
-		recipe: {
-			id: s.r_id,
-			name: s.r_name,
-			description: s.r_description,
-			tags: s.r_tags,
-			min_days: s.r_min_days,
-			image_type: s.r_image_type ?? null,
-			created_at: s.r_created_at
-		},
+		recipe: mapRowToRecipe(s as unknown as Record<string, unknown>, 'r_'),
 		exceptions
 	};
 }
@@ -36,14 +60,10 @@ export function getAllSchedules(): ScheduleWithRecipe[] {
 		FROM schedules s
 		JOIN recipes r ON r.id = s.recipe_id
 		ORDER BY s.weekday, s.meal_type, s.slot_index
-	`).all() as any[];
+	`).all() as ScheduleRow[];
 
-	return rows.map(s => {
-		const exceptions = (db.prepare(
-			'SELECT week_key FROM schedule_exceptions WHERE schedule_id = ?'
-		).all(s.id) as { week_key: string }[]).map(r => r.week_key);
-		return rowToScheduleWithRecipe(s, exceptions);
-	});
+	const exceptionsMap = loadAllExceptions(db);
+	return rows.map(s => rowToScheduleWithRecipe(s, exceptionsMap.get(s.id) ?? []));
 }
 
 export function getScheduleForSlot(
@@ -61,7 +81,7 @@ export function getScheduleForSlot(
 		FROM schedules s
 		JOIN recipes r ON r.id = s.recipe_id
 		WHERE s.weekday = ? AND s.meal_type = ? AND s.slot_index = ? AND s.is_accompaniment = ?
-	`).get(weekday, mealType, slotIndex, isAccompaniment) as any | undefined;
+	`).get(weekday, mealType, slotIndex, isAccompaniment) as ScheduleRow | undefined;
 
 	if (!s) return null;
 

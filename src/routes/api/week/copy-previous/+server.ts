@@ -1,15 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { copyPreviousWeek } from '$lib/server/weekplan.js';
 import { getWeekKey, getPreviousWeekKey } from '$lib/utils/dates.js';
+import { parseBody } from '$lib/utils/parseBody.js';
+import { copyPreviousBodySchema } from '$lib/schemas/index.js';
 
 export async function POST({ request }) {
-	try {
-		const body = await request.json();
-		const weekKey = body.weekKey || getWeekKey();
-		const previousWeekKey = getPreviousWeekKey(weekKey);
-		copyPreviousWeek(weekKey, previousWeekKey);
-		return json({ ok: true });
-	} catch (e) {
-		return json({ error: (e as Error).message }, { status: 500 });
-	}
+	const body = await parseBody(request, copyPreviousBodySchema);
+	const weekKey = body.weekKey ?? getWeekKey();
+	copyPreviousWeek(weekKey, getPreviousWeekKey(weekKey));
+	return json({ ok: true });
 }

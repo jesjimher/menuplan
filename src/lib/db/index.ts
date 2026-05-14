@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { runMigrations } from './migrations.js';
 
 const DB_PATH = process.env.DATABASE_PATH || './menuplan.db';
 
@@ -105,31 +106,10 @@ export function getDb(): Database.Database {
 		db.pragma('journal_mode = WAL');
 		db.pragma('foreign_keys = ON');
 		db.exec(SCHEMA);
-		// Migrations for existing databases
-		try { db.exec("ALTER TABLE week_day_config ADD COLUMN required_tag TEXT DEFAULT NULL"); } catch { /* already exists */ }
-		try { db.exec("ALTER TABLE week_day_config ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0"); } catch { /* already exists */ }
-		try { db.exec("ALTER TABLE week_day_config ADD COLUMN disabled_comment TEXT DEFAULT NULL"); } catch { /* already exists */ }
-		try { db.exec("ALTER TABLE recipes ADD COLUMN image_data BLOB DEFAULT NULL"); } catch { /* already exists */ }
-		try { db.exec("ALTER TABLE recipes ADD COLUMN image_type TEXT DEFAULT NULL"); } catch { /* already exists */ }
-		try { db.exec("ALTER TABLE week_day_config ADD COLUMN note TEXT DEFAULT NULL"); } catch { /* already exists */ }
-		try { db.exec(`CREATE TABLE IF NOT EXISTS schedules (
-			id               INTEGER PRIMARY KEY AUTOINCREMENT,
-			recipe_id        INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
-			weekday          INTEGER NOT NULL,
-			meal_type        TEXT    NOT NULL,
-			slot_index       INTEGER NOT NULL DEFAULT 0,
-			is_accompaniment INTEGER NOT NULL DEFAULT 0,
-			every_n_weeks    INTEGER NOT NULL DEFAULT 1,
-			anchor_week_key  TEXT    NOT NULL,
-			created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
-			UNIQUE(weekday, meal_type, slot_index, is_accompaniment)
-		)`); } catch { /* already exists */ }
-		try { db.exec(`CREATE TABLE IF NOT EXISTS schedule_exceptions (
-			id          INTEGER PRIMARY KEY AUTOINCREMENT,
-			schedule_id INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
-			week_key    TEXT    NOT NULL,
-			UNIQUE(schedule_id, week_key)
-		)`); } catch { /* already exists */ }
+		runMigrations(db);
 	}
 	return db;
 }
+
+process.on('SIGTERM', () => { try { db?.close(); } finally { process.exit(0); } });
+process.on('SIGINT',  () => { try { db?.close(); } finally { process.exit(0); } });

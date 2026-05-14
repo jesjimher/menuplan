@@ -3,7 +3,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import type { WeekData, Recipe, Rule, ScheduleWithRecipe } from '$lib/types/index.js';
 	import { checkRules } from '$lib/utils/ruleChecker.js';
-	import { getWeekKey, getPreviousWeekKey, getWeekDates, WEEKDAY_NAMES, SHORT_MONTH_NAMES } from '$lib/utils/dates.js';
+	import { getWeekKey, getPreviousWeekKey, getWeekDates, weekKeyToIndex, indexToWeekKey, WEEKDAY_NAMES, SHORT_MONTH_NAMES } from '$lib/utils/dates.js';
 	import WeekHeader from '$lib/components/week/WeekHeader.svelte';
 	import ViolationBanner from '$lib/components/week/ViolationBanner.svelte';
 	import RecipeSlot from '$lib/components/week/RecipeSlot.svelte';
@@ -99,11 +99,7 @@
 	}
 
 	function nextWeek() {
-		const [year, weekStr] = weekKey.split('-W');
-		let wn = parseInt(weekStr) + 1;
-		let yn = parseInt(year);
-		if (wn > 52) { wn = 1; yn++; }
-		const next = `${yn}-W${String(wn).padStart(2, '0')}`;
+		const next = indexToWeekKey(weekKeyToIndex(weekKey) + 1);
 		goto(`/week?weekKey=${next}`, { noScroll: true });
 	}
 

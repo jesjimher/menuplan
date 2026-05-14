@@ -7,17 +7,13 @@ export function getWeekKey(date: Date = new Date()): string {
 	return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
 }
 
+export function indexToWeekKey(idx: number): string {
+	const monday = new Date(idx * 7 * 24 * 60 * 60 * 1000);
+	return getWeekKey(monday);
+}
+
 export function getPreviousWeekKey(weekKey: string): string {
-	const [year, weekStr] = weekKey.split('-W');
-	let weekNum = parseInt(weekStr) - 1;
-	let yearNum = parseInt(year);
-
-	if (weekNum < 1) {
-		yearNum--;
-		weekNum = 52; // approximate
-	}
-
-	return `${yearNum}-W${String(weekNum).padStart(2, '0')}`;
+	return indexToWeekKey(weekKeyToIndex(weekKey) - 1);
 }
 
 export function getWeekDates(weekKey: string): Date[] {

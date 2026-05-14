@@ -1,9 +1,28 @@
 import { getDb } from '$lib/db/index.js';
-import type { WeekPlan, WeekDayConfig, SlotData, DayConfig, WeekData, ScheduleWithRecipe } from '$lib/types/index.js';
+import type { WeekPlan, WeekDayConfig, SlotData, DayConfig, WeekData, ScheduleWithRecipe, MealType } from '$lib/types/index.js';
 import { getAllRules } from './rules.js';
 import { checkRules } from '$lib/utils/ruleChecker.js';
 import { getOptions } from './options.js';
 import { applySchedulesToWeek } from './schedules.js';
+import { mapRowToRecipe } from './mappers.js';
+
+interface WeekPlanRow {
+	id: number; week_key: string; weekday: number; meal_type: MealType;
+	slot_index: number; is_accompaniment: number;
+	recipe_id: number | null; member_id: number | null;
+	r_id: number | null; name: string | null; description: string | null;
+	tags: string | null; min_days: number | null; image_type: string | null; created_at: string | null;
+	m_id: number | null; m_name: string | null;
+	cannot_eat: string | null; likes: string | null; dislikes: string | null;
+}
+
+interface ScheduleRow {
+	id: number; recipe_id: number; weekday: number; meal_type: MealType;
+	slot_index: number; is_accompaniment: number;
+	every_n_weeks: number; anchor_week_key: string; created_at: string;
+	r_id: number; r_name: string; r_description: string;
+	r_tags: string; r_min_days: number; r_image_type: string | null; r_created_at: string;
+}
 
 function parseRequiredTags(raw: string | null): string[][] {
 	if (!raw) return [];
@@ -36,9 +55,9 @@ export function getWeekData(weekKey: string): WeekData {
 		LEFT JOIN members m ON m.id = wp.member_id
 		WHERE wp.week_key = ?
 		ORDER BY wp.weekday, wp.meal_type, wp.is_accompaniment, wp.slot_index
-	`).all(weekKey) as any[];
+	`).all(weekKey) as WeekPlanRow[];
 
-	// Cargar schedules para enriquecer slots
+	// Cargar schedules — excepciones en una sola query (evita N+1)
 	const schedRows = db.prepare(`
 		SELECT s.*,
 		       r.id as r_id, r.name as r_name, r.description as r_description,
@@ -46,13 +65,20 @@ export function getWeekData(weekKey: string): WeekData {
 		       r.created_at as r_created_at
 		FROM schedules s
 		JOIN recipes r ON r.id = s.recipe_id
-	`).all() as any[];
+	`).all() as ScheduleRow[];
+
+	const exceptionRows = db.prepare(
+		'SELECT schedule_id, week_key FROM schedule_exceptions'
+	).all() as { schedule_id: number; week_key: string }[];
+	const exceptionsMap = new Map<number, string[]>();
+	for (const e of exceptionRows) {
+		const list = exceptionsMap.get(e.schedule_id) ?? [];
+		list.push(e.week_key);
+		exceptionsMap.set(e.schedule_id, list);
+	}
 
 	const schedMap = new Map<string, ScheduleWithRecipe>();
 	for (const s of schedRows) {
-		const exceptions = (db.prepare(
-			'SELECT week_key FROM schedule_exceptions WHERE schedule_id = ?'
-		).all(s.id) as { week_key: string }[]).map(r => r.week_key);
 		const key = `${s.weekday}-${s.meal_type}-${s.slot_index}-${s.is_accompaniment}`;
 		schedMap.set(key, {
 			id: s.id,
@@ -73,7 +99,7 @@ export function getWeekData(weekKey: string): WeekData {
 				image_type: s.r_image_type ?? null,
 				created_at: s.r_created_at
 			},
-			exceptions
+			exceptions: exceptionsMap.get(s.id) ?? []
 		});
 	}
 
@@ -83,20 +109,20 @@ export function getWeekData(weekKey: string): WeekData {
 		slot_index: p.slot_index,
 		is_accompaniment: p.is_accompaniment,
 		recipe: p.recipe_id ? {
-			id: p.r_id,
-			name: p.name,
-			description: p.description,
-			tags: p.tags,
-			min_days: p.min_days,
-			image_type: p.image_type ?? null,
-			created_at: p.created_at
+			id: p.r_id as number,
+			name: p.name as string,
+			description: p.description as string,
+			tags: p.tags as string,
+			min_days: p.min_days as number,
+			image_type: (p.image_type as string | null) ?? null,
+			created_at: p.created_at as string
 		} : null,
 		member: p.member_id ? {
-			id: p.m_id,
-			name: p.m_name,
-			cannot_eat: p.cannot_eat,
-			likes: p.likes,
-			dislikes: p.dislikes
+			id: p.m_id as number,
+			name: p.m_name as string,
+			cannot_eat: p.cannot_eat as string,
+			likes: p.likes as string,
+			dislikes: p.dislikes as string
 		} : null,
 		schedule: schedMap.get(`${p.weekday}-${p.meal_type}-${p.slot_index}-${p.is_accompaniment}`) ?? null
 	}));
@@ -116,7 +142,8 @@ export function getWeekData(weekKey: string): WeekData {
 
 	for (const cfg of configRows) {
 		if (!configs[cfg.weekday]) continue;
-		(configs[cfg.weekday] as any)[cfg.meal_type] = {
+		const meal = cfg.meal_type as MealType;
+		configs[cfg.weekday][meal] = {
 			recipe_count: cfg.recipe_count,
 			accompaniment_per_recipe: cfg.accompaniment_per_recipe,
 			accompaniment_per_slot: cfg.accompaniment_per_slot,
@@ -158,28 +185,29 @@ export function clearWeek(weekKey: string): void {
 
 export function copyPreviousWeek(weekKey: string, previousWeekKey: string): void {
 	const db = getDb();
-	clearWeek(weekKey);
-	db.prepare('DELETE FROM week_day_config WHERE week_key = ?').run(weekKey);
 
-	const plans = db.prepare('SELECT * FROM week_plans WHERE week_key = ?').all(previousWeekKey) as WeekPlan[];
-	const insertPlan = db.prepare(`
-		INSERT OR IGNORE INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, recipe_id, member_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`);
+	db.transaction(() => {
+		db.prepare('DELETE FROM week_plans WHERE week_key = ?').run(weekKey);
+		db.prepare('DELETE FROM week_day_config WHERE week_key = ?').run(weekKey);
 
-	for (const plan of plans) {
-		insertPlan.run(weekKey, plan.weekday, plan.meal_type, plan.slot_index, plan.is_accompaniment, plan.recipe_id, plan.member_id);
-	}
+		const plans = db.prepare('SELECT * FROM week_plans WHERE week_key = ?').all(previousWeekKey) as WeekPlan[];
+		const insertPlan = db.prepare(`
+			INSERT OR IGNORE INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, recipe_id, member_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`);
+		for (const plan of plans) {
+			insertPlan.run(weekKey, plan.weekday, plan.meal_type, plan.slot_index, plan.is_accompaniment, plan.recipe_id, plan.member_id);
+		}
 
-	const configs = db.prepare('SELECT * FROM week_day_config WHERE week_key = ?').all(previousWeekKey) as WeekDayConfig[];
-	const insertConfig = db.prepare(`
-		INSERT OR IGNORE INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, disabled, disabled_comment, note)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`);
-
-	for (const cfg of configs) {
-		insertConfig.run(weekKey, cfg.weekday, cfg.meal_type, cfg.recipe_count, cfg.accompaniment_per_recipe, cfg.accompaniment_per_slot, cfg.required_tag ?? null, cfg.disabled ?? 0, cfg.disabled_comment ?? null, cfg.note ?? null);
-	}
+		const configs = db.prepare('SELECT * FROM week_day_config WHERE week_key = ?').all(previousWeekKey) as WeekDayConfig[];
+		const insertConfig = db.prepare(`
+			INSERT OR IGNORE INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, disabled, disabled_comment, note)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`);
+		for (const cfg of configs) {
+			insertConfig.run(weekKey, cfg.weekday, cfg.meal_type, cfg.recipe_count, cfg.accompaniment_per_recipe, cfg.accompaniment_per_slot, cfg.required_tag ?? null, cfg.disabled ?? 0, cfg.disabled_comment ?? null, cfg.note ?? null);
+		}
+	})();
 }
 
 export function getHistory(): string[] {

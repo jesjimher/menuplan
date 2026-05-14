@@ -19,14 +19,14 @@ node build/index.js  # Ejecutar build de producción (var de entorno DATABASE_PA
 docker compose up    # Build + arranque en puerto 3000, BD persistida en volumen Docker
 ```
 
-No hay test runner configurado.
+Tests: `npm test` (vitest). Tests en `src/lib/utils/*.test.ts`.
 
 ## Arquitectura
 
 Aplicación **SvelteKit** con `@sveltejs/adapter-node` para despliegue en Docker. Todo el acceso a datos es síncrono mediante **better-sqlite3** — no hay llamadas asíncronas a la BD en el lado servidor.
 
 ### Capa de datos (`src/lib/db/index.ts`)
-Singleton de conexión SQLite. El schema está incrustado como constante de string (no se lee el fichero `.sql` en tiempo de ejecución — existe solo como referencia — para evitar problemas de bundling). La ruta de la BD por defecto es `./menuplan.db`, sobreescrita por la variable de entorno `DATABASE_PATH`.
+Singleton de conexión SQLite. El schema base está incrustado en `db/index.ts` como string. Las columnas y tablas añadidas después del schema inicial viven en `db/migrations.ts` (tabla `schema_migrations` con versiones numeradas). `src/lib/db/schema.sql` es una referencia desactualizada — ignorar. La ruta de la BD por defecto es `./menuplan.db`, sobreescrita por la variable de entorno `DATABASE_PATH`.
 
 **Al modificar el schema de `recipes`:** regenerar `data/sample-recipes.sql` 
 
@@ -46,7 +46,7 @@ Funciones puras, sin estado. Cada módulo tiene helpers CRUD simples. Destacados
 
 ### Utilidades compartidas (`src/lib/utils/`)
 - **`ruleChecker.ts`** — se ejecuta tanto en cliente como en servidor. Recibe `SlotData[]` + `Rule[]`, cuenta ocurrencias de tags en slots que no son acompañamientos, devuelve las violaciones.
-- **`dates.ts`** — cálculo de número de semana ISO (`getWeekKey` devuelve `"YYYY-Www"`). La semana empieza el lunes (weekday 1=Lun, 7=Dom).
+- **`dates.ts`** — cálculo de número de semana ISO (`getWeekKey` devuelve `"YYYY-Www"`). La semana empieza el lunes (weekday 1=Lun, 7=Dom). `weekKeyToIndex`/`indexToWeekKey` convierten entre clave y número de semana-desde-época (siempre usar estas funciones, nunca aritmética manual con `*52`).
 
 ### Rutas
 - `src/routes/api/` — endpoints REST, todos devuelven JSON. Los endpoints de mutación de semana (`/assign`, `/remove`, `/calculate`, `/clear`, `/copy-previous`, `/config`) aceptan POST con body JSON que incluye `weekKey`.
