@@ -42,3 +42,15 @@ export function getWeekDates(weekKey: string): Date[] {
 
 export const WEEKDAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 export const SHORT_MONTH_NAMES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+export function weekKeyToIndex(weekKey: string): number {
+	const [year, weekStr] = weekKey.split('-W');
+	const weekNum = parseInt(weekStr);
+	const yearNum = parseInt(year);
+	const jan4 = new Date(Date.UTC(yearNum, 0, 4));
+	const startOfYear = new Date(jan4);
+	startOfYear.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1));
+	const monday = new Date(startOfYear);
+	monday.setUTCDate(startOfYear.getUTCDate() + (weekNum - 1) * 7);
+	return Math.round(monday.getTime() / (7 * 24 * 60 * 60 * 1000));
+}

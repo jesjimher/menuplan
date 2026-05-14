@@ -57,6 +57,23 @@ export interface Options {
 	sidebar_collapsed_by_default: boolean;
 }
 
+export interface Schedule {
+	id: number;
+	recipe_id: number;
+	weekday: number;
+	meal_type: 'comida' | 'cena';
+	slot_index: number;
+	is_accompaniment: number;
+	every_n_weeks: number;
+	anchor_week_key: string;
+	created_at: string;
+}
+
+export interface ScheduleWithRecipe extends Schedule {
+	recipe: Recipe;
+	exceptions: string[];
+}
+
 export interface SlotData {
 	weekday: number;
 	meal_type: 'comida' | 'cena';
@@ -64,6 +81,7 @@ export interface SlotData {
 	is_accompaniment: number;
 	recipe: Recipe | null;
 	member: Member | null;
+	schedule: ScheduleWithRecipe | null;
 }
 
 export interface MealConfig {

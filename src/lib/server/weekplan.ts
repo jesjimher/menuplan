@@ -1,8 +1,9 @@
 import { getDb } from '$lib/db/index.js';
-import type { WeekPlan, WeekDayConfig, SlotData, DayConfig, WeekData } from '$lib/types/index.js';
+import type { WeekPlan, WeekDayConfig, SlotData, DayConfig, WeekData, ScheduleWithRecipe } from '$lib/types/index.js';
 import { getAllRules } from './rules.js';
 import { checkRules } from '$lib/utils/ruleChecker.js';
 import { getOptions } from './options.js';
+import { applySchedulesToWeek } from './schedules.js';
 
 function parseRequiredTags(raw: string | null): string[][] {
 	if (!raw) return [];
@@ -23,6 +24,8 @@ function parseRequiredTags(raw: string | null): string[][] {
 }
 
 export function getWeekData(weekKey: string): WeekData {
+	applySchedulesToWeek(weekKey);
+
 	const db = getDb();
 
 	const plans = db.prepare(`
@@ -34,6 +37,45 @@ export function getWeekData(weekKey: string): WeekData {
 		WHERE wp.week_key = ?
 		ORDER BY wp.weekday, wp.meal_type, wp.is_accompaniment, wp.slot_index
 	`).all(weekKey) as any[];
+
+	// Cargar schedules para enriquecer slots
+	const schedRows = db.prepare(`
+		SELECT s.*,
+		       r.id as r_id, r.name as r_name, r.description as r_description,
+		       r.tags as r_tags, r.min_days as r_min_days, r.image_type as r_image_type,
+		       r.created_at as r_created_at
+		FROM schedules s
+		JOIN recipes r ON r.id = s.recipe_id
+	`).all() as any[];
+
+	const schedMap = new Map<string, ScheduleWithRecipe>();
+	for (const s of schedRows) {
+		const exceptions = (db.prepare(
+			'SELECT week_key FROM schedule_exceptions WHERE schedule_id = ?'
+		).all(s.id) as { week_key: string }[]).map(r => r.week_key);
+		const key = `${s.weekday}-${s.meal_type}-${s.slot_index}-${s.is_accompaniment}`;
+		schedMap.set(key, {
+			id: s.id,
+			recipe_id: s.recipe_id,
+			weekday: s.weekday,
+			meal_type: s.meal_type,
+			slot_index: s.slot_index,
+			is_accompaniment: s.is_accompaniment,
+			every_n_weeks: s.every_n_weeks,
+			anchor_week_key: s.anchor_week_key,
+			created_at: s.created_at,
+			recipe: {
+				id: s.r_id,
+				name: s.r_name,
+				description: s.r_description,
+				tags: s.r_tags,
+				min_days: s.r_min_days,
+				image_type: s.r_image_type ?? null,
+				created_at: s.r_created_at
+			},
+			exceptions
+		});
+	}
 
 	const slots: SlotData[] = plans.map(p => ({
 		weekday: p.weekday,
@@ -55,7 +97,8 @@ export function getWeekData(weekKey: string): WeekData {
 			cannot_eat: p.cannot_eat,
 			likes: p.likes,
 			dislikes: p.dislikes
-		} : null
+		} : null,
+		schedule: schedMap.get(`${p.weekday}-${p.meal_type}-${p.slot_index}-${p.is_accompaniment}`) ?? null
 	}));
 
 	const options = getOptions();

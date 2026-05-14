@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
-	import type { WeekData, Recipe, Rule } from '$lib/types/index.js';
+	import type { WeekData, Recipe, Rule, ScheduleWithRecipe } from '$lib/types/index.js';
 	import { checkRules } from '$lib/utils/ruleChecker.js';
 	import { getWeekKey, getPreviousWeekKey, getWeekDates, WEEKDAY_NAMES, SHORT_MONTH_NAMES } from '$lib/utils/dates.js';
 	import WeekHeader from '$lib/components/week/WeekHeader.svelte';
 	import ViolationBanner from '$lib/components/week/ViolationBanner.svelte';
 	import RecipeSlot from '$lib/components/week/RecipeSlot.svelte';
 	import RecipePickerModal from '$lib/components/week/RecipePickerModal.svelte';
+	import ScheduleModal from '$lib/components/week/ScheduleModal.svelte';
+	import RemoveScheduledRecipeDialog from '$lib/components/week/RemoveScheduledRecipeDialog.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 
 	let { data } = $props();
@@ -54,6 +56,23 @@
 	type PickerSlot = { weekday: number; mealType: string; slotIndex: number; isAcc: number };
 	let pickerOpen = $state(false);
 	let pickerSlot = $state<PickerSlot | null>(null);
+
+	// Schedule modal state
+	type ScheduleSlot = { weekday: number; mealType: string; slotIndex: number; isAcc: number; recipe: Recipe; schedule: ScheduleWithRecipe | null };
+	let scheduleModalOpen = $state(false);
+	let scheduleModalSlot = $state<ScheduleSlot | null>(null);
+
+	// Remove scheduled recipe dialog state
+	type RemoveScheduleInfo = { scheduleId: number; recipeName: string; everyNWeeks: number; weekday: number; mealType: string; slotIndex: number; isAcc: number };
+	let removeScheduleDialogOpen = $state(false);
+	let removeScheduleInfo = $state<RemoveScheduleInfo | null>(null);
+
+	function openScheduleModal(weekday: number, mealType: string, slotIdx: number, isAcc: number) {
+		const slot = getSlot(weekday, mealType, slotIdx, isAcc);
+		if (!slot?.recipe) return;
+		scheduleModalSlot = { weekday, mealType, slotIndex: slotIdx, isAcc, recipe: slot.recipe, schedule: slot.schedule ?? null };
+		scheduleModalOpen = true;
+	}
 
 	// Drag & move state
 	type SlotCoord = { weekday: number; mealType: string; slotIndex: number; isAcc: number };
@@ -128,7 +147,7 @@
 					: s
 			);
 		} else if (recipe) {
-			newSlots = [...weekData.slots, { weekday, meal_type: mealType as 'comida' | 'cena', slot_index: slotIndex, is_accompaniment: isAcc, recipe, member: null }];
+			newSlots = [...weekData.slots, { weekday, meal_type: mealType as 'comida' | 'cena', slot_index: slotIndex, is_accompaniment: isAcc, recipe, member: null, schedule: null }];
 		} else {
 			return;
 		}
@@ -152,8 +171,8 @@
 	}
 
 	async function removeSlot(weekday: number, mealType: string, slotIndex: number, isAcc: number) {
-		const prev = getSlot(weekday, mealType, slotIndex, isAcc)?.recipe ?? null;
-		patchSlot(weekday, mealType, slotIndex, isAcc, null);
+		const slot = getSlot(weekday, mealType, slotIndex, isAcc);
+		const prev = slot?.recipe ?? null;
 		try {
 			const res = await fetch('/api/week/remove', {
 				method: 'POST',
@@ -161,10 +180,60 @@
 				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc })
 			});
 			if (!res.ok) throw new Error();
+			const data = await res.json();
+			if (data.had_schedule) {
+				removeScheduleInfo = {
+					scheduleId: data.schedule_id,
+					recipeName: prev?.name ?? '',
+					everyNWeeks: data.every_n_weeks,
+					weekday, mealType, slotIndex, isAcc
+				};
+				removeScheduleDialogOpen = true;
+				return;
+			}
+			patchSlot(weekday, mealType, slotIndex, isAcc, null);
 		} catch {
-			patchSlot(weekday, mealType, slotIndex, isAcc, prev);
 			showError('Error al quitar receta');
 		}
+	}
+
+	async function handleRemoveOnlyThisWeek() {
+		if (!removeScheduleInfo) return;
+		const { scheduleId, weekday, mealType, slotIndex, isAcc } = removeScheduleInfo;
+		removeScheduleDialogOpen = false;
+		try {
+			await fetch(`/api/schedules/${scheduleId}/exceptions`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ week_key: weekKey })
+			});
+			await fetch('/api/week/remove', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, force: 'only_week' })
+			});
+			patchSlot(weekday, mealType, slotIndex, isAcc, null);
+		} catch {
+			showError('Error al quitar receta');
+		}
+		removeScheduleInfo = null;
+	}
+
+	async function handleRemoveFullSchedule() {
+		if (!removeScheduleInfo) return;
+		const { weekday, mealType, slotIndex, isAcc } = removeScheduleInfo;
+		removeScheduleDialogOpen = false;
+		try {
+			await fetch('/api/week/remove', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, force: 'full_schedule' })
+			});
+			patchSlot(weekday, mealType, slotIndex, isAcc, null);
+		} catch {
+			showError('Error al quitar receta');
+		}
+		removeScheduleInfo = null;
 	}
 
 	async function moveRecipe(from: SlotCoord, to: SlotCoord) {
@@ -183,7 +252,7 @@
 			} else {
 				return fetch('/api/week/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ weekKey, weekday: coord.weekday, meal_type: coord.mealType,
-						slot_index: coord.slotIndex, is_accompaniment: coord.isAcc }) });
+						slot_index: coord.slotIndex, is_accompaniment: coord.isAcc, force: 'move' }) });
 			}
 		};
 		try {
@@ -481,6 +550,7 @@
 			},
 			onTouchEnd: () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } },
 			onTouchMove: () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } },
+			onSchedule: () => openScheduleModal(weekday, mealType, slotIdx, isAcc),
 		};
 	}
 </script>
@@ -690,6 +760,7 @@
 											isMoveMode={!!moveSource}
 											{isTouchDevice}
 											{editingTagKey} {slotTags} {slotTagEditKey}
+											schedule={slot?.schedule ?? null}
 											{...callbacks}
 											onDeleteSlot={() => decrementMealCount(weekday, mealType)}
 										/>
@@ -817,6 +888,33 @@
 				selectRecipe(pickerSlot!.weekday, pickerSlot!.mealType, pickerSlot!.slotIndex, pickerSlot!.isAcc, id);
 			}}
 			onClose={() => { pickerOpen = false; }}
+		/>
+	{/if}
+
+	{#if scheduleModalSlot}
+		<ScheduleModal
+			open={scheduleModalOpen}
+			{weekKey}
+			weekday={scheduleModalSlot.weekday}
+			mealType={scheduleModalSlot.mealType}
+			slotIndex={scheduleModalSlot.slotIndex}
+			isAccompaniment={scheduleModalSlot.isAcc}
+			recipe={scheduleModalSlot.recipe}
+			schedule={scheduleModalSlot.schedule}
+			onSaved={async () => { scheduleModalOpen = false; scheduleModalSlot = null; await invalidateAll(); }}
+			onDeleted={async () => { scheduleModalOpen = false; scheduleModalSlot = null; await invalidateAll(); }}
+			onClose={() => { scheduleModalOpen = false; scheduleModalSlot = null; }}
+		/>
+	{/if}
+
+	{#if removeScheduleInfo}
+		<RemoveScheduledRecipeDialog
+			open={removeScheduleDialogOpen}
+			recipeName={removeScheduleInfo.recipeName}
+			everyNWeeks={removeScheduleInfo.everyNWeeks}
+			onOnlyThisWeek={handleRemoveOnlyThisWeek}
+			onFullSchedule={handleRemoveFullSchedule}
+			onCancel={() => { removeScheduleDialogOpen = false; removeScheduleInfo = null; }}
 		/>
 	{/if}
 

@@ -77,6 +77,26 @@ INSERT OR IGNORE INTO options VALUES
     ('side_dishes_per_recipe', '1'),
     ('side_dishes_per_slot',   '0'),
     ('sidebar_collapsed_by_default', '0');
+
+CREATE TABLE IF NOT EXISTS schedules (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipe_id        INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+    weekday          INTEGER NOT NULL,
+    meal_type        TEXT    NOT NULL,
+    slot_index       INTEGER NOT NULL DEFAULT 0,
+    is_accompaniment INTEGER NOT NULL DEFAULT 0,
+    every_n_weeks    INTEGER NOT NULL DEFAULT 1,
+    anchor_week_key  TEXT    NOT NULL,
+    created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(weekday, meal_type, slot_index, is_accompaniment)
+);
+
+CREATE TABLE IF NOT EXISTS schedule_exceptions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    schedule_id INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+    week_key    TEXT    NOT NULL,
+    UNIQUE(schedule_id, week_key)
+);
 `;
 
 export function getDb(): Database.Database {
@@ -92,6 +112,24 @@ export function getDb(): Database.Database {
 		try { db.exec("ALTER TABLE recipes ADD COLUMN image_data BLOB DEFAULT NULL"); } catch { /* already exists */ }
 		try { db.exec("ALTER TABLE recipes ADD COLUMN image_type TEXT DEFAULT NULL"); } catch { /* already exists */ }
 		try { db.exec("ALTER TABLE week_day_config ADD COLUMN note TEXT DEFAULT NULL"); } catch { /* already exists */ }
+		try { db.exec(`CREATE TABLE IF NOT EXISTS schedules (
+			id               INTEGER PRIMARY KEY AUTOINCREMENT,
+			recipe_id        INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+			weekday          INTEGER NOT NULL,
+			meal_type        TEXT    NOT NULL,
+			slot_index       INTEGER NOT NULL DEFAULT 0,
+			is_accompaniment INTEGER NOT NULL DEFAULT 0,
+			every_n_weeks    INTEGER NOT NULL DEFAULT 1,
+			anchor_week_key  TEXT    NOT NULL,
+			created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+			UNIQUE(weekday, meal_type, slot_index, is_accompaniment)
+		)`); } catch { /* already exists */ }
+		try { db.exec(`CREATE TABLE IF NOT EXISTS schedule_exceptions (
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			schedule_id INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+			week_key    TEXT    NOT NULL,
+			UNIQUE(schedule_id, week_key)
+		)`); } catch { /* already exists */ }
 	}
 	return db;
 }
