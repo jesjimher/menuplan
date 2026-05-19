@@ -261,8 +261,7 @@
 								class:circ-open={menuOpen}
 								style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
 								aria-label="Añadir tag requerido"
-								title="Añadir tag requerido"
-							><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg></button>
+							><span class="btn-label">Añadir tag</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg></button>
 
 						{:else if btn.type === 'random'}
 							<button
@@ -273,8 +272,7 @@
 								class:circ-open={menuOpen}
 								style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
 								aria-label="Receta aleatoria"
-								title="Receta aleatoria"
-							>{isBusy ? '...' : '↻'}</button>
+							><span class="btn-label">Aleatoria</span><span>{isBusy ? '...' : '↻'}</span></button>
 
 						{:else if btn.type === 'schedule'}
 							<button
@@ -284,9 +282,9 @@
 								class:circ-open={menuOpen}
 								class:schedule-active={!!schedule}
 								style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
-								title={schedule ? `Programada cada ${schedule.every_n_weeks} sem.` : 'Programar repetición'}
 								aria-label="Programar receta periódica"
 							>
+								<span class="btn-label">{schedule ? `Cada ${schedule.every_n_weeks} sem.` : 'Programar'}</span>
 								<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 									<rect x="3" y="4" width="18" height="18" rx="2"/>
 									<line x1="16" y1="2" x2="16" y2="6"/>
@@ -303,9 +301,8 @@
 								class="circ-btn slot-action-btn"
 								class:circ-open={menuOpen}
 								style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
-								title="Editar receta"
 								aria-label="Editar receta"
-							><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></a>
+							><span class="btn-label">Editar</span><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></a>
 
 						{:else if btn.type === 'remove'}
 							<button
@@ -315,8 +312,7 @@
 								class:circ-open={menuOpen}
 								style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
 								aria-label="Quitar receta"
-								title="Quitar"
-							>&times;</button>
+							><span class="btn-label">Quitar</span><span>&times;</span></button>
 						{/if}
 					{/each}
 
@@ -474,5 +470,26 @@
 	.trigger-btn.trigger-active {
 		background: var(--primary) !important;
 		color: white !important;
+	}
+	.btn-label {
+		position: absolute;
+		right: calc(100% + 7px);
+		top: 50%;
+		transform: translateY(-50%);
+		white-space: nowrap;
+		font-size: 11px;
+		font-weight: 600;
+		background: rgba(255, 255, 255, 0.95);
+		backdrop-filter: blur(4px);
+		color: var(--text);
+		padding: 2px 7px;
+		border-radius: 999px;
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 0.1s ease;
+		box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+	}
+	.circ-btn:hover .btn-label {
+		opacity: 1;
 	}
 </style>
