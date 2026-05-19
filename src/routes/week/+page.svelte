@@ -27,14 +27,10 @@
 	let selectedDay = $state(1);
 
 	$effect(() => {
-		const currentWeek = getWeekKey();
-		if (weekKey === currentWeek) {
-			const now = new Date();
-			const jsDay = now.getDay();
-			selectedDay = jsDay === 0 ? 7 : jsDay;
-		} else {
-			selectedDay = 1;
-		}
+		void weekKey;
+		const now = new Date();
+		const jsDay = now.getDay();
+		selectedDay = jsDay === 0 ? 7 : jsDay;
 	});
 
 	function showError(msg: string) {
