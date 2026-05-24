@@ -50,6 +50,7 @@ export interface WeekDayConfig {
 	disabled: number;
 	disabled_comment: string | null;
 	note: string | null;
+	sticky: number;
 }
 
 export interface Options {

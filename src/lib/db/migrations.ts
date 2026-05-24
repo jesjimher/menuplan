@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { getWeekKey, weekKeyToIndex } from '../utils/dates.js';
 
 interface Migration {
 	version: number;
@@ -93,6 +94,19 @@ const MIGRATIONS: Migration[] = [
 		version: 10,
 		name: 'add_week_plans_is_leftover',
 		up: (db) => addColumnIfMissing(db, 'week_plans', 'is_leftover', 'INTEGER NOT NULL DEFAULT 0')
+	},
+	{
+		version: 11,
+		name: 'add_week_day_config_sticky',
+		up: (db) => {
+			addColumnIfMissing(db, 'week_day_config', 'sticky', 'INTEGER NOT NULL DEFAULT 0');
+			const todayIdx = weekKeyToIndex(getWeekKey());
+			const rows = db.prepare('SELECT id, week_key FROM week_day_config').all() as { id: number; week_key: string }[];
+			const upd = db.prepare('UPDATE week_day_config SET sticky = 1 WHERE id = ?');
+			for (const r of rows) {
+				if (weekKeyToIndex(r.week_key) >= todayIdx) upd.run(r.id);
+			}
+		}
 	}
 ];
 

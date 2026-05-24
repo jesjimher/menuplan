@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS week_day_config (
     disabled                   INTEGER NOT NULL DEFAULT 0,
     disabled_comment           TEXT    DEFAULT NULL,
     note                       TEXT    DEFAULT NULL,
+    sticky                     INTEGER NOT NULL DEFAULT 0,
     UNIQUE(week_key, weekday, meal_type)
 );
 

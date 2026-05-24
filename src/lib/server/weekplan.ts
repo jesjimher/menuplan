@@ -5,6 +5,8 @@ import { checkRules } from '$lib/utils/ruleChecker.js';
 import { getOptions } from './options.js';
 import { applySchedulesToWeek } from './schedules.js';
 import { mapRowToRecipe } from './mappers.js';
+import { getWeekKey, weekKeyToIndex } from '$lib/utils/dates.js';
+import type Database from 'better-sqlite3';
 
 interface WeekPlanRow {
 	id: number; week_key: string; weekday: number; meal_type: MealType;
@@ -22,6 +24,34 @@ interface ScheduleRow {
 	every_n_weeks: number; anchor_week_key: string; created_at: string;
 	r_id: number; r_name: string; r_description: string;
 	r_tags: string; r_min_days: number; r_image_type: string | null; r_created_at: string;
+}
+
+function getEffectiveStickyConfig(db: Database.Database, weekKey: string, weekday: number, mealType: string) {
+	const row = db.prepare(`
+		SELECT * FROM week_day_config
+		WHERE sticky = 1 AND week_key <= ?
+		  AND weekday = ? AND meal_type = ?
+		ORDER BY week_key DESC LIMIT 1
+	`).get(weekKey, weekday, mealType) as WeekDayConfig | undefined;
+	if (row) return {
+		recipe_count: row.recipe_count,
+		accompaniment_per_recipe: row.accompaniment_per_recipe,
+		accompaniment_per_slot: row.accompaniment_per_slot,
+		required_tag: row.required_tag ?? null
+	};
+	const options = getOptions();
+	return {
+		recipe_count: mealType === 'comida' ? options.meals_per_day : options.dinners_per_day,
+		accompaniment_per_recipe: options.side_dishes_per_recipe,
+		accompaniment_per_slot: options.side_dishes_per_slot,
+		required_tag: null as string | null
+	};
+}
+
+function computeNewSticky(existing: WeekDayConfig | undefined, weekKey: string): number {
+	const isFutureOrNow = weekKeyToIndex(weekKey) >= weekKeyToIndex(getWeekKey());
+	if (existing) return existing.sticky || (isFutureOrNow ? 1 : 0);
+	return isFutureOrNow ? 1 : 0;
 }
 
 function parseRequiredTags(raw: string | null): string[][] {
@@ -129,9 +159,20 @@ export function getWeekData(weekKey: string): WeekData {
 	}));
 
 	const options = getOptions();
-	const configRows = db.prepare(
+	const exactRows = db.prepare(
 		'SELECT * FROM week_day_config WHERE week_key = ?'
 	).all(weekKey) as WeekDayConfig[];
+
+	const stickyRows = db.prepare(`
+		SELECT c.*
+		FROM week_day_config c
+		WHERE c.sticky = 1 AND c.week_key <= ?
+		  AND c.week_key = (
+		    SELECT MAX(c2.week_key) FROM week_day_config c2
+		    WHERE c2.sticky = 1 AND c2.week_key <= ?
+		      AND c2.weekday = c.weekday AND c2.meal_type = c.meal_type
+		  )
+	`).all(weekKey, weekKey) as WeekDayConfig[];
 
 	const configs: Record<number, DayConfig> = {};
 	for (let d = 1; d <= 7; d++) {
@@ -141,18 +182,28 @@ export function getWeekData(weekKey: string): WeekData {
 		};
 	}
 
-	for (const cfg of configRows) {
-		if (!configs[cfg.weekday]) continue;
-		const meal = cfg.meal_type as MealType;
-		configs[cfg.weekday][meal] = {
-			recipe_count: cfg.recipe_count,
-			accompaniment_per_recipe: cfg.accompaniment_per_recipe,
-			accompaniment_per_slot: cfg.accompaniment_per_slot,
-			required_tags: parseRequiredTags(cfg.required_tag),
-			disabled: !!cfg.disabled,
-			disabled_comment: cfg.disabled_comment ?? null,
-			note: cfg.note ?? null
-		};
+	const stickyMap = new Map<string, WeekDayConfig>();
+	for (const s of stickyRows) stickyMap.set(`${s.weekday}-${s.meal_type}`, s);
+	const exactMap = new Map<string, WeekDayConfig>();
+	for (const e of exactRows) exactMap.set(`${e.weekday}-${e.meal_type}`, e);
+
+	for (let d = 1; d <= 7; d++) {
+		for (const meal of ['comida', 'cena'] as MealType[]) {
+			const key = `${d}-${meal}`;
+			const src = exactMap.get(key) ?? stickyMap.get(key);
+			if (src) {
+				configs[d][meal].recipe_count = src.recipe_count;
+				configs[d][meal].accompaniment_per_recipe = src.accompaniment_per_recipe;
+				configs[d][meal].accompaniment_per_slot = src.accompaniment_per_slot;
+				configs[d][meal].required_tags = parseRequiredTags(src.required_tag);
+			}
+			const exact = exactMap.get(key);
+			if (exact) {
+				configs[d][meal].disabled = !!exact.disabled;
+				configs[d][meal].disabled_comment = exact.disabled_comment ?? null;
+				configs[d][meal].note = exact.note ?? null;
+			}
+		}
 	}
 
 	const rules = getAllRules();
@@ -189,7 +240,6 @@ export function copyPreviousWeek(weekKey: string, previousWeekKey: string): void
 
 	db.transaction(() => {
 		db.prepare('DELETE FROM week_plans WHERE week_key = ?').run(weekKey);
-		db.prepare('DELETE FROM week_day_config WHERE week_key = ?').run(weekKey);
 
 		const plans = db.prepare('SELECT * FROM week_plans WHERE week_key = ?').all(previousWeekKey) as WeekPlan[];
 		const insertPlan = db.prepare(`
@@ -198,15 +248,6 @@ export function copyPreviousWeek(weekKey: string, previousWeekKey: string): void
 		`);
 		for (const plan of plans) {
 			insertPlan.run(weekKey, plan.weekday, plan.meal_type, plan.slot_index, plan.is_accompaniment, plan.is_leftover ?? 0, plan.recipe_id, plan.member_id);
-		}
-
-		const configs = db.prepare('SELECT * FROM week_day_config WHERE week_key = ?').all(previousWeekKey) as WeekDayConfig[];
-		const insertConfig = db.prepare(`
-			INSERT OR IGNORE INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, disabled, disabled_comment, note)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`);
-		for (const cfg of configs) {
-			insertConfig.run(weekKey, cfg.weekday, cfg.meal_type, cfg.recipe_count, cfg.accompaniment_per_recipe, cfg.accompaniment_per_slot, cfg.required_tag ?? null, cfg.disabled ?? 0, cfg.disabled_comment ?? null, cfg.note ?? null);
 		}
 	})();
 }
@@ -219,39 +260,40 @@ export function getHistory(): string[] {
 
 export function updateSlotRequiredTag(weekKey: string, weekday: number, mealType: string, slotIndex: number, tags: string[]): void {
 	const db = getDb();
-	const options = getOptions();
 
 	const existing = db.prepare(
 		'SELECT * FROM week_day_config WHERE week_key = ? AND weekday = ? AND meal_type = ?'
 	).get(weekKey, weekday, mealType) as WeekDayConfig | undefined;
 
-	const allTags = existing ? parseRequiredTags(existing.required_tag) : [];
+	const allTags = existing ? parseRequiredTags(existing.required_tag) : parseRequiredTags(getEffectiveStickyConfig(db, weekKey, weekday, mealType).required_tag);
 	while (allTags.length <= slotIndex) allTags.push([]);
 	allTags[slotIndex] = tags;
 	// Eliminar arrays vacíos del final
 	while (allTags.length > 0 && allTags[allTags.length - 1].length === 0) allTags.pop();
 
 	const serialized = allTags.length === 0 ? null : JSON.stringify(allTags);
+	const newSticky = computeNewSticky(existing, weekKey);
 
 	if (existing) {
-		db.prepare('UPDATE week_day_config SET required_tag = ? WHERE week_key = ? AND weekday = ? AND meal_type = ?')
-			.run(serialized, weekKey, weekday, mealType);
+		db.prepare('UPDATE week_day_config SET required_tag = ?, sticky = ? WHERE week_key = ? AND weekday = ? AND meal_type = ?')
+			.run(serialized, newSticky, weekKey, weekday, mealType);
 	} else {
-		const defaultCount = mealType === 'comida' ? options.meals_per_day : options.dinners_per_day;
+		const inherited = getEffectiveStickyConfig(db, weekKey, weekday, mealType);
 		db.prepare(`
-			INSERT INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`).run(weekKey, weekday, mealType, defaultCount, options.side_dishes_per_recipe, options.side_dishes_per_slot, serialized);
+			INSERT INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, sticky)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`).run(weekKey, weekday, mealType, inherited.recipe_count, inherited.accompaniment_per_recipe, inherited.accompaniment_per_slot, serialized, newSticky);
 	}
 }
 
 export function updateDayConfig(weekKey: string, weekday: number, mealType: string, config: Partial<WeekDayConfig>): void {
 	const db = getDb();
-	const options = getOptions();
 
 	const existing = db.prepare(
 		'SELECT * FROM week_day_config WHERE week_key = ? AND weekday = ? AND meal_type = ?'
 	).get(weekKey, weekday, mealType) as WeekDayConfig | undefined;
+
+	const newSticky = computeNewSticky(existing, weekKey);
 
 	if (existing) {
 		db.prepare(`
@@ -262,7 +304,8 @@ export function updateDayConfig(weekKey: string, weekday: number, mealType: stri
 				required_tag = ?,
 				disabled = ?,
 				disabled_comment = ?,
-				note = ?
+				note = ?,
+				sticky = ?
 			WHERE week_key = ? AND weekday = ? AND meal_type = ?
 		`).run(
 			config.recipe_count ?? existing.recipe_count,
@@ -272,22 +315,24 @@ export function updateDayConfig(weekKey: string, weekday: number, mealType: stri
 			'disabled' in config ? (config.disabled ? 1 : 0) : existing.disabled,
 			'disabled_comment' in config ? config.disabled_comment ?? null : existing.disabled_comment ?? null,
 			'note' in config ? config.note ?? null : existing.note ?? null,
+			newSticky,
 			weekKey, weekday, mealType
 		);
 	} else {
-		const defaultRecipeCount = mealType === 'comida' ? options.meals_per_day : options.dinners_per_day;
+		const inherited = getEffectiveStickyConfig(db, weekKey, weekday, mealType);
 		db.prepare(`
-			INSERT INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, disabled, disabled_comment, note)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, disabled, disabled_comment, note, sticky)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`).run(
 			weekKey, weekday, mealType,
-			config.recipe_count ?? defaultRecipeCount,
-			config.accompaniment_per_recipe ?? options.side_dishes_per_recipe,
-			config.accompaniment_per_slot ?? options.side_dishes_per_slot,
-			config.required_tag ?? null,
+			config.recipe_count ?? inherited.recipe_count,
+			config.accompaniment_per_recipe ?? inherited.accompaniment_per_recipe,
+			config.accompaniment_per_slot ?? inherited.accompaniment_per_slot,
+			'required_tag' in config ? config.required_tag ?? null : inherited.required_tag,
 			config.disabled ? 1 : 0,
 			config.disabled_comment ?? null,
-			config.note ?? null
+			config.note ?? null,
+			newSticky
 		);
 	}
 }
