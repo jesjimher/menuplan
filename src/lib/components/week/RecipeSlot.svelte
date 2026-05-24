@@ -67,7 +67,7 @@
 		onDragEnd: () => void;
 		onDragOver: (e: DragEvent) => void;
 		onDragLeave: (e: Event) => void;
-		onDrop: () => void;
+		onDrop: (e: DragEvent) => void;
 		onMoveClick: () => void;
 		onTouchStart: () => void;
 		onTouchEnd: () => void;
@@ -129,7 +129,7 @@
 		style:outline-offset={isMoveMode ? '2px' : undefined}
 		on:dragover|preventDefault={onDragOver}
 		on:dragleave={onDragLeave}
-		on:drop|preventDefault={onDrop}
+		on:drop|preventDefault={(e) => onDrop(e)}
 	>
 		<div class="relative group/acc">
 			<button
@@ -182,7 +182,7 @@
 			style:outline-offset={isMoveMode ? '2px' : undefined}
 			on:dragover|preventDefault={onDragOver}
 			on:dragleave={onDragLeave}
-			on:drop|preventDefault={onDrop}
+			on:drop|preventDefault={(e) => onDrop(e)}
 		>
 			<div class="relative group/slot flex-1 flex flex-col">
 				<button
@@ -204,12 +204,20 @@
 						<img src="/api/recipes/{slot.recipe.id}/image" alt={slot.recipe.name}
 							class="absolute inset-0 w-full h-full object-cover group-hover/slot:scale-105 transition-transform duration-500"
 							on:error={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
-						<span class="absolute bottom-0 left-0 right-0 px-2.5 py-2 font-bold text-sm leading-tight"
+						<span class="absolute bottom-0 left-0 right-0 px-2.5 py-2 font-bold text-sm leading-tight flex items-end gap-1.5 flex-wrap"
 							style="background: linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0) 100%); color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">
+							{#if slot.is_leftover === 1}
+								<span class="leftover-badge shrink-0">Restos</span>
+							{/if}
 							{slot.recipe.name}
 						</span>
 					{:else if slot?.recipe}
-						<span class="leading-snug font-semibold text-sm">{slot.recipe.name}</span>
+						<div class="flex flex-col gap-0.5">
+							{#if slot.is_leftover === 1}
+								<span class="leftover-badge w-fit">Restos</span>
+							{/if}
+							<span class="leading-snug font-semibold text-sm">{slot.recipe.name}</span>
+						</div>
 					{:else}
 						<div class="empty-slot">
 							<svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -496,6 +504,18 @@
 		box-shadow: 0 4px 12px rgba(0,0,0,0.12);
 		transform: translateY(-1px);
 	}
+	.leftover-badge {
+		font-size: 9px;
+		font-weight: 800;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		padding: 1px 5px;
+		border-radius: 4px;
+		background: var(--secondary-container);
+		color: var(--secondary);
+		text-shadow: none;
+		line-height: 1.4;
+	}
 	.circ-btn {
 		position: absolute;
 		top: 50%;
@@ -583,5 +603,17 @@
 		font-size: 13px;
 		font-weight: 600;
 		cursor: pointer;
+	}
+	.leftover-badge {
+		font-size: 9px;
+		font-weight: 800;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		padding: 1px 5px;
+		border-radius: 4px;
+		background: var(--secondary-container);
+		color: var(--secondary);
+		text-shadow: none;
+		line-height: 1.4;
 	}
 </style>

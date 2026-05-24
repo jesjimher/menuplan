@@ -10,6 +10,7 @@
 	import RecipePickerModal from '$lib/components/week/RecipePickerModal.svelte';
 	import ScheduleModal from '$lib/components/week/ScheduleModal.svelte';
 	import RemoveScheduledRecipeDialog from '$lib/components/week/RemoveScheduledRecipeDialog.svelte';
+	import MoveCopyLeftoverModal from '$lib/components/week/MoveCopyLeftoverModal.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 
 	let { data } = $props();
@@ -73,12 +74,19 @@
 	// Drag & move state
 	type SlotCoord = { weekday: number; mealType: string; slotIndex: number; isAcc: number };
 	let dragSource = $state<SlotCoord | null>(null);
+	let dragModifier = $state(false);
+	let ctrlHeld = false; // tracked independently via keydown/keyup, more reliable than DragEvent.ctrlKey
 	let dragOver = $state<string | null>(null);
 	let moveSource = $state<SlotCoord | null>(null);
 	let longPressTimer: ReturnType<typeof setTimeout> | null = null;
 	let dayLongPressTimer: ReturnType<typeof setTimeout> | null = null;
 	let dayDisableConfirm = $state<number | null>(null);
 	let isTouchDevice = false;
+
+	// Move/copy/leftover modal
+	let moveCopyModalOpen = $state(false);
+	let moveCopySource = $state<SlotCoord | null>(null);
+	let moveCopyTarget = $state<SlotCoord | null>(null);
 
 	let weekDates = $derived(getWeekDates(weekKey));
 
@@ -87,6 +95,26 @@
 
 	onMount(() => {
 		isTouchDevice = 'ontouchstart' in window;
+		const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Control' || e.key === 'Meta') ctrlHeld = true; };
+		const onKeyUp = (e: KeyboardEvent) => { if (e.key === 'Control' || e.key === 'Meta') ctrlHeld = false; };
+		// Fires for every dragover on the page — only engage when Ctrl held so we don't
+		// suppress the native no-drop cursor when dragging over non-slot areas without Ctrl.
+		const onDocDragOver = (e: DragEvent) => {
+			if (!dragSource) return;
+			if (ctrlHeld) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; }
+		};
+		// Prevent the browser from navigating when the user drops on an empty area.
+		const onDocDrop = (e: DragEvent) => { if (dragSource) e.preventDefault(); };
+		document.addEventListener('keydown', onKeyDown);
+		document.addEventListener('keyup', onKeyUp);
+		document.addEventListener('dragover', onDocDragOver);
+		document.addEventListener('drop', onDocDrop);
+		return () => {
+			document.removeEventListener('keydown', onKeyDown);
+			document.removeEventListener('keyup', onKeyUp);
+			document.removeEventListener('dragover', onDocDragOver);
+			document.removeEventListener('drop', onDocDrop);
+		};
 	});
 
 	function prevWeek() {
@@ -124,7 +152,7 @@
 		pickerOpen = true;
 	}
 
-	function patchSlot(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipe: Recipe | null) {
+	function patchSlot(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipe: Recipe | null, isLeftover: 0 | 1 = 0) {
 		if (!weekData) return;
 		const exists = weekData.slots.some(s =>
 			s.weekday === weekday && s.meal_type === mealType &&
@@ -135,29 +163,31 @@
 			newSlots = weekData.slots.map(s =>
 				s.weekday === weekday && s.meal_type === mealType &&
 				s.slot_index === slotIndex && s.is_accompaniment === isAcc
-					? { ...s, recipe }
+					? { ...s, recipe, is_leftover: isLeftover }
 					: s
 			);
 		} else if (recipe) {
-			newSlots = [...weekData.slots, { weekday, meal_type: mealType as 'comida' | 'cena', slot_index: slotIndex, is_accompaniment: isAcc, recipe, member: null, schedule: null }];
+			newSlots = [...weekData.slots, { weekday, meal_type: mealType as 'comida' | 'cena', slot_index: slotIndex, is_accompaniment: isAcc, is_leftover: isLeftover, recipe, member: null, schedule: null }];
 		} else {
 			return;
 		}
 		weekData = { ...weekData, slots: newSlots, violations: checkRules(newSlots, rules) };
 	}
 
-	async function selectRecipe(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipeId: number) {
-		const prev = getSlot(weekday, mealType, slotIndex, isAcc)?.recipe ?? null;
-		patchSlot(weekday, mealType, slotIndex, isAcc, recipes.find(r => r.id === recipeId) ?? null);
+	async function selectRecipe(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipeId: number, isLeftover = false) {
+		const prevSlot = getSlot(weekday, mealType, slotIndex, isAcc);
+		const prev = prevSlot?.recipe ?? null;
+		const prevIsLeftover = prevSlot?.is_leftover ?? 0;
+		patchSlot(weekday, mealType, slotIndex, isAcc, recipes.find(r => r.id === recipeId) ?? null, isLeftover ? 1 : 0);
 		try {
 			const res = await fetch('/api/week/assign', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, recipe_id: recipeId, member_id: null })
+				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, recipe_id: recipeId, member_id: null, is_leftover: isLeftover ? 1 : 0 })
 			});
 			if (!res.ok) throw new Error();
 		} catch {
-			patchSlot(weekday, mealType, slotIndex, isAcc, prev);
+			patchSlot(weekday, mealType, slotIndex, isAcc, prev, prevIsLeftover as 0 | 1);
 			showError('Error al asignar receta');
 		}
 	}
@@ -231,16 +261,20 @@
 	async function moveRecipe(from: SlotCoord, to: SlotCoord) {
 		if (slotKey(from.weekday, from.mealType, from.slotIndex, from.isAcc) ===
 			slotKey(to.weekday, to.mealType, to.slotIndex, to.isAcc)) return;
-		const fromRecipe = getSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc)?.recipe ?? null;
-		const toRecipe   = getSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc)?.recipe ?? null;
+		const fromSlot = getSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc);
+		const toSlot   = getSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc);
+		const fromRecipe = fromSlot?.recipe ?? null;
+		const toRecipe   = toSlot?.recipe ?? null;
+		const fromIsLeftover = fromSlot?.is_leftover ?? 0;
+		const toIsLeftover   = toSlot?.is_leftover ?? 0;
 		if (!fromRecipe) return;
-		patchSlot(to.weekday,   to.mealType,   to.slotIndex,   to.isAcc,   fromRecipe);
-		patchSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc, toRecipe);
+		patchSlot(to.weekday,   to.mealType,   to.slotIndex,   to.isAcc,   fromRecipe, 0);
+		patchSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc, toRecipe,   0);
 		const doAssign = (coord: SlotCoord, recipe: Recipe | null) => {
 			if (recipe) {
 				return fetch('/api/week/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ weekKey, weekday: coord.weekday, meal_type: coord.mealType,
-						slot_index: coord.slotIndex, is_accompaniment: coord.isAcc, recipe_id: recipe.id, member_id: null }) });
+						slot_index: coord.slotIndex, is_accompaniment: coord.isAcc, recipe_id: recipe.id, member_id: null, is_leftover: 0 }) });
 			} else {
 				return fetch('/api/week/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ weekKey, weekday: coord.weekday, meal_type: coord.mealType,
@@ -251,10 +285,65 @@
 			const results = await Promise.all([doAssign(to, fromRecipe), doAssign(from, toRecipe)]);
 			if (results.some(r => !r.ok)) throw new Error();
 		} catch {
-			patchSlot(to.weekday,   to.mealType,   to.slotIndex,   to.isAcc,   toRecipe);
-			patchSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc, fromRecipe);
+			patchSlot(to.weekday,   to.mealType,   to.slotIndex,   to.isAcc,   toRecipe,   toIsLeftover as 0 | 1);
+			patchSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc, fromRecipe, fromIsLeftover as 0 | 1);
 			showError('Error al mover receta');
 		}
+	}
+
+	async function copySlot(from: SlotCoord, to: SlotCoord) {
+		const fromRecipe = getSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc)?.recipe ?? null;
+		if (!fromRecipe) return;
+		const prevSlot = getSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc);
+		const prevRecipe = prevSlot?.recipe ?? null;
+		const prevIsLeftover = prevSlot?.is_leftover ?? 0;
+		patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, fromRecipe, 0);
+		try {
+			const res = await fetch('/api/week/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey, weekday: to.weekday, meal_type: to.mealType, slot_index: to.slotIndex, is_accompaniment: to.isAcc, recipe_id: fromRecipe.id, member_id: null, is_leftover: 0 }) });
+			if (!res.ok) throw new Error();
+		} catch {
+			patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, prevRecipe, prevIsLeftover as 0 | 1);
+			showError('Error al copiar receta');
+		}
+	}
+
+	async function markAsLeftover(from: SlotCoord, to: SlotCoord) {
+		const fromRecipe = getSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc)?.recipe ?? null;
+		if (!fromRecipe) return;
+		const prevSlot = getSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc);
+		const prevRecipe = prevSlot?.recipe ?? null;
+		const prevIsLeftover = prevSlot?.is_leftover ?? 0;
+		patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, fromRecipe, 1);
+		try {
+			const res = await fetch('/api/week/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey, weekday: to.weekday, meal_type: to.mealType, slot_index: to.slotIndex, is_accompaniment: to.isAcc, recipe_id: fromRecipe.id, member_id: null, is_leftover: 1 }) });
+			if (!res.ok) throw new Error();
+		} catch {
+			patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, prevRecipe, prevIsLeftover as 0 | 1);
+			showError('Error al marcar como restos');
+		}
+	}
+
+	function isWithinLeftoverWindow(source: SlotCoord, target: SlotCoord): boolean {
+		const dates = weekDates;
+		const sourceDate = dates[source.weekday - 1];
+		const targetDate = dates[target.weekday - 1];
+		if (!sourceDate || !targetDate) return false;
+		const diffDays = Math.round((targetDate.getTime() - sourceDate.getTime()) / 86400000);
+		return diffDays > 0 && diffDays <= 5;
+	}
+
+	function handleMoveCopyAction(action: 'move' | 'copy' | 'leftover') {
+		moveCopyModalOpen = false;
+		const src = moveCopySource;
+		const tgt = moveCopyTarget;
+		moveCopySource = null;
+		moveCopyTarget = null;
+		if (!src || !tgt) return;
+		if (action === 'move') moveRecipe(src, tgt);
+		else if (action === 'copy') copySlot(src, tgt);
+		else markAsLeftover(src, tgt);
 	}
 
 	async function randomSlot(weekday: number, mealType: 'comida' | 'cena', slotIndex: number, isAcc: number) {
@@ -513,20 +602,36 @@
 				const slot = getSlot(weekday, mealType, slotIdx, isAcc);
 				if (!slot?.recipe) return;
 				dragSource = coord;
-				e.dataTransfer!.effectAllowed = 'move';
+				dragModifier = ctrlHeld || e.ctrlKey || e.metaKey;
+				e.dataTransfer!.effectAllowed = 'copyMove';
 				e.dataTransfer!.setData('text/plain', key);
 			},
-			onDragEnd: () => { dragSource = null; dragOver = null; },
-			onDragOver: (e: DragEvent) => { if (!dragSource) return; e.dataTransfer!.dropEffect = 'move'; dragOver = key; },
-			onDragLeave: (e: DragEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) dragOver = null; },
-			onDrop: () => {
+			onDragEnd: () => { dragSource = null; dragOver = null; dragModifier = false; },
+			onDragOver: (e: DragEvent) => {
 				if (!dragSource) return;
-				moveRecipe(dragSource, coord);
-				dragSource = null; dragOver = null;
+				dragModifier = ctrlHeld || e.ctrlKey || e.metaKey;
+				e.dataTransfer!.dropEffect = dragModifier ? 'copy' : 'move';
+				dragOver = key;
+			},
+			onDragLeave: (e: DragEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) dragOver = null; },
+			onDrop: (e: DragEvent) => {
+				if (!dragSource) return;
+				const src = dragSource;
+				const mod = ctrlHeld || e.ctrlKey || e.metaKey || dragModifier;
+				dragSource = null; dragOver = null; dragModifier = false;
+				if (mod) {
+					moveCopySource = src;
+					moveCopyTarget = coord;
+					moveCopyModalOpen = true;
+				} else {
+					moveRecipe(src, coord);
+				}
 			},
 			onMoveClick: () => {
 				if (moveSource) {
-					moveRecipe(moveSource, coord);
+					moveCopySource = moveSource;
+					moveCopyTarget = coord;
+					moveCopyModalOpen = true;
 					moveSource = null;
 					return;
 				}
@@ -875,9 +980,9 @@
 			slotIndex={pickerSlot.slotIndex}
 			isAcc={pickerSlot.isAcc}
 			{allTags}
-			onSelect={(id) => {
+			onSelect={(id, isLeftover) => {
 				pickerOpen = false;
-				selectRecipe(pickerSlot!.weekday, pickerSlot!.mealType, pickerSlot!.slotIndex, pickerSlot!.isAcc, id);
+				selectRecipe(pickerSlot!.weekday, pickerSlot!.mealType, pickerSlot!.slotIndex, pickerSlot!.isAcc, id, isLeftover);
 			}}
 			onClose={() => { pickerOpen = false; }}
 		/>
@@ -949,6 +1054,16 @@
 				Cancelar
 			</button>
 		</div>
+	{/if}
+
+	{#if moveCopySource && moveCopyTarget}
+		<MoveCopyLeftoverModal
+			open={moveCopyModalOpen}
+			sourceName={getSlot(moveCopySource.weekday, moveCopySource.mealType, moveCopySource.slotIndex, moveCopySource.isAcc)?.recipe?.name ?? ''}
+			canLeftover={isWithinLeftoverWindow(moveCopySource, moveCopyTarget)}
+			onConfirm={handleMoveCopyAction}
+			onClose={() => { moveCopyModalOpen = false; moveCopySource = null; moveCopyTarget = null; }}
+		/>
 	{/if}
 </div>
 

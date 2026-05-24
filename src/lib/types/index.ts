@@ -33,6 +33,7 @@ export interface WeekPlan {
 	meal_type: MealType;
 	slot_index: number;
 	is_accompaniment: number;
+	is_leftover: number;
 	recipe_id: number | null;
 	member_id: number | null;
 }
@@ -82,6 +83,7 @@ export interface SlotData {
 	meal_type: MealType;
 	slot_index: number;
 	is_accompaniment: number;
+	is_leftover: 0 | 1;
 	recipe: Recipe | null;
 	member: Member | null;
 	schedule: ScheduleWithRecipe | null;

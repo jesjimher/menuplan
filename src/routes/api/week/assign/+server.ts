@@ -5,6 +5,6 @@ import { assignBodySchema } from '$lib/schemas/index.js';
 
 export async function POST({ request }) {
 	const body = await parseBody(request, assignBodySchema);
-	assignRecipe(body.weekKey, body.weekday, body.meal_type, body.slot_index, body.is_accompaniment, body.recipe_id, body.member_id);
+	assignRecipe(body.weekKey, body.weekday, body.meal_type, body.slot_index, body.is_accompaniment, body.recipe_id, body.member_id, body.is_leftover ?? 0);
 	return json({ ok: true });
 }

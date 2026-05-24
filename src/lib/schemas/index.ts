@@ -13,6 +13,7 @@ export const assignBodySchema = z.object({
 	meal_type: mealTypeSchema,
 	slot_index: slotIndexSchema,
 	is_accompaniment: isAccompanimentSchema,
+	is_leftover: z.union([z.literal(0), z.literal(1)]).default(0),
 	recipe_id: z.number().int().positive().nullable(),
 	member_id: z.number().int().positive().nullable().default(null),
 });

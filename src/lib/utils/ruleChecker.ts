@@ -5,7 +5,7 @@ export function checkRules(slots: SlotData[], rules: Rule[]): RuleViolation[] {
 	const tagCounts: Record<string, number> = {};
 
 	for (const slot of slots) {
-		if (slot.recipe && !slot.is_accompaniment) {
+		if (slot.recipe && !slot.is_accompaniment && !slot.is_leftover) {
 			const tags = parseTags(slot.recipe.tags);
 			for (const tag of tags) {
 				tagCounts[tag] = (tagCounts[tag] || 0) + 1;

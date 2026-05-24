@@ -1,7 +1,8 @@
 import { json } from '@sveltejs/kit';
-import { getTopRecipesForSlot, getTopRecipesOverall, getRecentRecipesForSlot, getOldestPlannedRecipes } from '$lib/server/recipes.js';
+import { getTopRecipesForSlot, getTopRecipesOverall, getRecentRecipesForSlot, getOldestPlannedRecipes, getRecipesPlannedNearDate } from '$lib/server/recipes.js';
 import { getDiscardedRecipes } from '$lib/server/planner.js';
 import { getWeekData } from '$lib/server/weekplan.js';
+import { getWeekDates } from '$lib/utils/dates.js';
 
 export async function GET({ url }) {
 	const weekKey = url.searchParams.get('weekKey') ?? '';
@@ -22,5 +23,7 @@ export async function GET({ url }) {
 	const oldestPlanned = getOldestPlannedRecipes(mealType, 20);
 	const discarded = getDiscardedRecipes(weekKey, weekday, mealType, isAcc, slotIndex, currentSlots, slotRequiredTags);
 
-	return json({ topForDay, topOverall, recentForDay, oldestPlanned, discarded });
+	const leftovers = isAcc ? [] : getRecipesPlannedNearDate(getWeekDates(weekKey)[weekday - 1], 5);
+
+	return json({ topForDay, topOverall, recentForDay, oldestPlanned, discarded, leftovers });
 }

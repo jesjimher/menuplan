@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS week_plans (
     meal_type        TEXT    NOT NULL,
     slot_index       INTEGER NOT NULL DEFAULT 0,
     is_accompaniment INTEGER NOT NULL DEFAULT 0,
+    is_leftover      INTEGER NOT NULL DEFAULT 0,
     recipe_id        INTEGER REFERENCES recipes(id) ON DELETE SET NULL,
     member_id        INTEGER REFERENCES members(id) ON DELETE SET NULL,
     UNIQUE(week_key, weekday, meal_type, is_accompaniment, slot_index, COALESCE(member_id, -1))

@@ -20,11 +20,11 @@
 		slotIndex: number;
 		isAcc?: number;
 		allTags?: string[];
-		onSelect: (recipeId: number) => void;
+		onSelect: (recipeId: number, isLeftover?: boolean) => void;
 		onClose: () => void;
 	} = $props();
 
-	type Tab = 'search' | 'topDay' | 'topAll' | 'recent' | 'oldest' | 'discarded';
+	type Tab = 'search' | 'topDay' | 'topAll' | 'recent' | 'oldest' | 'discarded' | 'leftovers';
 	let activeTab = $state<Tab>('search');
 
 	// Search tab state
@@ -46,6 +46,7 @@
 	let recentForDay = $state<RecipeWithWeek[]>([]);
 	let oldestPlanned = $state<RecipeWithWeek[]>([]);
 	let discarded = $state<Discarded[]>([]);
+	let leftoverRecipes = $state<Recipe[]>([]);
 	let pickerLoading = $state(false);
 	let pickerError = $state<string | null>(null);
 	let pickerAbort: AbortController | null = null;
@@ -89,6 +90,7 @@
 			recentForDay = data.recentForDay ?? [];
 			oldestPlanned = data.oldestPlanned ?? [];
 			discarded = data.discarded ?? [];
+			leftoverRecipes = data.leftovers ?? [];
 		} catch (e) {
 			if (e instanceof DOMException && e.name === 'AbortError') {
 				// If it was our timeout (controller still current), surface a message.
@@ -173,8 +175,8 @@
 		});
 	}
 
-	function handleSelect(id: number) {
-		onSelect(id);
+	function handleSelect(id: number, isLeftover = false) {
+		onSelect(id, isLeftover);
 	}
 
 	function handleBackdrop(e: MouseEvent) {
@@ -185,14 +187,16 @@
 		if (e.key === 'Escape') onClose();
 	}
 
-	const TABS: { id: Tab; label: string }[] = [
+	const ALL_TABS: { id: Tab; label: string; hideForAcc?: boolean }[] = [
 		{ id: 'search',    label: 'Búsqueda' },
+		{ id: 'leftovers', label: 'Restos de...', hideForAcc: true },
 		{ id: 'topDay',    label: 'Top este día' },
 		{ id: 'topAll',    label: 'Top general' },
 		{ id: 'recent',    label: 'Más recientes' },
 		{ id: 'oldest',    label: 'Menos planificadas' },
 		{ id: 'discarded', label: 'Descartadas' },
 	];
+	let TABS = $derived(ALL_TABS.filter(t => !t.hideForAcc || !isAcc));
 
 	let searchInputEl: HTMLInputElement | null = null;
 
@@ -295,6 +299,30 @@
 					{:else}
 						{#each searchResults as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
+								{#if r.image_type}
+									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
+								{:else}
+									<div class="recipe-thumb-placeholder"></div>
+								{/if}
+								<div class="recipe-info">
+									<span class="recipe-name">{r.name}</span>
+									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
+								</div>
+							</button>
+						{/each}
+					{/if}
+				</div>
+
+			{:else if activeTab === 'leftovers'}
+				{@const filtered = applyFilters(leftoverRecipes)}
+				<div class="recipe-list">
+					{#if pickerLoading}
+						<p class="empty-msg">Cargando...</p>
+					{:else if filtered.length === 0}
+						<p class="empty-msg">Sin recetas planificadas en los últimos 5 días</p>
+					{:else}
+						{#each filtered as r}
+							<button class="recipe-row" onclick={() => handleSelect(r.id, true)}>
 								{#if r.image_type}
 									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
 								{:else}

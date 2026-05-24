@@ -88,6 +88,11 @@ const MIGRATIONS: Migration[] = [
 		up: (db) => {
 			db.exec("INSERT OR IGNORE INTO options VALUES ('sidebar_collapsed_by_default', '0')");
 		}
+	},
+	{
+		version: 10,
+		name: 'add_week_plans_is_leftover',
+		up: (db) => addColumnIfMissing(db, 'week_plans', 'is_leftover', 'INTEGER NOT NULL DEFAULT 0')
 	}
 ];
 

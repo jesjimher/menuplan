@@ -8,7 +8,7 @@ import { mapRowToRecipe } from './mappers.js';
 
 interface WeekPlanRow {
 	id: number; week_key: string; weekday: number; meal_type: MealType;
-	slot_index: number; is_accompaniment: number;
+	slot_index: number; is_accompaniment: number; is_leftover: number;
 	recipe_id: number | null; member_id: number | null;
 	r_id: number | null; name: string | null; description: string | null;
 	tags: string | null; min_days: number | null; image_type: string | null; created_at: string | null;
@@ -108,6 +108,7 @@ export function getWeekData(weekKey: string): WeekData {
 		meal_type: p.meal_type,
 		slot_index: p.slot_index,
 		is_accompaniment: p.is_accompaniment,
+		is_leftover: p.is_leftover ?? 0,
 		recipe: p.recipe_id ? {
 			id: p.r_id as number,
 			name: p.name as string,
@@ -160,20 +161,20 @@ export function getWeekData(weekKey: string): WeekData {
 	return { week_key: weekKey, slots, configs, violations };
 }
 
-export function assignRecipe(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number, recipeId: number | null, memberId: number | null): void {
+export function assignRecipe(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number, recipeId: number | null, memberId: number | null, isLeftover = 0): void {
 	const db = getDb();
 	db.prepare(`
-		INSERT INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, recipe_id, member_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, is_leftover, recipe_id, member_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(week_key, weekday, meal_type, is_accompaniment, slot_index, COALESCE(member_id, -1))
-		DO UPDATE SET recipe_id = excluded.recipe_id, member_id = excluded.member_id
-	`).run(weekKey, weekday, mealType, slotIndex, isAccompaniment, recipeId, memberId);
+		DO UPDATE SET recipe_id = excluded.recipe_id, member_id = excluded.member_id, is_leftover = excluded.is_leftover
+	`).run(weekKey, weekday, mealType, slotIndex, isAccompaniment, isLeftover, recipeId, memberId);
 }
 
 export function removeRecipe(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number): void {
 	const db = getDb();
 	db.prepare(`
-		UPDATE week_plans SET recipe_id = NULL
+		UPDATE week_plans SET recipe_id = NULL, is_leftover = 0
 		WHERE week_key = ? AND weekday = ? AND meal_type = ? AND slot_index = ? AND is_accompaniment = ?
 	`).run(weekKey, weekday, mealType, slotIndex, isAccompaniment);
 }
@@ -192,11 +193,11 @@ export function copyPreviousWeek(weekKey: string, previousWeekKey: string): void
 
 		const plans = db.prepare('SELECT * FROM week_plans WHERE week_key = ?').all(previousWeekKey) as WeekPlan[];
 		const insertPlan = db.prepare(`
-			INSERT OR IGNORE INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, recipe_id, member_id)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
+			INSERT OR IGNORE INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, is_leftover, recipe_id, member_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		`);
 		for (const plan of plans) {
-			insertPlan.run(weekKey, plan.weekday, plan.meal_type, plan.slot_index, plan.is_accompaniment, plan.recipe_id, plan.member_id);
+			insertPlan.run(weekKey, plan.weekday, plan.meal_type, plan.slot_index, plan.is_accompaniment, plan.is_leftover ?? 0, plan.recipe_id, plan.member_id);
 		}
 
 		const configs = db.prepare('SELECT * FROM week_day_config WHERE week_key = ?').all(previousWeekKey) as WeekDayConfig[];
