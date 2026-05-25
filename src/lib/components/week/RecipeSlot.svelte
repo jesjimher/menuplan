@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { SlotData, MealConfig, ScheduleWithRecipe } from '$lib/types/index.js';
 	import TagInput from '$lib/components/TagInput.svelte';
+	import { weekdayDateFromWeekKey, formatShortDate, computeNextOccurrenceWeekKey } from '$lib/utils/dates.js';
 
 	let {
 		weekday,
@@ -39,6 +40,7 @@
 		onTouchMove,
 		onDeleteSlot,
 		schedule,
+		slotSchedules = [],
 		onSchedule,
 	}: {
 		weekday: number;
@@ -74,6 +76,7 @@
 		onTouchMove: () => void;
 		onDeleteSlot?: () => void;
 		schedule?: ScheduleWithRecipe | null;
+		slotSchedules?: ScheduleWithRecipe[];
 		onSchedule?: () => void;
 	} = $props();
 
@@ -97,6 +100,18 @@
 		cfg.recipe_count === 1 ? 'min-h-[3rem]' :
 		cfg.recipe_count === 2 ? 'min-h-[2rem]' : 'min-h-[1.5rem]'
 	);
+
+	let scheduleTooltip = $derived.by(() => {
+		if (slotSchedules.length === 0) return '';
+		return slotSchedules.map(s => {
+			const nextWk = computeNextOccurrenceWeekKey(s.anchor_week_key, s.every_n_weeks, s.exceptions);
+			const nextDate = nextWk ? formatShortDate(weekdayDateFromWeekKey(nextWk, s.weekday)) : null;
+			const freq = s.every_n_weeks === 1 ? 'cada semana' : `cada ${s.every_n_weeks} semanas`;
+			return nextDate
+				? `${s.recipe.name}, ${freq}, próxima el ${nextDate}`
+				: `${s.recipe.name}, ${freq}`;
+		}).join('\n');
+	});
 
 	let menuOpen = $state(false);
 	let closeTimer: ReturnType<typeof setTimeout>;
@@ -230,18 +245,35 @@
 				{#if slot?.recipe && schedule && onSchedule}
 					<button
 						on:click|stopPropagation={onSchedule}
-						class="absolute top-1.5 left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full transition-opacity hover:opacity-100"
+						class="absolute top-1.5 left-1.5 z-10 flex items-center justify-center rounded-full transition-opacity hover:opacity-100 {slotSchedules.length > 1 ? 'px-1.5 h-5 gap-0.5' : 'w-5 h-5'}"
 						style="background: var(--primary); color: white; opacity: 0.85;"
-						title="Programada cada {schedule.every_n_weeks} semanas — clic para editar"
+						title={scheduleTooltip}
 						aria-label="Editar programación"
 					>
-						<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+						<svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
 							<rect x="3" y="4" width="18" height="18" rx="2"/>
 							<line x1="16" y1="2" x2="16" y2="6"/>
 							<line x1="8" y1="2" x2="8" y2="6"/>
 							<line x1="3" y1="10" x2="21" y2="10"/>
 						</svg>
+						{#if slotSchedules.length > 1}
+							<span class="text-[9px] font-black leading-none">{slotSchedules.length}</span>
+						{/if}
 					</button>
+				{:else if slotSchedules.length > 1}
+					<div
+						class="absolute top-1.5 left-1.5 z-10 px-1.5 h-5 flex items-center justify-center gap-0.5 rounded-full"
+						style="background: var(--surface-container-highest); color: var(--text-muted); opacity: 0.8;"
+						title={scheduleTooltip}
+					>
+						<svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+							<rect x="3" y="4" width="18" height="18" rx="2"/>
+							<line x1="16" y1="2" x2="16" y2="6"/>
+							<line x1="8" y1="2" x2="8" y2="6"/>
+							<line x1="3" y1="10" x2="21" y2="10"/>
+						</svg>
+						<span class="text-[9px] font-black leading-none">{slotSchedules.length}</span>
+					</div>
 				{/if}
 				<!-- Backdrop para cerrar el menú al tocar fuera (solo en móvil vía CSS) -->
 				{#if menuOpen}

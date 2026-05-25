@@ -109,7 +109,7 @@ export function getWeekData(weekKey: string): WeekData {
 
 	const schedMap = new Map<string, ScheduleWithRecipe>();
 	for (const s of schedRows) {
-		const key = `${s.weekday}-${s.meal_type}-${s.slot_index}-${s.is_accompaniment}`;
+		const key = `${s.weekday}-${s.meal_type}-${s.slot_index}-${s.is_accompaniment}-${s.recipe_id}`;
 		schedMap.set(key, {
 			id: s.id,
 			recipe_id: s.recipe_id,
@@ -155,7 +155,7 @@ export function getWeekData(weekKey: string): WeekData {
 			likes: p.likes as string,
 			dislikes: p.dislikes as string
 		} : null,
-		schedule: schedMap.get(`${p.weekday}-${p.meal_type}-${p.slot_index}-${p.is_accompaniment}`) ?? null
+		schedule: p.recipe_id ? (schedMap.get(`${p.weekday}-${p.meal_type}-${p.slot_index}-${p.is_accompaniment}-${p.recipe_id}`) ?? null) : null
 	}));
 
 	const options = getOptions();

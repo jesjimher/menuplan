@@ -1,6 +1,7 @@
 import { getWeekData } from '$lib/server/weekplan.js';
 import { getAllRecipes, getAllTags } from '$lib/server/recipes.js';
 import { getAllRules } from '$lib/server/rules.js';
+import { getSchedulesPerSlot } from '$lib/server/schedules.js';
 import { getWeekKey } from '$lib/utils/dates.js';
 
 export function load({ url }) {
@@ -10,6 +11,7 @@ export function load({ url }) {
 		weekData: getWeekData(weekKey),
 		recipes: getAllRecipes(),
 		rules: getAllRules(),
-		allTags: getAllTags()
+		allTags: getAllTags(),
+		schedulesPerSlot: getSchedulesPerSlot()
 	};
 }

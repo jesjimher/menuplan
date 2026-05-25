@@ -107,6 +107,33 @@ const MIGRATIONS: Migration[] = [
 				if (weekKeyToIndex(r.week_key) >= todayIdx) upd.run(r.id);
 			}
 		}
+	},
+	{
+		version: 12,
+		name: 'schedules_unique_per_recipe_slot',
+		up: (db) => {
+			// Recreate schedules with UNIQUE(recipe_id, weekday, ...) so multiple recipes can be
+			// scheduled for the same slot position (e.g. alternating weeks).
+			db.pragma('foreign_keys = OFF');
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS schedules_new (
+					id               INTEGER PRIMARY KEY AUTOINCREMENT,
+					recipe_id        INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+					weekday          INTEGER NOT NULL,
+					meal_type        TEXT    NOT NULL,
+					slot_index       INTEGER NOT NULL DEFAULT 0,
+					is_accompaniment INTEGER NOT NULL DEFAULT 0,
+					every_n_weeks    INTEGER NOT NULL DEFAULT 1,
+					anchor_week_key  TEXT    NOT NULL,
+					created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+					UNIQUE(recipe_id, weekday, meal_type, slot_index, is_accompaniment)
+				);
+				INSERT OR IGNORE INTO schedules_new SELECT * FROM schedules;
+				DROP TABLE schedules;
+				ALTER TABLE schedules_new RENAME TO schedules;
+			`);
+			db.pragma('foreign_keys = ON');
+		}
 	}
 ];
 

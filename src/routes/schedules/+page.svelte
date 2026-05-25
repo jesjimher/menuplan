@@ -1,7 +1,16 @@
 <script lang="ts">
 	import type { ScheduleWithRecipe } from '$lib/types/index.js';
-	import { WEEKDAY_NAMES } from '$lib/utils/dates.js';
+	import { WEEKDAY_NAMES, weekdayDateFromWeekKey, formatShortDate, computeNextOccurrenceWeekKey } from '$lib/utils/dates.js';
 	import { invalidateAll } from '$app/navigation';
+
+	function scheduleStartDate(s: ScheduleWithRecipe): string {
+		return formatShortDate(weekdayDateFromWeekKey(s.anchor_week_key, s.weekday));
+	}
+
+	function scheduleNextDate(s: ScheduleWithRecipe): string {
+		const wk = computeNextOccurrenceWeekKey(s.anchor_week_key, s.every_n_weeks, s.exceptions);
+		return wk ? formatShortDate(weekdayDateFromWeekKey(wk, s.weekday)) : '—';
+	}
 
 	let { data } = $props();
 	let schedules = $state<ScheduleWithRecipe[]>(data.schedules);
@@ -132,6 +141,16 @@
 										style="color: var(--text-muted);"
 									>Editar</button>
 								{/if}
+							</div>
+
+							<!-- Fechas -->
+							<div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
+								<span class="text-xs" style="color: var(--text-muted);">
+									Desde <span class="font-semibold" style="color: var(--text-secondary);">{scheduleStartDate(s)}</span>
+								</span>
+								<span class="text-xs" style="color: var(--text-muted);">
+									Próxima <span class="font-semibold" style="color: var(--text-secondary);">{scheduleNextDate(s)}</span>
+								</span>
 							</div>
 
 							<!-- Excepciones -->

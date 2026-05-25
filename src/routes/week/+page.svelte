@@ -20,6 +20,7 @@
 	let recipes = $state<Recipe[]>(data.recipes);
 	let rules = $state<Rule[]>(data.rules);
 	let allTags = $state<string[]>(data.allTags);
+	let schedulesPerSlot = $state<Record<string, import('$lib/types/index.js').ScheduleWithRecipe[]>>(data.schedulesPerSlot);
 	let calculating = $state(false);
 	let busySlots = $state(new Set<string>());
 	let editingTagKey = $state<string | null>(null);
@@ -47,6 +48,7 @@
 		recipes = data.recipes;
 		rules = data.rules;
 		allTags = data.allTags;
+		schedulesPerSlot = data.schedulesPerSlot;
 	});
 
 	// Recipe picker modal state
@@ -858,6 +860,7 @@
 											{isTouchDevice}
 											{editingTagKey} {slotTags} {slotTagEditKey}
 											schedule={slot?.schedule ?? null}
+											slotSchedules={schedulesPerSlot[key] ?? []}
 											{...callbacks}
 											onDeleteSlot={() => decrementMealCount(weekday, mealType)}
 										/>

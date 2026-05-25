@@ -39,6 +39,34 @@ export function getWeekDates(weekKey: string): Date[] {
 export const WEEKDAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 export const SHORT_MONTH_NAMES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
+export function weekdayDateFromWeekKey(weekKey: string, weekday: number): Date {
+	return getWeekDates(weekKey)[weekday - 1];
+}
+
+export function formatShortDate(date: Date): string {
+	const day = date.getUTCDate();
+	const month = SHORT_MONTH_NAMES[date.getUTCMonth()];
+	const year = date.getUTCFullYear();
+	const thisYear = new Date().getUTCFullYear();
+	return year === thisYear ? `${day} ${month}` : `${day} ${month} ${year}`;
+}
+
+export function computeNextOccurrenceWeekKey(
+	anchorWeekKey: string,
+	everyNWeeks: number,
+	exceptions: string[]
+): string | null {
+	const anchorIdx = weekKeyToIndex(anchorWeekKey);
+	const todayIdx = weekKeyToIndex(getWeekKey());
+	const diff = todayIdx - anchorIdx;
+	const n = Math.max(0, Math.ceil((diff + 1) / everyNWeeks));
+	for (let i = 0; i < 200; i++) {
+		const wk = indexToWeekKey(anchorIdx + (n + i) * everyNWeeks);
+		if (!exceptions.includes(wk)) return wk;
+	}
+	return null;
+}
+
 export function weekKeyToIndex(weekKey: string): number {
 	const [year, weekStr] = weekKey.split('-W');
 	const weekNum = parseInt(weekStr);

@@ -50,6 +50,16 @@ function rowToScheduleWithRecipe(s: ScheduleRow, exceptions: string[]): Schedule
 	};
 }
 
+export function getSchedulesPerSlot(): Record<string, ScheduleWithRecipe[]> {
+	const all = getAllSchedules();
+	const result: Record<string, ScheduleWithRecipe[]> = {};
+	for (const s of all) {
+		const key = `${s.weekday}-${s.meal_type}-${s.slot_index}-${s.is_accompaniment}`;
+		(result[key] ??= []).push(s);
+	}
+	return result;
+}
+
 export function getAllSchedules(): ScheduleWithRecipe[] {
 	const db = getDb();
 	const rows = db.prepare(`
@@ -105,17 +115,16 @@ export function upsertSchedule(
 	const result = db.prepare(`
 		INSERT INTO schedules (recipe_id, weekday, meal_type, slot_index, is_accompaniment, every_n_weeks, anchor_week_key)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(weekday, meal_type, slot_index, is_accompaniment)
-		DO UPDATE SET recipe_id = excluded.recipe_id,
-		              every_n_weeks = excluded.every_n_weeks,
+		ON CONFLICT(recipe_id, weekday, meal_type, slot_index, is_accompaniment)
+		DO UPDATE SET every_n_weeks = excluded.every_n_weeks,
 		              anchor_week_key = excluded.anchor_week_key
 	`).run(recipeId, weekday, mealType, slotIndex, isAccompaniment, everyNWeeks, anchorWeekKey);
 
 	if (result.lastInsertRowid) return result.lastInsertRowid as number;
 	// On update, fetch the existing id
 	const existing = db.prepare(
-		'SELECT id FROM schedules WHERE weekday = ? AND meal_type = ? AND slot_index = ? AND is_accompaniment = ?'
-	).get(weekday, mealType, slotIndex, isAccompaniment) as { id: number };
+		'SELECT id FROM schedules WHERE recipe_id = ? AND weekday = ? AND meal_type = ? AND slot_index = ? AND is_accompaniment = ?'
+	).get(recipeId, weekday, mealType, slotIndex, isAccompaniment) as { id: number };
 	return existing.id;
 }
 
