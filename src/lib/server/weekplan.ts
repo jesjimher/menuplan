@@ -3,8 +3,7 @@ import type { WeekPlan, WeekDayConfig, SlotData, DayConfig, WeekData, ScheduleWi
 import { getAllRules } from './rules.js';
 import { checkRules } from '$lib/utils/ruleChecker.js';
 import { getOptions } from './options.js';
-import { applySchedulesToWeek } from './schedules.js';
-import { mapRowToRecipe } from './mappers.js';
+import { getActiveSchedulesForWeek } from './schedules.js';
 import { getWeekKey, weekKeyToIndex } from '$lib/utils/dates.js';
 import type Database from 'better-sqlite3';
 
@@ -16,14 +15,6 @@ interface WeekPlanRow {
 	tags: string | null; min_days: number | null; image_type: string | null; created_at: string | null;
 	m_id: number | null; m_name: string | null;
 	cannot_eat: string | null; likes: string | null; dislikes: string | null;
-}
-
-interface ScheduleRow {
-	id: number; recipe_id: number; weekday: number; meal_type: MealType;
-	slot_index: number; is_accompaniment: number;
-	every_n_weeks: number; anchor_week_key: string; created_at: string;
-	r_id: number; r_name: string; r_description: string;
-	r_tags: string; r_min_days: number; r_image_type: string | null; r_created_at: string;
 }
 
 function getEffectiveStickyConfig(db: Database.Database, weekKey: string, weekday: number, mealType: string) {
@@ -73,8 +64,6 @@ function parseRequiredTags(raw: string | null): string[][] {
 }
 
 export function getWeekData(weekKey: string): WeekData {
-	applySchedulesToWeek(weekKey);
-
 	const db = getDb();
 
 	const plans = db.prepare(`
@@ -87,76 +76,118 @@ export function getWeekData(weekKey: string): WeekData {
 		ORDER BY wp.weekday, wp.meal_type, wp.is_accompaniment, wp.slot_index
 	`).all(weekKey) as WeekPlanRow[];
 
-	// Cargar schedules — excepciones en una sola query (evita N+1)
-	const schedRows = db.prepare(`
-		SELECT s.*,
-		       r.id as r_id, r.name as r_name, r.description as r_description,
-		       r.tags as r_tags, r.min_days as r_min_days, r.image_type as r_image_type,
-		       r.created_at as r_created_at
-		FROM schedules s
-		JOIN recipes r ON r.id = s.recipe_id
-	`).all() as ScheduleRow[];
+	// Programaciones activas para esta semana (ya ordenadas por priority DESC, id ASC)
+	const activeSchedules = getActiveSchedulesForWeek(weekKey);
 
-	const exceptionRows = db.prepare(
-		'SELECT schedule_id, week_key FROM schedule_exceptions'
-	).all() as { schedule_id: number; week_key: string }[];
-	const exceptionsMap = new Map<number, string[]>();
-	for (const e of exceptionRows) {
-		const list = exceptionsMap.get(e.schedule_id) ?? [];
-		list.push(e.week_key);
-		exceptionsMap.set(e.schedule_id, list);
-	}
-
-	const schedMap = new Map<string, ScheduleWithRecipe>();
-	for (const s of schedRows) {
-		const key = `${s.weekday}-${s.meal_type}-${s.slot_index}-${s.is_accompaniment}-${s.recipe_id}`;
-		schedMap.set(key, {
-			id: s.id,
-			recipe_id: s.recipe_id,
-			weekday: s.weekday,
-			meal_type: s.meal_type,
-			slot_index: s.slot_index,
-			is_accompaniment: s.is_accompaniment,
-			every_n_weeks: s.every_n_weeks,
-			anchor_week_key: s.anchor_week_key,
-			created_at: s.created_at,
+	// Construir slots manuales desde week_plans
+	const manualSlots: SlotData[] = plans
+		.filter(p => p.recipe_id !== null)
+		.map(p => ({
+			weekday: p.weekday,
+			meal_type: p.meal_type,
+			slot_index: p.slot_index,
+			is_accompaniment: p.is_accompaniment,
+			is_leftover: (p.is_leftover ?? 0) as 0 | 1,
 			recipe: {
-				id: s.r_id,
-				name: s.r_name,
-				description: s.r_description,
-				tags: s.r_tags,
-				min_days: s.r_min_days,
-				image_type: s.r_image_type ?? null,
-				created_at: s.r_created_at
+				id: p.r_id as number,
+				name: p.name as string,
+				description: p.description as string,
+				tags: p.tags as string,
+				min_days: p.min_days as number,
+				image_type: (p.image_type as string | null) ?? null,
+				created_at: p.created_at as string
 			},
-			exceptions: exceptionsMap.get(s.id) ?? []
-		});
+			member: p.member_id ? {
+				id: p.m_id as number,
+				name: p.m_name as string,
+				cannot_eat: p.cannot_eat as string,
+				likes: p.likes as string,
+				dislikes: p.dislikes as string
+			} : null,
+			schedule: null as ScheduleWithRecipe | null
+		}));
+
+	// Agrupar slots manuales por comida: "wd-mt-ia" → SlotData[]
+	const mealKey = (wd: number, mt: string, ia: number) => `${wd}-${mt}-${ia}`;
+	const mealSlots = new Map<string, SlotData[]>();
+	for (const slot of manualSlots) {
+		const key = mealKey(slot.weekday, slot.meal_type, slot.is_accompaniment);
+		const arr = mealSlots.get(key) ?? [];
+		arr.push(slot);
+		mealSlots.set(key, arr);
 	}
 
-	const slots: SlotData[] = plans.map(p => ({
-		weekday: p.weekday,
-		meal_type: p.meal_type,
-		slot_index: p.slot_index,
-		is_accompaniment: p.is_accompaniment,
-		is_leftover: p.is_leftover ?? 0,
-		recipe: p.recipe_id ? {
-			id: p.r_id as number,
-			name: p.name as string,
-			description: p.description as string,
-			tags: p.tags as string,
-			min_days: p.min_days as number,
-			image_type: (p.image_type as string | null) ?? null,
-			created_at: p.created_at as string
-		} : null,
-		member: p.member_id ? {
-			id: p.m_id as number,
-			name: p.m_name as string,
-			cannot_eat: p.cannot_eat as string,
-			likes: p.likes as string,
-			dislikes: p.dislikes as string
-		} : null,
-		schedule: p.recipe_id ? (schedMap.get(`${p.weekday}-${p.meal_type}-${p.slot_index}-${p.is_accompaniment}-${p.recipe_id}`) ?? null) : null
-	}));
+	// Slots virtuales añadidos por programaciones con on_conflict='add'
+	const virtualSlots: SlotData[] = [];
+
+	// Aplicar programaciones a nivel de comida
+	for (const sched of activeSchedules) {
+		const key = mealKey(sched.weekday, sched.meal_type, sched.is_accompaniment);
+		const mealArr = mealSlots.get(key) ?? [];
+
+		// Si la receta ya está en un slot manual de esta comida, adjuntar referencia
+		const existingIdx = mealArr.findIndex(s => s.recipe?.id === sched.recipe_id);
+		if (existingIdx >= 0) {
+			if (!mealArr[existingIdx].schedule) {
+				mealArr[existingIdx] = { ...mealArr[existingIdx], schedule: sched };
+				mealSlots.set(key, mealArr);
+			}
+			continue;
+		}
+
+		// Calcular capacidad máxima de la comida
+		const cfg = getEffectiveStickyConfig(db, weekKey, sched.weekday, sched.meal_type);
+		const maxSlots = sched.is_accompaniment === 0 ? cfg.recipe_count : cfg.accompaniment_per_slot;
+
+		// Encontrar el primer slot_index libre (no ocupado por entrada manual)
+		const occupied = new Set(mealArr.map(s => s.slot_index));
+		let freeSlot = -1;
+		for (let i = 0; i < maxSlots; i++) {
+			if (!occupied.has(i)) { freeSlot = i; break; }
+		}
+
+		if (freeSlot >= 0) {
+			// Colocar la programación en el hueco libre
+			const newSlot: SlotData = {
+				weekday: sched.weekday,
+				meal_type: sched.meal_type,
+				slot_index: freeSlot,
+				is_accompaniment: sched.is_accompaniment,
+				is_leftover: 0,
+				recipe: sched.recipe,
+				member: null,
+				schedule: sched
+			};
+			mealArr.push(newSlot);
+			mealSlots.set(key, mealArr);
+		} else if (sched.on_conflict === 'overwrite') {
+			// Sobreescribir slot_index 0
+			const idx0 = mealArr.findIndex(s => s.slot_index === 0);
+			if (idx0 >= 0) {
+				mealArr[idx0] = { ...mealArr[idx0], recipe: sched.recipe, is_leftover: 0, schedule: sched };
+				mealSlots.set(key, mealArr);
+			}
+		} else if (sched.on_conflict === 'add') {
+			// Añadir slot virtual adicional más allá de los existentes
+			const allInMeal = [...mealArr, ...virtualSlots.filter(s => s.weekday === sched.weekday && s.meal_type === sched.meal_type && s.is_accompaniment === sched.is_accompaniment)];
+			const maxIdx = allInMeal.reduce((m, s) => Math.max(m, s.slot_index), -1);
+			virtualSlots.push({
+				weekday: sched.weekday,
+				meal_type: sched.meal_type,
+				slot_index: maxIdx + 1,
+				is_accompaniment: sched.is_accompaniment,
+				is_leftover: 0,
+				recipe: sched.recipe,
+				member: null,
+				schedule: sched
+			});
+		}
+		// on_conflict === 'skip': no hacer nada si la comida está llena
+	}
+
+	const allManual = [...mealSlots.values()].flat();
+	const slots: SlotData[] = [...allManual, ...virtualSlots]
+		.sort((a, b) => a.weekday - b.weekday || a.meal_type.localeCompare(b.meal_type) || a.is_accompaniment - b.is_accompaniment || a.slot_index - b.slot_index);
 
 	const options = getOptions();
 	const exactRows = db.prepare(
@@ -223,11 +254,19 @@ export function assignRecipe(weekKey: string, weekday: number, mealType: string,
 }
 
 export function removeRecipe(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number): void {
-	const db = getDb();
-	db.prepare(`
-		UPDATE week_plans SET recipe_id = NULL, is_leftover = 0
+	getDb().prepare(`
+		DELETE FROM week_plans
 		WHERE week_key = ? AND weekday = ? AND meal_type = ? AND slot_index = ? AND is_accompaniment = ?
 	`).run(weekKey, weekday, mealType, slotIndex, isAccompaniment);
+}
+
+export function hasManualEntry(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number): boolean {
+	const row = getDb().prepare(`
+		SELECT 1 FROM week_plans
+		WHERE week_key = ? AND weekday = ? AND meal_type = ? AND slot_index = ? AND is_accompaniment = ?
+		  AND recipe_id IS NOT NULL
+	`).get(weekKey, weekday, mealType, slotIndex, isAccompaniment);
+	return !!row;
 }
 
 export function clearWeek(weekKey: string): void {

@@ -1,6 +1,6 @@
 import { getDb } from '$lib/db/index.js';
 import { weekKeyToIndex } from '$lib/utils/dates.js';
-import type { Schedule, ScheduleWithRecipe, MealType } from '$lib/types/index.js';
+import type { ScheduleWithRecipe, ScheduleConflictMode, MealType } from '$lib/types/index.js';
 import { mapRowToRecipe } from './mappers.js';
 import Database from 'better-sqlite3';
 
@@ -9,10 +9,11 @@ interface ScheduleRow {
 	recipe_id: number;
 	weekday: number;
 	meal_type: MealType;
-	slot_index: number;
 	is_accompaniment: number;
 	every_n_weeks: number;
 	anchor_week_key: string;
+	on_conflict: ScheduleConflictMode;
+	priority: number;
 	created_at: string;
 	r_id: number;
 	r_name: string;
@@ -40,21 +41,22 @@ function rowToScheduleWithRecipe(s: ScheduleRow, exceptions: string[]): Schedule
 		recipe_id: s.recipe_id,
 		weekday: s.weekday,
 		meal_type: s.meal_type as MealType,
-		slot_index: s.slot_index,
 		is_accompaniment: s.is_accompaniment,
 		every_n_weeks: s.every_n_weeks,
 		anchor_week_key: s.anchor_week_key,
+		on_conflict: s.on_conflict ?? 'skip',
+		priority: s.priority ?? 5,
 		created_at: s.created_at,
 		recipe: mapRowToRecipe(s as unknown as Record<string, unknown>, 'r_'),
 		exceptions
 	};
 }
 
-export function getSchedulesPerSlot(): Record<string, ScheduleWithRecipe[]> {
+export function getSchedulesPerMeal(): Record<string, ScheduleWithRecipe[]> {
 	const all = getAllSchedules();
 	const result: Record<string, ScheduleWithRecipe[]> = {};
 	for (const s of all) {
-		const key = `${s.weekday}-${s.meal_type}-${s.slot_index}-${s.is_accompaniment}`;
+		const key = `${s.weekday}-${s.meal_type}-${s.is_accompaniment}`;
 		(result[key] ??= []).push(s);
 	}
 	return result;
@@ -69,20 +71,24 @@ export function getAllSchedules(): ScheduleWithRecipe[] {
 		       r.created_at as r_created_at
 		FROM schedules s
 		JOIN recipes r ON r.id = s.recipe_id
-		ORDER BY s.weekday, s.meal_type, s.slot_index
+		ORDER BY s.weekday, s.meal_type, s.priority DESC, s.id
 	`).all() as ScheduleRow[];
 
 	const exceptionsMap = loadAllExceptions(db);
 	return rows.map(s => rowToScheduleWithRecipe(s, exceptionsMap.get(s.id) ?? []));
 }
 
-export function getScheduleForSlot(
+export function getScheduleForMeal(
 	weekday: number,
 	mealType: string,
-	slotIndex: number,
-	isAccompaniment: number
+	isAccompaniment: number,
+	recipeId?: number
 ): ScheduleWithRecipe | null {
 	const db = getDb();
+	const extraFilter = recipeId !== undefined ? ' AND s.recipe_id = ?' : '';
+	const params: unknown[] = [weekday, mealType, isAccompaniment];
+	if (recipeId !== undefined) params.push(recipeId);
+
 	const s = db.prepare(`
 		SELECT s.*,
 		       r.id as r_id, r.name as r_name, r.description as r_description,
@@ -90,8 +96,10 @@ export function getScheduleForSlot(
 		       r.created_at as r_created_at
 		FROM schedules s
 		JOIN recipes r ON r.id = s.recipe_id
-		WHERE s.weekday = ? AND s.meal_type = ? AND s.slot_index = ? AND s.is_accompaniment = ?
-	`).get(weekday, mealType, slotIndex, isAccompaniment) as ScheduleRow | undefined;
+		WHERE s.weekday = ? AND s.meal_type = ? AND s.is_accompaniment = ?${extraFilter}
+		ORDER BY s.priority DESC, s.id ASC
+		LIMIT 1
+	`).get(...params) as ScheduleRow | undefined;
 
 	if (!s) return null;
 
@@ -102,29 +110,55 @@ export function getScheduleForSlot(
 	return rowToScheduleWithRecipe(s, exceptions);
 }
 
+export function getActiveSchedulesForWeek(weekKey: string): ScheduleWithRecipe[] {
+	const db = getDb();
+	const targetIdx = weekKeyToIndex(weekKey);
+
+	const rows = db.prepare(`
+		SELECT s.*,
+		       r.id as r_id, r.name as r_name, r.description as r_description,
+		       r.tags as r_tags, r.min_days as r_min_days, r.image_type as r_image_type,
+		       r.created_at as r_created_at
+		FROM schedules s
+		JOIN recipes r ON r.id = s.recipe_id
+		ORDER BY s.priority DESC, s.id ASC
+	`).all() as ScheduleRow[];
+
+	const exceptionsMap = loadAllExceptions(db);
+
+	return rows.filter(s => {
+		const diff = targetIdx - weekKeyToIndex(s.anchor_week_key);
+		if (diff < 0 || diff % s.every_n_weeks !== 0) return false;
+		const exceptions = exceptionsMap.get(s.id) ?? [];
+		return !exceptions.includes(weekKey);
+	}).map(s => rowToScheduleWithRecipe(s, exceptionsMap.get(s.id) ?? []));
+}
+
 export function upsertSchedule(
 	recipeId: number,
 	weekday: number,
 	mealType: string,
-	slotIndex: number,
 	isAccompaniment: number,
 	everyNWeeks: number,
-	anchorWeekKey: string
+	anchorWeekKey: string,
+	onConflict: ScheduleConflictMode,
+	priority: number
 ): number {
 	const db = getDb();
 	const result = db.prepare(`
-		INSERT INTO schedules (recipe_id, weekday, meal_type, slot_index, is_accompaniment, every_n_weeks, anchor_week_key)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(recipe_id, weekday, meal_type, slot_index, is_accompaniment)
+		INSERT INTO schedules (recipe_id, weekday, meal_type, is_accompaniment, every_n_weeks, anchor_week_key, on_conflict, priority)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(recipe_id, weekday, meal_type, is_accompaniment)
 		DO UPDATE SET every_n_weeks = excluded.every_n_weeks,
-		              anchor_week_key = excluded.anchor_week_key
-	`).run(recipeId, weekday, mealType, slotIndex, isAccompaniment, everyNWeeks, anchorWeekKey);
+		              anchor_week_key = excluded.anchor_week_key,
+		              on_conflict = excluded.on_conflict,
+		              priority = excluded.priority
+	`).run(recipeId, weekday, mealType, isAccompaniment, everyNWeeks, anchorWeekKey, onConflict, priority);
 
 	if (result.lastInsertRowid) return result.lastInsertRowid as number;
-	// On update, fetch the existing id
 	const existing = db.prepare(
-		'SELECT id FROM schedules WHERE recipe_id = ? AND weekday = ? AND meal_type = ? AND slot_index = ? AND is_accompaniment = ?'
-	).get(recipeId, weekday, mealType, slotIndex, isAccompaniment) as { id: number };
+		'SELECT id FROM schedules WHERE recipe_id = ? AND weekday = ? AND meal_type = ? AND is_accompaniment = ?'
+	).get(recipeId, weekday, mealType, isAccompaniment) as { id: number };
 	return existing.id;
 }
 
@@ -142,30 +176,4 @@ export function removeException(scheduleId: number, weekKey: string): void {
 	getDb().prepare(
 		'DELETE FROM schedule_exceptions WHERE schedule_id = ? AND week_key = ?'
 	).run(scheduleId, weekKey);
-}
-
-export function applySchedulesToWeek(weekKey: string): void {
-	const db = getDb();
-	const targetIdx = weekKeyToIndex(weekKey);
-	const schedules = db.prepare('SELECT * FROM schedules').all() as Schedule[];
-
-	const upsertPlan = db.prepare(`
-		INSERT INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, recipe_id, member_id)
-		VALUES (?, ?, ?, ?, ?, ?, NULL)
-		ON CONFLICT(week_key, weekday, meal_type, is_accompaniment, slot_index, COALESCE(member_id, -1))
-		DO UPDATE SET recipe_id = excluded.recipe_id
-		WHERE week_plans.recipe_id IS NULL
-	`);
-
-	const checkException = db.prepare(
-		'SELECT 1 FROM schedule_exceptions WHERE schedule_id = ? AND week_key = ?'
-	);
-
-	for (const sched of schedules) {
-		const diff = targetIdx - weekKeyToIndex(sched.anchor_week_key);
-		if (diff < 0 || diff % sched.every_n_weeks !== 0) continue;
-		if (checkException.get(sched.id, weekKey)) continue;
-		upsertPlan.run(weekKey, sched.weekday, sched.meal_type,
-			sched.slot_index, sched.is_accompaniment, sched.recipe_id);
-	}
 }

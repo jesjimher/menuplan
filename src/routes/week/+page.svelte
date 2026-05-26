@@ -20,7 +20,7 @@
 	let recipes = $state<Recipe[]>(data.recipes);
 	let rules = $state<Rule[]>(data.rules);
 	let allTags = $state<string[]>(data.allTags);
-	let schedulesPerSlot = $state<Record<string, import('$lib/types/index.js').ScheduleWithRecipe[]>>(data.schedulesPerSlot);
+	let schedulesPerMeal = $state<Record<string, import('$lib/types/index.js').ScheduleWithRecipe[]>>(data.schedulesPerMeal);
 	let calculating = $state(false);
 	let busySlots = $state(new Set<string>());
 	let editingTagKey = $state<string | null>(null);
@@ -35,10 +35,19 @@
 		selectedDay = jsDay === 0 ? 7 : jsDay;
 	});
 
+	let infoMsg = $state<string | null>(null);
+	let infoTimeout: ReturnType<typeof setTimeout>;
+
 	function showError(msg: string) {
 		errorMsg = msg;
 		clearTimeout(errorTimeout);
 		errorTimeout = setTimeout(() => { errorMsg = null; }, 5000);
+	}
+
+	function showInfo(msg: string) {
+		infoMsg = msg;
+		clearTimeout(infoTimeout);
+		infoTimeout = setTimeout(() => { infoMsg = null; }, 4000);
 	}
 
 	// Sync when server data changes (e.g. navigating weeks via goto)
@@ -48,7 +57,7 @@
 		recipes = data.recipes;
 		rules = data.rules;
 		allTags = data.allTags;
-		schedulesPerSlot = data.schedulesPerSlot;
+		schedulesPerMeal = data.schedulesPerMeal;
 	});
 
 	// Recipe picker modal state
@@ -62,7 +71,7 @@
 	let scheduleModalSlot = $state<ScheduleSlot | null>(null);
 
 	// Remove scheduled recipe dialog state
-	type RemoveScheduleInfo = { scheduleId: number; recipeName: string; everyNWeeks: number; weekday: number; mealType: string; slotIndex: number; isAcc: number };
+	type RemoveScheduleInfo = { scheduleId: number; recipeId: number | undefined; recipeName: string; everyNWeeks: number; weekday: number; mealType: string; slotIndex: number; isAcc: number };
 	let removeScheduleDialogOpen = $state(false);
 	let removeScheduleInfo = $state<RemoveScheduleInfo | null>(null);
 
@@ -161,7 +170,13 @@
 			s.slot_index === slotIndex && s.is_accompaniment === isAcc
 		);
 		let newSlots;
-		if (exists) {
+		if (recipe === null && exists) {
+			// Eliminar el slot del array (en el nuevo modelo no hay filas con recipe_id = NULL)
+			newSlots = weekData.slots.filter(s =>
+				!(s.weekday === weekday && s.meal_type === mealType &&
+				  s.slot_index === slotIndex && s.is_accompaniment === isAcc)
+			);
+		} else if (exists) {
 			newSlots = weekData.slots.map(s =>
 				s.weekday === weekday && s.meal_type === mealType &&
 				s.slot_index === slotIndex && s.is_accompaniment === isAcc
@@ -201,18 +216,26 @@
 			const res = await fetch('/api/week/remove', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc })
+				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, recipe_id: prev?.id })
 			});
 			if (!res.ok) throw new Error();
-			const data = await res.json();
-			if (data.had_schedule) {
+			const responseData = await res.json();
+			if (responseData.had_schedule) {
+				// Slot virtual (programación): preguntar si quitar solo esta semana o eliminar programación
 				removeScheduleInfo = {
-					scheduleId: data.schedule_id,
+					scheduleId: responseData.schedule_id,
+					recipeId: prev?.id,
 					recipeName: prev?.name ?? '',
-					everyNWeeks: data.every_n_weeks,
+					everyNWeeks: responseData.every_n_weeks,
 					weekday, mealType, slotIndex, isAcc
 				};
 				removeScheduleDialogOpen = true;
+				return;
+			}
+			if (responseData.schedule_resumed) {
+				// La receta manual fue borrada; una programación ha tomado el control
+				showInfo('La programación ha retomado el control de este slot.');
+				await invalidateAll();
 				return;
 			}
 			patchSlot(weekday, mealType, slotIndex, isAcc, null);
@@ -231,6 +254,8 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ week_key: weekKey })
 			});
+			// Para slots virtuales no hay fila en week_plans que borrar; solo recargamos.
+			// Para slots con sobreescritura manual, también limpiamos la fila.
 			await fetch('/api/week/remove', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -245,15 +270,15 @@
 
 	async function handleRemoveFullSchedule() {
 		if (!removeScheduleInfo) return;
-		const { weekday, mealType, slotIndex, isAcc } = removeScheduleInfo;
+		const { weekday, mealType, slotIndex, isAcc, recipeId } = removeScheduleInfo;
 		removeScheduleDialogOpen = false;
 		try {
 			await fetch('/api/week/remove', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, force: 'full_schedule' })
+				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, recipe_id: recipeId, force: 'full_schedule' })
 			});
-			patchSlot(weekday, mealType, slotIndex, isAcc, null);
+			await invalidateAll();
 		} catch {
 			showError('Error al quitar receta');
 		}
@@ -680,6 +705,14 @@
 		</div>
 	{/if}
 
+	{#if infoMsg}
+		<div class="px-4 sm:px-6 py-2 text-sm font-medium flex items-center justify-between"
+			style="background: var(--primary-light); color: var(--primary);">
+			<span>{infoMsg}</span>
+			<button on:click={() => infoMsg = null} class="ml-2 font-bold hover:opacity-70">&times;</button>
+		</div>
+	{/if}
+
 	<!-- Selector de día (solo móvil) -->
 	<div class="sm:hidden flex gap-1.5 px-3 pt-3 pb-1 shrink-0">
 		{#each [1,2,3,4,5,6,7] as weekday, i}
@@ -860,7 +893,7 @@
 											{isTouchDevice}
 											{editingTagKey} {slotTags} {slotTagEditKey}
 											schedule={slot?.schedule ?? null}
-											slotSchedules={schedulesPerSlot[key] ?? []}
+											slotSchedules={schedulesPerMeal[`${weekday}-${mealType}-0`] ?? []}
 											{...callbacks}
 											onDeleteSlot={() => decrementMealCount(weekday, mealType)}
 										/>

@@ -1,8 +1,14 @@
 <script lang="ts">
-	import type { ScheduleWithRecipe } from '$lib/types/index.js';
+	import type { ScheduleWithRecipe, ScheduleConflictMode } from '$lib/types/index.js';
 	import { weekKeyToIndex, indexToWeekKey, getWeekKey, getWeekDates, WEEKDAY_NAMES } from '$lib/utils/dates.js';
 	import { invalidateAll } from '$app/navigation';
 	const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+	const CONFLICT_LABELS: Record<ScheduleConflictMode, string> = {
+		skip: 'Saltar si ocupado',
+		overwrite: 'Sobreescribir',
+		add: 'Añadir junto',
+	};
 
 	let { data } = $props();
 	let schedules = $state<ScheduleWithRecipe[]>(data.schedules);
@@ -11,6 +17,8 @@
 	// ---- Modal state ----
 	let editScheduleId = $state<number | null>(null);
 	let editN = $state(1);
+	let editOnConflict = $state<ScheduleConflictMode>('skip');
+	let editPriority = $state(5);
 
 	let editSchedule = $derived(
 		editScheduleId !== null ? (schedules.find(s => s.id === editScheduleId) ?? null) : null
@@ -19,6 +27,8 @@
 	function openModal(s: ScheduleWithRecipe) {
 		editScheduleId = s.id;
 		editN = s.every_n_weeks;
+		editOnConflict = s.on_conflict ?? 'skip';
+		editPriority = s.priority ?? 5;
 	}
 
 	function closeModal() {
@@ -32,8 +42,9 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				recipe_id: editSchedule.recipe_id, weekday: editSchedule.weekday, meal_type: editSchedule.meal_type,
-				slot_index: editSchedule.slot_index, is_accompaniment: editSchedule.is_accompaniment,
+				is_accompaniment: editSchedule.is_accompaniment,
 				every_n_weeks: editN, anchor_week_key: editSchedule.anchor_week_key,
+				on_conflict: editOnConflict, priority: editPriority,
 			})
 		});
 		closeModal();
@@ -115,9 +126,17 @@
 				{s.recipe.name}
 			</button>
 			<span class="text-[10px] font-bold shrink-0 px-1 rounded"
-				style="background:{rgba(rc(s.recipe_id),0.18)};color:{rc(s.recipe_id)};">
+				style="background:{rgba(rc(s.recipe_id),0.18)};color:{rc(s.recipe_id)};"
+				title="Prioridad: {s.priority ?? 5}">
 				{s.every_n_weeks}s
 			</span>
+			{#if (s.on_conflict ?? 'skip') !== 'skip'}
+				<span class="text-[9px] font-bold shrink-0 px-1 rounded"
+					style="background:var(--surface-container-highest);color:var(--text-muted);"
+					title="Conflicto: {CONFLICT_LABELS[s.on_conflict ?? 'skip']}">
+					{s.on_conflict === 'overwrite' ? '↑' : '+'}
+				</span>
+			{/if}
 			<button on:click={() => openModal(s)}
 				class="w-4 h-4 flex items-center justify-center rounded transition-opacity opacity-50 hover:opacity-100"
 				style="color:var(--text-muted);" title="Editar">
@@ -289,6 +308,26 @@
 						class="w-16 px-2 py-1.5 rounded-lg text-center text-sm font-bold border-2 outline-none"
 						style="background:var(--surface-container-low);color:var(--text);border-color:var(--primary);"/>
 					<span class="text-sm" style="color:var(--text);">semanas</span>
+				</div>
+			</div>
+
+			<!-- Conflicto y prioridad -->
+			<div class="px-5 py-4" style="border-bottom:1px solid var(--surface-container-low);">
+				<p class="text-[11px] font-bold uppercase tracking-wider mb-3" style="color:var(--text-muted);">Si el slot ya tiene receta</p>
+				<div class="flex flex-col gap-1.5 mb-4">
+					{#each ([['skip','Saltar'],['overwrite','Sobreescribir'],['add','Añadir junto']] as const) as [val, label]}
+						<label class="flex items-center gap-2 cursor-pointer">
+							<input type="radio" name="edit_on_conflict" value={val} bind:group={editOnConflict} class="accent-[var(--primary)]" />
+							<span class="text-sm" style="color:var(--text);">{label}</span>
+						</label>
+					{/each}
+				</div>
+				<p class="text-[11px] font-bold uppercase tracking-wider mb-2" style="color:var(--text-muted);">Prioridad</p>
+				<input type="range" min="1" max="10" bind:value={editPriority}
+					class="w-full accent-[var(--primary)]"/>
+				<div class="flex justify-between text-xs mt-1" style="color:var(--text-muted);">
+					<span>Menos prioritaria</span>
+					<span>Más prioritaria</span>
 				</div>
 			</div>
 

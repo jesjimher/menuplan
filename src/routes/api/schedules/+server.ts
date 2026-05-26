@@ -9,6 +9,6 @@ export async function GET() {
 
 export async function POST({ request }) {
 	const body = await parseBody(request, scheduleBodySchema);
-	const id = upsertSchedule(body.recipe_id, body.weekday, body.meal_type, body.slot_index, body.is_accompaniment, body.every_n_weeks, body.anchor_week_key);
+	const id = upsertSchedule(body.recipe_id, body.weekday, body.meal_type, body.is_accompaniment, body.every_n_weeks, body.anchor_week_key, body.on_conflict, body.priority);
 	return json({ ok: true, id });
 }

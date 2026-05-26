@@ -134,6 +134,62 @@ const MIGRATIONS: Migration[] = [
 			`);
 			db.pragma('foreign_keys = ON');
 		}
+	},
+	{
+		version: 13,
+		name: 'add_schedules_on_conflict_and_priority',
+		up: (db) => {
+			addColumnIfMissing(db, 'schedules', 'on_conflict', "TEXT NOT NULL DEFAULT 'skip'");
+			addColumnIfMissing(db, 'schedules', 'priority', 'INTEGER NOT NULL DEFAULT 10');
+		}
+	},
+	{
+		version: 14,
+		name: 'cleanup_materialized_schedule_rows',
+		up: (db) => {
+			const currentWeekKey = getWeekKey();
+			db.prepare(`
+				DELETE FROM week_plans
+				WHERE week_key >= ?
+				  AND member_id IS NULL
+				  AND recipe_id IS NOT NULL
+				  AND EXISTS (
+				    SELECT 1 FROM schedules s
+				    WHERE s.recipe_id = week_plans.recipe_id
+				      AND s.weekday = week_plans.weekday
+				      AND s.meal_type = week_plans.meal_type
+				      AND s.is_accompaniment = week_plans.is_accompaniment
+				  )
+			`).run(currentWeekKey);
+		}
+	},
+	{
+		version: 15,
+		name: 'schedules_meal_level',
+		up: (db) => {
+			db.pragma('foreign_keys = OFF');
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS schedules_new (
+					id               INTEGER PRIMARY KEY AUTOINCREMENT,
+					recipe_id        INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+					weekday          INTEGER NOT NULL,
+					meal_type        TEXT    NOT NULL,
+					is_accompaniment INTEGER NOT NULL DEFAULT 0,
+					every_n_weeks    INTEGER NOT NULL DEFAULT 1,
+					anchor_week_key  TEXT    NOT NULL,
+					on_conflict      TEXT    NOT NULL DEFAULT 'skip',
+					priority         INTEGER NOT NULL DEFAULT 5,
+					created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+					UNIQUE(recipe_id, weekday, meal_type, is_accompaniment)
+				);
+				INSERT OR IGNORE INTO schedules_new (id, recipe_id, weekday, meal_type, is_accompaniment, every_n_weeks, anchor_week_key, on_conflict, priority, created_at)
+					SELECT id, recipe_id, weekday, meal_type, is_accompaniment, every_n_weeks, anchor_week_key, on_conflict, 5, created_at
+					FROM schedules;
+				DROP TABLE schedules;
+				ALTER TABLE schedules_new RENAME TO schedules;
+			`);
+			db.pragma('foreign_keys = ON');
+		}
 	}
 ];
 

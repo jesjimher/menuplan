@@ -24,6 +24,7 @@ export const removeBodySchema = z.object({
 	meal_type: mealTypeSchema,
 	slot_index: slotIndexSchema,
 	is_accompaniment: isAccompanimentSchema,
+	recipe_id: z.number().int().positive().optional(),
 	force: z.enum(['only_week', 'full_schedule', 'move']).optional(),
 });
 
@@ -106,10 +107,11 @@ export const scheduleBodySchema = z.object({
 	recipe_id: z.number().int().positive(),
 	weekday: weekdaySchema,
 	meal_type: mealTypeSchema,
-	slot_index: slotIndexSchema.default(0),
 	is_accompaniment: isAccompanimentSchema,
 	every_n_weeks: z.number().int().min(1),
 	anchor_week_key: weekKeySchema,
+	on_conflict: z.enum(['skip', 'overwrite', 'add']).default('skip'),
+	priority: z.number().int().min(1).max(10).default(5),
 });
 
 export const exceptionBodySchema = z.object({

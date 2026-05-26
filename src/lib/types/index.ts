@@ -62,15 +62,18 @@ export interface Options {
 	sidebar_collapsed_by_default: boolean;
 }
 
+export type ScheduleConflictMode = 'skip' | 'overwrite' | 'add';
+
 export interface Schedule {
 	id: number;
 	recipe_id: number;
 	weekday: number;
 	meal_type: MealType;
-	slot_index: number;
 	is_accompaniment: number;
 	every_n_weeks: number;
 	anchor_week_key: string;
+	on_conflict: ScheduleConflictMode;
+	priority: number;
 	created_at: string;
 }
 
