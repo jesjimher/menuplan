@@ -41,12 +41,16 @@
 		style="background: var(--surface-container-low);">
 
 		<!-- Logo -->
-		<div class="flex items-center justify-between h-20 px-6 shrink-0">
-			<div class:hidden={$sidebarCollapsed}>
-				<h1 class="text-xl font-black tracking-tight leading-none" style="font-family: 'Epilogue', sans-serif; color: var(--primary);">MenuPlan</h1>
-				<p class="text-[10px] font-bold tracking-widest uppercase mt-1" style="color: var(--text-secondary);">Planificador culinario</p>
+		<div class="flex items-center justify-between h-20 shrink-0 transition-all {$sidebarCollapsed ? 'px-2' : 'px-6'}">
+			<div class="flex items-center gap-3 min-w-0">
+				<img src="/icons/icon-glyph.png" alt="MenuPlan"
+					class="shrink-0 transition-all {$sidebarCollapsed ? 'w-6 h-6' : 'w-9 h-9'}" />
+				<div class:hidden={$sidebarCollapsed}>
+					<h1 class="text-xl font-black tracking-tight leading-none" style="font-family: 'Epilogue', sans-serif; color: var(--primary);">MenuPlan</h1>
+					<p class="text-[10px] font-bold tracking-widest uppercase mt-1" style="color: var(--text-secondary);">Planificador culinario</p>
+				</div>
 			</div>
-			<button class="p-2 rounded-lg hover:bg-white/5 transition-colors" 
+			<button class="p-2 rounded-lg hover:bg-white/5 transition-colors shrink-0"
 				style="color: var(--text-secondary);"
 				on:click={() => $sidebarCollapsed = !$sidebarCollapsed}
 				aria-label={$sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}>
