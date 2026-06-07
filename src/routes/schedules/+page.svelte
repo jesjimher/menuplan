@@ -2,6 +2,7 @@
 	import type { ScheduleWithRecipe, ScheduleConflictMode } from '$lib/types/index.js';
 	import { weekKeyToIndex, indexToWeekKey, getWeekKey, getWeekDates, WEEKDAY_NAMES } from '$lib/utils/dates.js';
 	import { invalidateAll } from '$app/navigation';
+	import { sidebarOpen } from '$lib/stores/ui.js';
 	const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 	const CONFLICT_LABELS: Record<ScheduleConflictMode, string> = {
@@ -156,13 +157,24 @@
 	</div>
 {/snippet}
 
+<!-- Cabecera -->
+<header class="sticky top-0 z-10 px-4 sm:px-6 py-3 shrink-0" style="background: rgba(255,248,243,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--surface-container-highest);">
+	<div class="max-w-4xl mx-auto flex items-center gap-3">
+		<button class="lg:hidden p-1.5 rounded-lg transition-colors shrink-0"
+			style="color: var(--primary);"
+			on:click={() => $sidebarOpen = true}>
+			<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+			</svg>
+		</button>
+		<div class="flex-1 min-w-0">
+			<h1 class="text-xl sm:text-2xl font-black tracking-tight leading-none" style="font-family: 'Epilogue', sans-serif; color: var(--primary);">Programaciones</h1>
+			<p class="text-xs mt-0.5" style="color: var(--text-secondary);">Recetas que se planifican automáticamente en intervalos regulares.</p>
+		</div>
+	</div>
+</header>
+
 <div class="px-3 sm:px-4 py-6">
-	<h1 class="text-2xl font-black mb-1" style="font-family:'Epilogue',sans-serif;color:var(--primary);">
-		Programaciones
-	</h1>
-	<p class="text-sm mb-6" style="color:var(--text-secondary);">
-		Recetas que se planifican automáticamente en intervalos regulares.
-	</p>
 
 	{#if schedules.length === 0}
 		<div class="text-center py-16 rounded-2xl" style="background:var(--surface-container-low);color:var(--text-muted);">
