@@ -10,6 +10,7 @@ const CACHE = `cache-${version}`;
 const ASSETS = [...build, ...files];
 
 sw.addEventListener('install', (event) => {
+	sw.skipWaiting();
 	event.waitUntil(
 		caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
 	);
@@ -17,11 +18,13 @@ sw.addEventListener('install', (event) => {
 
 sw.addEventListener('activate', (event) => {
 	event.waitUntil(
-		caches.keys().then(async (keys) => {
+		(async () => {
+			const keys = await caches.keys();
 			for (const key of keys) {
 				if (key !== CACHE) await caches.delete(key);
 			}
-		})
+			await sw.clients.claim();
+		})()
 	);
 });
 

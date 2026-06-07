@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page, updated } from '$app/stores';
 	import { sidebarOpen, sidebarCollapsed } from '$lib/stores/ui.js';
 	import type { Options } from '$lib/types/index.js';
 
@@ -92,3 +92,18 @@
 		</main>
 	</div>
 </div>
+
+{#if $updated}
+	<div class="fixed bottom-4 right-4 z-[300] flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm font-semibold"
+		style="background: var(--surface); color: var(--text); box-shadow: 0 8px 30px rgba(0,0,0,0.2), 0 0 0 1.5px var(--border);">
+		<svg class="w-4 h-4 shrink-0" style="color: var(--primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+		</svg>
+		<span>Nueva versión disponible</span>
+		<button
+			on:click={() => location.reload()}
+			class="px-3 py-1 rounded-xl text-xs font-bold transition-opacity hover:opacity-80"
+			style="background: var(--primary); color: white;"
+		>Actualizar</button>
+	</div>
+{/if}
