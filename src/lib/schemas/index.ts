@@ -114,6 +114,10 @@ export const scheduleBodySchema = z.object({
 	priority: z.number().int().min(1).max(10).default(5),
 });
 
+export const scheduleMoveBodySchema = z.object({
+	weekday: weekdaySchema,
+});
+
 export const exceptionBodySchema = z.object({
 	week_key: weekKeySchema,
 });

@@ -101,7 +101,7 @@
 	}
 
 	function cellActive(wd: number, mt: string, wk: string): ScheduleWithRecipe[] {
-		return schedules.filter(s => s.weekday === wd && s.meal_type === mt && isActive(s, wk));
+		return previewSchedules.filter(s => s.weekday === wd && s.meal_type === mt && isActive(s, wk));
 	}
 
 	function wkLabel(wk: string): string {
@@ -115,12 +115,59 @@
 		const words = name.split(/\s+/).filter(w => !STOP_WORDS.has(w.toLowerCase()));
 		return words.slice(0, 3).join(' ') || name;
 	}
+
+	// ---- Drag & drop (vista semanal -> mover a otro día) ----
+	let draggedSchedule = $state<ScheduleWithRecipe | null>(null);
+	let dragOverDay = $state<number | null>(null);
+
+	let previewSchedules = $derived.by(() => {
+		if (!draggedSchedule || dragOverDay === null || dragOverDay === draggedSchedule.weekday) return schedules;
+		return schedules.map(s => s.id === draggedSchedule!.id ? { ...s, weekday: dragOverDay! } : s);
+	});
+
+	function handleDragStart(e: DragEvent, s: ScheduleWithRecipe) {
+		draggedSchedule = s;
+		e.dataTransfer?.setData('text/plain', String(s.id));
+		if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+	}
+
+	function handleDragEnd() {
+		draggedSchedule = null;
+		dragOverDay = null;
+	}
+
+	function handleDragOver(e: DragEvent, wd: number, mt: string) {
+		if (!draggedSchedule || draggedSchedule.meal_type !== mt) return;
+		e.preventDefault();
+		dragOverDay = wd;
+	}
+
+	async function handleDrop(e: DragEvent, wd: number, mt: string) {
+		e.preventDefault();
+		const s = draggedSchedule;
+		draggedSchedule = null;
+		dragOverDay = null;
+		if (!s || s.meal_type !== mt || s.weekday === wd) return;
+		const res = await fetch(`/api/schedules/${s.id}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ weekday: wd })
+		});
+		if (!res.ok) {
+			const body = await res.json().catch(() => null);
+			alert(body?.message ?? 'No se pudo mover la programación a ese día.');
+			return;
+		}
+		await invalidateAll();
+	}
 </script>
 
 {#snippet chip(s: ScheduleWithRecipe)}
-	<div class="mb-1.5">
-		<div class="flex items-center gap-1 px-2 py-1.5 rounded-lg"
-			style="background:{rgba(rc(s.recipe_id),0.12)};border:1px solid {rgba(rc(s.recipe_id),0.28)};">
+	<div class="mb-1.5" draggable="true"
+		on:dragstart={(e) => handleDragStart(e, s)}
+		on:dragend={handleDragEnd}>
+		<div class="flex items-center gap-1 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing transition-opacity"
+			style="background:{rgba(rc(s.recipe_id),0.12)};border:1px solid {rgba(rc(s.recipe_id),0.28)};opacity:{draggedSchedule?.id === s.id ? 0.4 : 1};">
 			<button class="text-[11px] font-semibold flex-1 min-w-0 truncate text-left hover:underline"
 				style="color:var(--text);" title={s.recipe.name}
 				on:click={() => openModal(s)}>
@@ -205,7 +252,10 @@
 								{#if mi > 0}
 									<div class="mx-2 border-t" style="border-color:var(--surface-container-low);"></div>
 								{/if}
-								<div class="px-2 py-2">
+								<div class="px-2 py-2 rounded-lg transition-colors"
+									style="background:{draggedSchedule && draggedSchedule.meal_type === mt && dragOverDay === wd ? 'var(--primary-container, #e8f0fe)' : 'transparent'};"
+									on:dragover={(e) => handleDragOver(e, wd, mt)}
+									on:drop={(e) => handleDrop(e, wd, mt)}>
 									<p class="text-[9px] font-bold uppercase tracking-widest mb-1.5" style="color:var(--text-muted);">
 										{mt}
 									</p>

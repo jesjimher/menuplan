@@ -162,6 +162,22 @@ export function upsertSchedule(
 	return existing.id;
 }
 
+export function moveSchedule(scheduleId: number, weekday: number): { ok: true } | { ok: false; error: 'not_found' | 'conflict' } {
+	const db = getDb();
+	const current = db.prepare(
+		'SELECT recipe_id, meal_type, is_accompaniment FROM schedules WHERE id = ?'
+	).get(scheduleId) as { recipe_id: number; meal_type: string; is_accompaniment: number } | undefined;
+	if (!current) return { ok: false, error: 'not_found' };
+
+	const conflict = db.prepare(
+		'SELECT id FROM schedules WHERE recipe_id = ? AND weekday = ? AND meal_type = ? AND is_accompaniment = ? AND id != ?'
+	).get(current.recipe_id, weekday, current.meal_type, current.is_accompaniment, scheduleId);
+	if (conflict) return { ok: false, error: 'conflict' };
+
+	db.prepare('UPDATE schedules SET weekday = ? WHERE id = ?').run(weekday, scheduleId);
+	return { ok: true };
+}
+
 export function deleteSchedule(scheduleId: number): void {
 	getDb().prepare('DELETE FROM schedules WHERE id = ?').run(scheduleId);
 }
