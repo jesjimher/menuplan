@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ScheduleWithRecipe, ScheduleConflictMode } from '$lib/types/index.js';
 	import { weekKeyToIndex, indexToWeekKey, getWeekKey, getWeekDates, WEEKDAY_NAMES } from '$lib/utils/dates.js';
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 	const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -261,7 +261,15 @@
 							{#each [1,2,3,4,5,6,7] as wd}
 								{@const comida = cellActive(wd, 'comida', wk)}
 								{@const cena = cellActive(wd, 'cena', wk)}
-								<div class="rounded overflow-hidden flex flex-col min-w-0">
+								<div class="relative group rounded overflow-hidden flex flex-col min-w-0">
+									<button class="absolute top-0.5 right-0.5 z-10 w-5 h-5 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"
+										style="background:var(--primary);color:white;"
+										title="Ir a la semana del {wkLabel(wk)}"
+										on:click|stopPropagation={() => goto(`/week?weekKey=${wk}`)}>
+										<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+										</svg>
+									</button>
 									<div class="px-1.5 py-1 flex flex-col gap-0.5" style="background:var(--surface-container-low);min-height:22px;">
 										{#each comida as s}
 											<button class="text-[11px] font-semibold leading-tight truncate text-left hover:underline"
