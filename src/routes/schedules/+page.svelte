@@ -104,6 +104,39 @@
 		return previewSchedules.filter(s => s.weekday === wd && s.meal_type === mt && isActive(s, wk));
 	}
 
+	// ---- Resolución real de conflictos por semana (qué programación prevalece) ----
+	// data.resolutions contiene, para cada semana simulada, qué programaciones acabaron
+	// realmente colocadas en un slot. Las activas que no aparecen ahí han sido desactivadas
+	// por otra programación con más prioridad (o por su propio modo de conflicto).
+	let resolutionMap = $derived.by(() => {
+		const map = new Map<string, Set<number>>();
+		for (const r of data.resolutions) {
+			const key = `${r.week_key}|${r.weekday}|${r.meal_type}`;
+			const set = map.get(key) ?? new Set<number>();
+			set.add(r.schedule_id);
+			map.set(key, set);
+		}
+		return map;
+	});
+
+	function isApplied(s: ScheduleWithRecipe, wk: string): boolean {
+		const applied = resolutionMap.get(`${wk}|${s.weekday}|${s.meal_type}`);
+		return !applied || applied.has(s.id);
+	}
+
+	function scheduleTitle(s: ScheduleWithRecipe, wk: string): string {
+		const applied = resolutionMap.get(`${wk}|${s.weekday}|${s.meal_type}`);
+		if (!applied) return s.recipe.name;
+		const peers = previewSchedules.filter(o => o.id !== s.id && o.weekday === s.weekday && o.meal_type === s.meal_type && isActive(o, wk));
+		if (peers.length === 0) return s.recipe.name;
+		if (applied.has(s.id)) {
+			const suppressed = peers.filter(o => !applied.has(o.id)).map(o => o.recipe.name);
+			return suppressed.length ? `${s.recipe.name} — prevalece esta semana sobre: ${suppressed.join(', ')}` : s.recipe.name;
+		}
+		const winners = peers.filter(o => applied.has(o.id)).map(o => o.recipe.name);
+		return `${s.recipe.name} — no se aplica esta semana (prevalece: ${winners.join(', ') || 'otra programación'})`;
+	}
+
 	function wkLabel(wk: string): string {
 		const d = getWeekDates(wk)[0];
 		return `${d.getUTCDate()}/${d.getUTCMonth()+1}`;
@@ -383,8 +416,10 @@
 									</button>
 									<div class="px-1.5 py-1 flex flex-col gap-0.5" style="background:var(--surface-container-low);min-height:22px;">
 										{#each comida as s}
+											{@const applied = isApplied(s, wk)}
 											<button class="text-[11px] font-semibold leading-tight truncate text-left hover:underline cursor-grab active:cursor-grabbing"
-												style="color:{rc(s.recipe_id)};opacity:{simDrag?.schedule.id === s.id ? 0.4 : 1};" title={s.recipe.name}
+												style="color:{applied ? rc(s.recipe_id) : 'var(--text-muted)'};text-decoration:{applied ? 'none' : 'line-through'};opacity:{simDrag?.schedule.id === s.id ? 0.4 : (applied ? 1 : 0.5)};"
+												title={scheduleTitle(s, wk)}
 												draggable="true"
 												on:dragstart={(e) => handleSimDragStart(e, s, wk)}
 												on:dragend={handleSimDragEnd}
@@ -395,8 +430,10 @@
 									</div>
 									<div class="px-1.5 py-1 flex flex-col gap-0.5" style="background:var(--surface-container);min-height:22px;">
 										{#each cena as s}
+											{@const applied = isApplied(s, wk)}
 											<button class="text-[11px] font-semibold leading-tight truncate text-left hover:underline cursor-grab active:cursor-grabbing"
-												style="color:{rc(s.recipe_id)};opacity:{simDrag?.schedule.id === s.id ? 0.4 : 1};" title={s.recipe.name}
+												style="color:{applied ? rc(s.recipe_id) : 'var(--text-muted)'};text-decoration:{applied ? 'none' : 'line-through'};opacity:{simDrag?.schedule.id === s.id ? 0.4 : (applied ? 1 : 0.5)};"
+												title={scheduleTitle(s, wk)}
 												draggable="true"
 												on:dragstart={(e) => handleSimDragStart(e, s, wk)}
 												on:dragend={handleSimDragEnd}

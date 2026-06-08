@@ -243,6 +243,27 @@ export function getWeekData(weekKey: string): WeekData {
 	return { week_key: weekKey, slots, configs, violations };
 }
 
+export interface ScheduleSlotResolution {
+	week_key: string;
+	weekday: number;
+	meal_type: MealType;
+	schedule_id: number;
+}
+
+// Para cada semana indicada, qué programaciones acaban realmente colocadas en un slot
+// (las que no aparecen aquí pero sí estaban activas esa semana han sido desactivadas por un conflicto).
+export function getScheduleResolutionsForWeeks(weekKeys: string[]): ScheduleSlotResolution[] {
+	const out: ScheduleSlotResolution[] = [];
+	for (const weekKey of weekKeys) {
+		for (const slot of getWeekData(weekKey).slots) {
+			if (slot.schedule) {
+				out.push({ week_key: weekKey, weekday: slot.weekday, meal_type: slot.meal_type, schedule_id: slot.schedule.id });
+			}
+		}
+	}
+	return out;
+}
+
 export function assignRecipe(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number, recipeId: number | null, memberId: number | null, isLeftover = 0): void {
 	const db = getDb();
 	db.prepare(`
