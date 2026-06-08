@@ -116,6 +116,7 @@ export const scheduleBodySchema = z.object({
 
 export const scheduleMoveBodySchema = z.object({
 	weekday: weekdaySchema,
+	anchor_week_key: weekKeySchema.optional(),
 });
 
 export const exceptionBodySchema = z.object({

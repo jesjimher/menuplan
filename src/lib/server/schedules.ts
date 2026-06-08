@@ -162,7 +162,7 @@ export function upsertSchedule(
 	return existing.id;
 }
 
-export function moveSchedule(scheduleId: number, weekday: number): { ok: true } | { ok: false; error: 'not_found' | 'conflict' } {
+export function moveSchedule(scheduleId: number, weekday: number, anchorWeekKey?: string): { ok: true } | { ok: false; error: 'not_found' | 'conflict' } {
 	const db = getDb();
 	const current = db.prepare(
 		'SELECT recipe_id, meal_type, is_accompaniment FROM schedules WHERE id = ?'
@@ -174,7 +174,11 @@ export function moveSchedule(scheduleId: number, weekday: number): { ok: true } 
 	).get(current.recipe_id, weekday, current.meal_type, current.is_accompaniment, scheduleId);
 	if (conflict) return { ok: false, error: 'conflict' };
 
-	db.prepare('UPDATE schedules SET weekday = ? WHERE id = ?').run(weekday, scheduleId);
+	if (anchorWeekKey !== undefined) {
+		db.prepare('UPDATE schedules SET weekday = ?, anchor_week_key = ? WHERE id = ?').run(weekday, anchorWeekKey, scheduleId);
+	} else {
+		db.prepare('UPDATE schedules SET weekday = ? WHERE id = ?').run(weekday, scheduleId);
+	}
 	return { ok: true };
 }
 

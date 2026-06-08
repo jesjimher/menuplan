@@ -120,9 +120,67 @@
 	let draggedSchedule = $state<ScheduleWithRecipe | null>(null);
 	let dragOverDay = $state<number | null>(null);
 
+	// ---- Drag & drop (simulación -> mover de día y/o de semana de inicio) ----
+	let simDrag = $state<{ schedule: ScheduleWithRecipe; sourceWk: string } | null>(null);
+	let simDragOver = $state<{ wd: number; wk: string } | null>(null);
+
+	// Calcula el nuevo día y anclaje al soltar una ocurrencia de `sourceWk` sobre `(targetWd, targetWk)`.
+	// Re-fasea toda la serie según el desplazamiento de filas, sin permitir que el nuevo anclaje quede en el pasado.
+	function computeSimMove(schedule: ScheduleWithRecipe, sourceWk: string, targetWd: number, targetWk: string): { weekday: number; anchor_week_key: string } {
+		const weekDelta = weekKeyToIndex(targetWk) - weekKeyToIndex(sourceWk);
+		let anchorIdx = weekKeyToIndex(schedule.anchor_week_key) + weekDelta;
+		while (anchorIdx < baseIdx) anchorIdx += schedule.every_n_weeks;
+		return { weekday: targetWd, anchor_week_key: indexToWeekKey(anchorIdx) };
+	}
+
+	function handleSimDragStart(e: DragEvent, s: ScheduleWithRecipe, sourceWk: string) {
+		simDrag = { schedule: s, sourceWk };
+		e.dataTransfer?.setData('text/plain', String(s.id));
+		if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+	}
+
+	function handleSimDragEnd() {
+		simDrag = null;
+		simDragOver = null;
+	}
+
+	function handleSimDragOver(e: DragEvent, wd: number, wk: string) {
+		if (!simDrag) return;
+		e.preventDefault();
+		simDragOver = { wd, wk };
+	}
+
+	async function handleSimDrop(e: DragEvent, wd: number, wk: string) {
+		e.preventDefault();
+		const drag = simDrag;
+		simDrag = null;
+		simDragOver = null;
+		if (!drag) return;
+		const { schedule: s, sourceWk } = drag;
+		const move = computeSimMove(s, sourceWk, wd, wk);
+		if (move.weekday === s.weekday && move.anchor_week_key === s.anchor_week_key) return;
+		const res = await fetch(`/api/schedules/${s.id}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(move)
+		});
+		if (!res.ok) {
+			const body = await res.json().catch(() => null);
+			alert(body?.message ?? 'No se pudo mover la programación a esa celda.');
+			return;
+		}
+		await invalidateAll();
+	}
+
 	let previewSchedules = $derived.by(() => {
-		if (!draggedSchedule || dragOverDay === null || dragOverDay === draggedSchedule.weekday) return schedules;
-		return schedules.map(s => s.id === draggedSchedule!.id ? { ...s, weekday: dragOverDay! } : s);
+		if (draggedSchedule && dragOverDay !== null && dragOverDay !== draggedSchedule.weekday) {
+			return schedules.map(s => s.id === draggedSchedule!.id ? { ...s, weekday: dragOverDay! } : s);
+		}
+		if (simDrag && simDragOver) {
+			const move = computeSimMove(simDrag.schedule, simDrag.sourceWk, simDragOver.wd, simDragOver.wk);
+			return schedules.map(s => s.id === simDrag!.schedule.id ? { ...s, ...move } : s);
+		}
+		return schedules;
 	});
 
 	function handleDragStart(e: DragEvent, s: ScheduleWithRecipe) {
@@ -311,7 +369,10 @@
 							{#each [1,2,3,4,5,6,7] as wd}
 								{@const comida = cellActive(wd, 'comida', wk)}
 								{@const cena = cellActive(wd, 'cena', wk)}
-								<div class="relative group rounded overflow-hidden flex flex-col min-w-0">
+								<div class="relative group rounded overflow-hidden flex flex-col min-w-0 transition-colors"
+									style="outline:2px solid {simDrag && simDragOver?.wd === wd && simDragOver?.wk === wk ? 'var(--primary)' : 'transparent'};outline-offset:-2px;"
+									on:dragover={(e) => handleSimDragOver(e, wd, wk)}
+									on:drop={(e) => handleSimDrop(e, wd, wk)}>
 									<button class="absolute top-0.5 right-0.5 z-10 w-5 h-5 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"
 										style="background:var(--primary);color:white;"
 										title="Ir a la semana del {wkLabel(wk)}"
@@ -322,8 +383,11 @@
 									</button>
 									<div class="px-1.5 py-1 flex flex-col gap-0.5" style="background:var(--surface-container-low);min-height:22px;">
 										{#each comida as s}
-											<button class="text-[11px] font-semibold leading-tight truncate text-left hover:underline"
-												style="color:{rc(s.recipe_id)};" title={s.recipe.name}
+											<button class="text-[11px] font-semibold leading-tight truncate text-left hover:underline cursor-grab active:cursor-grabbing"
+												style="color:{rc(s.recipe_id)};opacity:{simDrag?.schedule.id === s.id ? 0.4 : 1};" title={s.recipe.name}
+												draggable="true"
+												on:dragstart={(e) => handleSimDragStart(e, s, wk)}
+												on:dragend={handleSimDragEnd}
 												on:click={() => openModal(s)}>
 												{simplifyName(s.recipe.name)}
 											</button>
@@ -331,8 +395,11 @@
 									</div>
 									<div class="px-1.5 py-1 flex flex-col gap-0.5" style="background:var(--surface-container);min-height:22px;">
 										{#each cena as s}
-											<button class="text-[11px] font-semibold leading-tight truncate text-left hover:underline"
-												style="color:{rc(s.recipe_id)};" title={s.recipe.name}
+											<button class="text-[11px] font-semibold leading-tight truncate text-left hover:underline cursor-grab active:cursor-grabbing"
+												style="color:{rc(s.recipe_id)};opacity:{simDrag?.schedule.id === s.id ? 0.4 : 1};" title={s.recipe.name}
+												draggable="true"
+												on:dragstart={(e) => handleSimDragStart(e, s, wk)}
+												on:dragend={handleSimDragEnd}
 												on:click={() => openModal(s)}>
 												{simplifyName(s.recipe.name)}
 											</button>

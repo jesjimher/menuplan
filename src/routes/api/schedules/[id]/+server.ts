@@ -10,7 +10,7 @@ export async function DELETE({ params }) {
 
 export async function PATCH({ params, request }) {
 	const body = await parseBody(request, scheduleMoveBodySchema);
-	const result = moveSchedule(parseInt(params.id), body.weekday);
+	const result = moveSchedule(parseInt(params.id), body.weekday, body.anchor_week_key);
 	if (!result.ok) {
 		if (result.error === 'not_found') throw error(404, 'Programación no encontrada');
 		throw error(409, 'Ya existe una programación de esta receta para ese día');
