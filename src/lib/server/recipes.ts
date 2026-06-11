@@ -1,7 +1,8 @@
 import { getDb } from '$lib/db/index.js';
 import type { Recipe } from '$lib/types/index.js';
 import { buildSafeUpdate } from './utils.js';
-import { getWeekKey, getWeekDates } from '$lib/utils/dates.js';
+import { getWeekKey, getWeekDates, MS_PER_DAY } from '$lib/utils/dates.js';
+import { parseTags } from '$lib/utils/parseTags.js';
 
 const RECIPE_COLS = 'id, name, description, tags, min_days, image_type, created_at';
 const DEFAULT_TOP_FOR_SLOT_LIMIT = 3;
@@ -56,7 +57,7 @@ export function deleteRecipe(id: number): void {
 
 export function searchRecipes(q: string, mealType?: string): Recipe[] {
 	const db = getDb();
-	let query = 'SELECT * FROM recipes WHERE 1=1';
+	let query = `SELECT ${RECIPE_COLS} FROM recipes WHERE 1=1`;
 	const params: string[] = [];
 
 	if (q) {
@@ -79,7 +80,7 @@ export function getAllTags(): string[] {
 	const rows = db.prepare("SELECT tags FROM recipes WHERE tags != ''").all() as { tags: string }[];
 	const tagSet = new Set<string>();
 	for (const row of rows) {
-		row.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean).forEach(t => tagSet.add(t));
+		parseTags(row.tags).forEach(t => tagSet.add(t));
 	}
 	return Array.from(tagSet).sort();
 }
@@ -87,7 +88,7 @@ export function getAllTags(): string[] {
 export function getTopRecipesForSlot(weekday: number, mealType: string, limit = DEFAULT_TOP_FOR_SLOT_LIMIT): Recipe[] {
 	const db = getDb();
 	return db.prepare(`
-		SELECT r.*, COUNT(*) as freq
+		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at, COUNT(*) as freq
 		FROM week_plans wp
 		JOIN recipes r ON r.id = wp.recipe_id
 		WHERE wp.weekday = ? AND wp.meal_type = ? AND wp.is_accompaniment = 0
@@ -144,7 +145,7 @@ export function getOldestPlannedRecipes(mealType: string, limit = DEFAULT_RECENT
 export function getRecipesPlannedNearDate(targetDate: Date, daysBack = 5): Recipe[] {
 	const db = getDb();
 
-	const startDate = new Date(targetDate.getTime() - daysBack * 86400000);
+	const startDate = new Date(targetDate.getTime() - daysBack * MS_PER_DAY);
 
 	const weekKeys = new Set<string>();
 	const cur = new Date(startDate);

@@ -4,6 +4,7 @@ import { parseTags } from '$lib/utils/parseTags.js';
 import { weekKeyToIndex } from '$lib/utils/dates.js';
 import { getAllRules } from './rules.js';
 import { getAllMembers } from './members.js';
+import { getAllRecipes } from './recipes.js';
 import { getOptions } from './options.js';
 import { assignRecipe } from './weekplan.js';
 
@@ -64,7 +65,7 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 		}
 	}
 
-	const allRecipes = db.prepare('SELECT * FROM recipes').all() as Recipe[];
+	const allRecipes = getAllRecipes();
 
 	db.transaction(() => {
 		for (const slot of slotsToFill) {
@@ -136,7 +137,7 @@ export function getDiscardedRecipes(
 	}
 
 	const requiredTag = isAcc ? 'acompañamiento' : mealType;
-	const allRecipes = db.prepare('SELECT * FROM recipes').all() as Recipe[];
+	const allRecipes = getAllRecipes();
 	const result: { recipe: Recipe; reason: string }[] = [];
 
 	// Batch: última semana por receta

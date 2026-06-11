@@ -1,19 +1,35 @@
+import { createHash } from 'node:crypto';
 import { error } from '@sveltejs/kit';
+import sharp from 'sharp';
 import { getRecipeImageData, setRecipeImage, clearRecipeImage } from '$lib/server/recipes.js';
 import { validateImageUrl } from '$lib/utils/validateImageUrl.js';
+import type { RequestHandler } from './$types.js';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 const FETCH_TIMEOUT_MS = 10_000;
+const MAX_IMAGE_DIMENSION = 800;
+const WEBP_QUALITY = 80;
 
-export async function GET({ params }) {
-	const result = getRecipeImageData(parseInt(params.id));
-	if (!result) throw error(404, 'No image');
-	return new Response(result.data, {
-		headers: { 'Content-Type': result.type, 'Cache-Control': 'public, max-age=31536000' }
-	});
+function parseRecipeId(raw: string): number {
+	const id = parseInt(raw);
+	if (!Number.isInteger(id) || id < 1) throw error(400, 'id de receta inválido');
+	return id;
 }
 
-export async function POST({ params, request }) {
+export const GET: RequestHandler = async ({ params, request }) => {
+	const result = getRecipeImageData(parseRecipeId(params.id));
+	if (!result) throw error(404, 'No image');
+	const etag = `"${createHash('sha1').update(result.data).digest('base64url')}"`;
+	if (request.headers.get('if-none-match') === etag) {
+		return new Response(null, { status: 304, headers: { ETag: etag } });
+	}
+	const body = new Uint8Array(result.data.buffer as ArrayBuffer, result.data.byteOffset, result.data.byteLength);
+	return new Response(body, {
+		headers: { 'Content-Type': result.type, 'Cache-Control': 'public, max-age=31536000', ETag: etag }
+	});
+};
+
+export const POST: RequestHandler = async ({ params, request }) => {
 	const { url } = await request.json() as { url: string };
 	if (!url) throw error(400, 'Falta el campo url');
 
@@ -60,11 +76,24 @@ export async function POST({ params, request }) {
 	}
 	const buffer = Buffer.concat(chunks);
 
-	setRecipeImage(parseInt(params.id), buffer, mimeType);
-	return new Response(null, { status: 204 });
-}
+	// Redimensionar y recomprimir: las recetas se muestran como miniaturas,
+	// no tiene sentido guardar el original completo en la BD.
+	let processed: Buffer;
+	try {
+		processed = await sharp(buffer)
+			.rotate() // respeta la orientación EXIF
+			.resize({ width: MAX_IMAGE_DIMENSION, height: MAX_IMAGE_DIMENSION, fit: 'inside', withoutEnlargement: true })
+			.webp({ quality: WEBP_QUALITY })
+			.toBuffer();
+	} catch {
+		throw error(400, 'La imagen descargada no es válida');
+	}
 
-export async function DELETE({ params }) {
-	clearRecipeImage(parseInt(params.id));
+	setRecipeImage(parseRecipeId(params.id), processed, 'image/webp');
 	return new Response(null, { status: 204 });
-}
+};
+
+export const DELETE: RequestHandler = async ({ params }) => {
+	clearRecipeImage(parseRecipeId(params.id));
+	return new Response(null, { status: 204 });
+};

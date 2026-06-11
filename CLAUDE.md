@@ -13,13 +13,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 source ~/.nvm/nvm.sh && nvm use 20
 npm run dev          # Servidor Vite con hot reload, puerto por defecto 5173
 npm run build        # Build de producción → build/
-node build/index.js  # Ejecutar build de producción (var de entorno DATABASE_PATH para la BD)
+node server/index.js # Ejecutar build de producción con gzip (var de entorno DATABASE_PATH para la BD)
 
 # Docker
 docker compose up    # Build + arranque en puerto 3000, BD persistida en volumen Docker
 ```
 
-Tests: `npm test` (vitest). Tests en `src/lib/utils/*.test.ts`.
+Tests: `npm test` (vitest). Tests en `src/lib/utils/*.test.ts` y `src/lib/server/*.test.ts` (estos últimos usan BD SQLite en memoria — `src/test-setup.ts` fija `DATABASE_PATH=':memory:'` y `src/lib/server/test-helpers.ts` da seeds/reset).
 
 ## Arquitectura
 
@@ -35,7 +35,7 @@ Singleton de conexión SQLite. El schema base está incrustado en `db/index.ts` 
 - Los tags se almacenan como strings separados por comas en todas partes (recetas, restricciones de miembros, etc.). Todas las comparaciones de tags hacen lowercase y trim de cada elemento.
 - `week_plans.is_accompaniment` (0/1) distingue platos principales de acompañamientos dentro de la misma tabla.
 - `week_day_config` sobreescribe las opciones globales por combinación (week_key, weekday, meal_type). Los campos `disabled`/`disabled_comment` permiten desactivar un slot concreto (día+comida) para semanas en que no hace falta planificarlo.
-- `recipes.image_data` (BLOB) e `image_type` almacenan la imagen de la receta directamente en la BD. 
+- `recipes.image_data` (BLOB) e `image_type` almacenan la imagen de la receta directamente en la BD. Desde la subida se redimensiona a máx. 800px y se guarda como WebP (sharp); `scripts/recompress-images.mjs` recomprime manualmente las imágenes antiguas.
 
 ### Módulos de servidor (`src/lib/server/`)
 Funciones puras, sin estado. Cada módulo tiene helpers CRUD simples. Destacados:
@@ -50,7 +50,7 @@ Funciones puras, sin estado. Cada módulo tiene helpers CRUD simples. Destacados
 
 ### Rutas
 - `src/routes/api/` — endpoints REST, todos devuelven JSON. Los endpoints de mutación de semana (`/assign`, `/remove`, `/calculate`, `/clear`, `/copy-previous`, `/config`) aceptan POST con body JSON que incluye `weekKey`.
-- `/api/recipes/[id]/image` — GET devuelve el BLOB de imagen con el Content-Type correcto; PUT recibe `multipart/form-data` con el campo `image`; DELETE borra la imagen.
+- `/api/recipes/[id]/image` — GET devuelve el BLOB de imagen con Content-Type, `Cache-Control` de 1 año y ETag (responde 304 a `If-None-Match`); POST recibe JSON `{url}`, descarga la imagen (con validación SSRF y límite de 10 MB) y la guarda redimensionada como WebP; DELETE borra la imagen.
 - `/api/image-search` — GET proxy hacia DuckDuckGo Images (obtiene el token `vqd` primero, luego la lista de imágenes). Devuelve array de `{url, thumbnail, title}`.
 - `src/routes/week/+page.svelte` — la página principal y más compleja. Usa **actualizaciones optimistas**: los cambios de slot actualizan `weekData.slots` localmente de forma inmediata, luego persisten en la API y llaman a `refreshViolations()` en background. El flag `initialLoading` (true solo en el primer montaje) controla el spinner de carga — los refrescos posteriores de datos nunca ocultan la grid.
 
@@ -59,5 +59,6 @@ Funciones puras, sin estado. Cada módulo tiene helpers CRUD simples. Destacados
 
 ## Notas de despliegue
 - Se requiere Node 20 (el sistema puede tener una versión anterior — usar `nvm use 20`).
-- La stage runner de Docker instala `python3 make g++` para recompilar los bindings nativos de `better-sqlite3` para la arquitectura destino.
+- La stage runner de Docker instala `python3 make g++` para recompilar los bindings nativos de `better-sqlite3` para la arquitectura destino. `sharp` no necesita rebuild: usa binarios precompilados (`@img/sharp-linuxmusl-*`) que npm instala según plataforma.
+- En producción la app se sirve con `server/index.js`, que envuelve el handler de adapter-node con compresión gzip (`@polka/compression`); los assets estáticos se precomprimen en build (`precompress: true`).
 - La variable de entorno `ORIGIN` debe estar definida en docker-compose para la protección CSRF de SvelteKit en form actions.

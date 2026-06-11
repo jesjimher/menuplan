@@ -3,6 +3,7 @@
 	import type { Member } from '$lib/types/index.js';
 	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
+	import { parseTags } from '$lib/utils/parseTags.js';
 
 	let { data } = $props();
 	let members = $derived(data.members);
@@ -24,9 +25,6 @@
 		showForm = true;
 	}
 
-	function parseTags(str: string): string[] {
-		return str.split(',').map(t => t.trim()).filter(Boolean);
-	}
 </script>
 
 <div class="min-h-full" style="background: var(--bg);">

@@ -2,11 +2,13 @@
 	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import { enhance } from '$app/forms';
+	import type { ActionResult } from '@sveltejs/kit';
 	import { SvelteSet } from 'svelte/reactivity';
 	import type { Recipe } from '$lib/types/index.js';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
+	import { parseTags } from '$lib/utils/parseTags.js';
 
 	let { data } = $props();
 	let recipes = $derived(data.recipes);
@@ -60,7 +62,7 @@
 			r.name.toLowerCase().includes(searchQ.toLowerCase()) ||
 			r.tags.toLowerCase().includes(searchQ.toLowerCase());
 
-		const recipeTags = r.tags.split(',').map(t => t.trim().toLowerCase());
+		const recipeTags = parseTags(r.tags);
 		const matchesTags = selectedTags.every(t => recipeTags.includes(t));
 		return matchesText && matchesTags;
 	}));
@@ -110,9 +112,9 @@
 		showForm = true;
 	}
 
-	async function handleRecipeSubmit({ result, update }: { result: any; update: () => Promise<void> }) {
+	async function handleRecipeSubmit({ result, update }: { result: ActionResult; update: () => Promise<void> }) {
 		if (result.type === 'success') {
-			const savedId = result.data?.createdId ?? result.data?.updatedId ?? editingRecipe?.id;
+			const savedId = (result.data?.createdId ?? result.data?.updatedId ?? editingRecipe?.id) as number | undefined;
 			if (pendingImageUrl && savedId) {
 				await fetch(`/api/recipes/${savedId}/image`, {
 					method: 'POST',

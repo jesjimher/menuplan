@@ -3,15 +3,17 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import type { WeekData, Recipe, Rule, ScheduleWithRecipe } from '$lib/types/index.js';
 	import { checkRules } from '$lib/utils/ruleChecker.js';
-	import { getWeekKey, getPreviousWeekKey, getWeekDates, weekKeyToIndex, indexToWeekKey, WEEKDAY_NAMES, SHORT_MONTH_NAMES } from '$lib/utils/dates.js';
+	import { getWeekKey, getPreviousWeekKey, getWeekDates, weekKeyToIndex, indexToWeekKey, WEEKDAY_NAMES, SHORT_MONTH_NAMES, MS_PER_DAY } from '$lib/utils/dates.js';
 	import WeekHeader from '$lib/components/week/WeekHeader.svelte';
 	import ViolationBanner from '$lib/components/week/ViolationBanner.svelte';
-	import RecipeSlot from '$lib/components/week/RecipeSlot.svelte';
+	import MealCell from '$lib/components/week/MealCell.svelte';
+	import EditableNote from '$lib/components/week/EditableNote.svelte';
 	import RecipePickerModal from '$lib/components/week/RecipePickerModal.svelte';
 	import ScheduleModal from '$lib/components/week/ScheduleModal.svelte';
 	import RemoveScheduledRecipeDialog from '$lib/components/week/RemoveScheduledRecipeDialog.svelte';
 	import MoveCopyLeftoverModal from '$lib/components/week/MoveCopyLeftoverModal.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
+	import { WeekDragDrop, type SlotCoord } from '$lib/utils/weekDragDrop.svelte.js';
 
 	let { data } = $props();
 
@@ -38,16 +40,36 @@
 	let infoMsg = $state<string | null>(null);
 	let infoTimeout: ReturnType<typeof setTimeout>;
 
+	const ERROR_MSG_MS = 5000;
+	const INFO_MSG_MS = 4000;
+
 	function showError(msg: string) {
 		errorMsg = msg;
 		clearTimeout(errorTimeout);
-		errorTimeout = setTimeout(() => { errorMsg = null; }, 5000);
+		errorTimeout = setTimeout(() => { errorMsg = null; }, ERROR_MSG_MS);
 	}
 
 	function showInfo(msg: string) {
 		infoMsg = msg;
 		clearTimeout(infoTimeout);
-		infoTimeout = setTimeout(() => { infoMsg = null; }, 4000);
+		infoTimeout = setTimeout(() => { infoMsg = null; }, INFO_MSG_MS);
+	}
+
+	// POST a /api/week/config con manejo de errores; en fallo resincroniza con el servidor
+	async function postConfig(body: Record<string, unknown>): Promise<boolean> {
+		try {
+			const res = await fetch('/api/week/config', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey, ...body })
+			});
+			if (!res.ok) throw new Error();
+			return true;
+		} catch {
+			showError('Error al guardar la configuración');
+			await invalidateAll().catch(() => {});
+			return false;
+		}
 	}
 
 	// Sync when server data changes (e.g. navigating weeks via goto)
@@ -82,12 +104,16 @@
 		scheduleModalOpen = true;
 	}
 
-	// Drag & move state
-	type SlotCoord = { weekday: number; mealType: string; slotIndex: number; isAcc: number };
-	let dragSource = $state<SlotCoord | null>(null);
-	let dragModifier = $state(false);
-	let ctrlHeld = false; // tracked independently via keydown/keyup, more reliable than DragEvent.ctrlKey
-	let dragOver = $state<string | null>(null);
+	// Drag & move state (HTML5 drag en $lib/utils/weekDragDrop.svelte.ts)
+	const dnd = new WeekDragDrop((src, target, withModifier) => {
+		if (withModifier) {
+			moveCopySource = src;
+			moveCopyTarget = target;
+			moveCopyModalOpen = true;
+		} else {
+			moveRecipe(src, target);
+		}
+	});
 	let moveSource = $state<SlotCoord | null>(null);
 	let longPressTimer: ReturnType<typeof setTimeout> | null = null;
 	let dayLongPressTimer: ReturnType<typeof setTimeout> | null = null;
@@ -106,26 +132,7 @@
 
 	onMount(() => {
 		isTouchDevice = 'ontouchstart' in window;
-		const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Control' || e.key === 'Meta') ctrlHeld = true; };
-		const onKeyUp = (e: KeyboardEvent) => { if (e.key === 'Control' || e.key === 'Meta') ctrlHeld = false; };
-		// Fires for every dragover on the page — only engage when Ctrl held so we don't
-		// suppress the native no-drop cursor when dragging over non-slot areas without Ctrl.
-		const onDocDragOver = (e: DragEvent) => {
-			if (!dragSource) return;
-			if (ctrlHeld) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; }
-		};
-		// Prevent the browser from navigating when the user drops on an empty area.
-		const onDocDrop = (e: DragEvent) => { if (dragSource) e.preventDefault(); };
-		document.addEventListener('keydown', onKeyDown);
-		document.addEventListener('keyup', onKeyUp);
-		document.addEventListener('dragover', onDocDragOver);
-		document.addEventListener('drop', onDocDrop);
-		return () => {
-			document.removeEventListener('keydown', onKeyDown);
-			document.removeEventListener('keyup', onKeyUp);
-			document.removeEventListener('dragover', onDocDragOver);
-			document.removeEventListener('drop', onDocDrop);
-		};
+		return dnd.attachDocumentListeners();
 	});
 
 	function prevWeek() {
@@ -357,7 +364,7 @@
 		const sourceDate = dates[source.weekday - 1];
 		const targetDate = dates[target.weekday - 1];
 		if (!sourceDate || !targetDate) return false;
-		const diffDays = Math.round((targetDate.getTime() - sourceDate.getTime()) / 86400000);
+		const diffDays = Math.round((targetDate.getTime() - sourceDate.getTime()) / MS_PER_DAY);
 		return diffDays > 0 && diffDays <= 5;
 	}
 
@@ -470,12 +477,7 @@
 	}
 
 	async function updateConfig(weekday: number, mealType: string, field: string, value: number) {
-		await fetch('/api/week/config', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, [field]: value })
-		});
-		await invalidateAll();
+		if (await postConfig({ weekday, meal_type: mealType, [field]: value })) await invalidateAll();
 	}
 
 	async function decrementMealCount(weekday: number, mealType: string) {
@@ -493,11 +495,7 @@
 					}
 				}
 			};
-			fetch('/api/week/config', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, recipe_count: 0, disabled: true, disabled_comment: comment })
-			});
+			await postConfig({ weekday, meal_type: mealType, recipe_count: 0, disabled: true, disabled_comment: comment });
 		} else {
 			await updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count - 1);
 		}
@@ -517,22 +515,14 @@
 					}
 				}
 			};
-			fetch('/api/week/config', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, recipe_count: 1, disabled: false, disabled_comment: null })
-			});
+			await postConfig({ weekday, meal_type: mealType, recipe_count: 1, disabled: false, disabled_comment: null });
 		} else {
 			await updateConfig(weekday, mealType, 'recipe_count', cfg.recipe_count + 1);
 		}
 	}
 
-	function setDisabledComment(weekday: number, mealType: string, comment: string) {
-		fetch('/api/week/config', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, disabled: true, disabled_comment: comment })
-		});
+	async function setDisabledComment(weekday: number, mealType: string, comment: string) {
+		await postConfig({ weekday, meal_type: mealType, disabled: true, disabled_comment: comment });
 	}
 
 	async function disableDay(weekday: number) {
@@ -553,38 +543,20 @@
 			}
 		};
 		await Promise.all([
-			fetch('/api/week/config', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday, meal_type: 'comida', disabled: nowDisabled, disabled_comment: sharedComment })
-			}),
-			fetch('/api/week/config', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday, meal_type: 'cena', disabled: nowDisabled, disabled_comment: sharedComment })
-			})
+			postConfig({ weekday, meal_type: 'comida', disabled: nowDisabled, disabled_comment: sharedComment }),
+			postConfig({ weekday, meal_type: 'cena', disabled: nowDisabled, disabled_comment: sharedComment })
 		]);
 	}
 
-	function setMealNote(weekday: number, mealType: string, note: string) {
-		fetch('/api/week/config', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, note: note || null })
-		});
+	async function setMealNote(weekday: number, mealType: string, note: string) {
+		await postConfig({ weekday, meal_type: mealType, note: note || null });
 	}
 
-	function setDayComment(weekday: number, comment: string) {
-		fetch('/api/week/config', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ weekKey, weekday, meal_type: 'comida', disabled: true, disabled_comment: comment })
-		});
-		fetch('/api/week/config', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ weekKey, weekday, meal_type: 'cena', disabled: true, disabled_comment: comment })
-		});
+	async function setDayComment(weekday: number, comment: string) {
+		await Promise.all([
+			postConfig({ weekday, meal_type: 'comida', disabled: true, disabled_comment: comment }),
+			postConfig({ weekday, meal_type: 'cena', disabled: true, disabled_comment: comment })
+		]);
 	}
 
 	function getSlotTags(weekday: number, mealType: string, slotIdx: number): string[] {
@@ -592,12 +564,7 @@
 	}
 
 	async function setSlotTags(weekday: number, mealType: string, slotIdx: number, tags: string[]) {
-		await fetch('/api/week/config', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIdx, required_tags: tags })
-		});
-		await invalidateAll();
+		if (await postConfig({ weekday, meal_type: mealType, slot_index: slotIdx, required_tags: tags })) await invalidateAll();
 	}
 
 	async function addRequiredTag(weekday: number, mealType: string, slotIdx: number, tag: string) {
@@ -625,35 +592,7 @@
 			onAddTag: (tag: string) => addRequiredTag(weekday, mealType, slotIdx, tag),
 			onRemoveTag: (tag: string) => removeRequiredTag(weekday, mealType, slotIdx, tag),
 			onSetEditingTag: (k: string | null) => { editingTagKey = k; },
-			onDragStart: (e: DragEvent) => {
-				const slot = getSlot(weekday, mealType, slotIdx, isAcc);
-				if (!slot?.recipe) return;
-				dragSource = coord;
-				dragModifier = ctrlHeld || e.ctrlKey || e.metaKey;
-				e.dataTransfer!.effectAllowed = 'copyMove';
-				e.dataTransfer!.setData('text/plain', key);
-			},
-			onDragEnd: () => { dragSource = null; dragOver = null; dragModifier = false; },
-			onDragOver: (e: DragEvent) => {
-				if (!dragSource) return;
-				dragModifier = ctrlHeld || e.ctrlKey || e.metaKey;
-				e.dataTransfer!.dropEffect = dragModifier ? 'copy' : 'move';
-				dragOver = key;
-			},
-			onDragLeave: (e: DragEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) dragOver = null; },
-			onDrop: (e: DragEvent) => {
-				if (!dragSource) return;
-				const src = dragSource;
-				const mod = ctrlHeld || e.ctrlKey || e.metaKey || dragModifier;
-				dragSource = null; dragOver = null; dragModifier = false;
-				if (mod) {
-					moveCopySource = src;
-					moveCopyTarget = coord;
-					moveCopyModalOpen = true;
-				} else {
-					moveRecipe(src, coord);
-				}
-			},
+			...dnd.handlersFor(coord, key, () => !!getSlot(weekday, mealType, slotIdx, isAcc)?.recipe),
 			onMoveClick: () => {
 				if (moveSource) {
 					moveCopySource = moveSource;
@@ -680,7 +619,7 @@
 </script>
 
 <svelte:window
-	on:keydown={(e) => { if (e.key === 'Escape') { moveSource = null; dragSource = null; dayDisableConfirm = null; } }}
+	on:keydown={(e) => { if (e.key === 'Escape') { moveSource = null; dnd.reset(); dayDisableConfirm = null; } }}
 />
 
 <div class="flex flex-col h-full" style="background: var(--background);">
@@ -810,191 +749,45 @@
 									on:click={(e) => (e.currentTarget.querySelector('[contenteditable]') as HTMLElement)?.focus()}
 										style="background: var(--surface-container-highest); border: none;">
 										{#key weekKey}
-										<div
-											contenteditable="true"
-											role="textbox"
-											aria-multiline="true"
-											aria-label="Motivo de desactivación del día"
-											on:blur={(e) => { const el = e.currentTarget as HTMLDivElement; const t = el.innerText.trim(); if (!t) el.innerHTML = ''; setDayComment(weekday, t); }}
-											data-placeholder="Motivo (ej. Vacaciones en París)..."
-											class="disabled-reason w-full text-center text-sm focus:outline-none"
-											style="color: var(--text);"
-										>{dayComidaCfg?.disabled_comment ?? ''}</div>
-									{/key}
+											<EditableNote
+												value={dayComidaCfg?.disabled_comment}
+												placeholder="Motivo (ej. Vacaciones en París)..."
+												ariaLabel="Motivo de desactivación del día"
+												onSave={(t) => setDayComment(weekday, t)}
+											/>
+										{/key}
 									</div>
 								</div>
 							</div>
 						{:else}
-						{#each ['comida', 'cena'] as mealType, j}
-							{@const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena')}
-							{@const isComida = mealType === 'comida'}
-
-							<div class="flex-1 flex flex-col {j === 1 ? 'mt-2 lg:mt-0 lg:pt-3' : ''}"
-								style="{isToday ? 'background: var(--primary-light);' : ''} grid-column: {i+2}; grid-row: {j+2};">
-
-								<!-- Encabezado de franja -->
-								<div class="flex items-center px-2.5 pt-2 lg:hidden">
-									<span class="text-[10px] font-black uppercase tracking-tighter"
-										style="color: {cfg.disabled ? 'var(--text-muted)' : (isComida ? 'var(--comida-accent)' : 'var(--cena-accent)')}; {cfg.disabled ? 'text-decoration: line-through; opacity: 0.5;' : ''}">
-										{isComida ? 'COMIDA' : 'CENA'}
-									</span>
-								</div>
-
-								{#if cfg.disabled}
-									<div class="px-2.5 pb-2.5 pt-2 flex-1 flex flex-col">
-										<div class="flex-1 flex items-center justify-center rounded-xl px-3 py-2 cursor-text"
-									on:click={(e) => (e.currentTarget.querySelector('[contenteditable]') as HTMLElement)?.focus()}
-											style="background: var(--surface-container-highest); border: none;">
-											{#key weekKey}
-											<div
-												contenteditable="true"
-												role="textbox"
-												aria-multiline="true"
-												aria-label="Motivo de desactivación de {mealType}"
-												on:blur={(e) => { const el = e.currentTarget as HTMLDivElement; const t = el.innerText.trim(); if (!t) el.innerHTML = ''; setDisabledComment(weekday, mealType, t); }}
-												data-placeholder="Motivo (ej. Cenamos fuera)..."
-												class="disabled-reason w-full text-center text-sm focus:outline-none"
-												style="color: var(--text);"
-											>{cfg.disabled_comment ?? ''}</div>
-											{/key}
-										</div>
-									</div>
-									<!-- Botones añadir cuando no hay slots -->
-									<div class="flex gap-1.5 px-2 pb-2 shrink-0 justify-center">
-										<button
-											on:click={() => incrementMealCount(weekday, mealType)}
-											class="text-[10px] font-semibold py-1.5 px-3 rounded-lg transition-all hover:opacity-80"
-											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
-										>+ plato</button>
-										<button
-											on:click={() => updateConfig(weekday, mealType, 'accompaniment_per_slot', cfg.accompaniment_per_slot + 1)}
-											class="text-[10px] font-semibold py-1.5 px-3 rounded-lg transition-all hover:opacity-80"
-											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
-										>+ acomp.</button>
-									</div>
-								{:else}
-
-								<!-- Slots -->
-								<div class="px-2 pb-3 pt-2 flex-1 flex flex-col gap-2">
-									{#each Array(cfg.recipe_count) as _, slotIdx}
-										{@const slot = getSlot(weekday, mealType, slotIdx, 0)}
-										{@const key = slotKey(weekday, mealType, slotIdx, 0)}
-										{@const slotTags = cfg.required_tags[slotIdx] ?? []}
-										{@const slotTagEditKey = `tag-${weekday}-${mealType}-${slotIdx}`}
-										{@const callbacks = makeSlotCallbacks(weekday, mealType, slotIdx, 0)}
-
-										<RecipeSlot
-											{weekday} {mealType} {slotIdx}
-											{slot} slotKeyStr={key} {cfg} {allTags}
-											isBusy={busySlots.has(key)}
-											isDragSource={!!dragSource && key === slotKey(dragSource.weekday, dragSource.mealType, dragSource.slotIndex, dragSource.isAcc)}
-											isDragOver={dragOver === key}
-											isMoveMode={!!moveSource}
-											{isTouchDevice}
-											{editingTagKey} {slotTags} {slotTagEditKey}
-											schedule={slot?.schedule ?? null}
-											slotSchedules={schedulesPerMeal[`${weekday}-${mealType}-0`] ?? []}
-											{...callbacks}
-											onDeleteSlot={() => decrementMealCount(weekday, mealType)}
-										/>
-
-										<!-- Acompañamientos por receta -->
-										{#if cfg.accompaniment_per_recipe > 0}
-											{#each Array(cfg.accompaniment_per_recipe) as _, aIdx}
-												{@const accSlotIdx = slotIdx * cfg.accompaniment_per_recipe + aIdx}
-												{@const accSlot = getSlot(weekday, mealType, accSlotIdx, 1)}
-												{@const accKey = slotKey(weekday, mealType, accSlotIdx, 1)}
-												{@const accCallbacks = makeSlotCallbacks(weekday, mealType, accSlotIdx, 1)}
-
-												<RecipeSlot
-													{weekday} {mealType} slotIdx={accSlotIdx} isAcc={1}
-													slot={accSlot} slotKeyStr={accKey} {cfg} {allTags}
-													isDragSource={!!dragSource && accKey === slotKey(dragSource.weekday, dragSource.mealType, dragSource.slotIndex, dragSource.isAcc)}
-													isDragOver={dragOver === accKey}
-													isMoveMode={!!moveSource}
-													{isTouchDevice}
-													{editingTagKey}
-													{...accCallbacks}
-												/>
-											{/each}
-										{/if}
-									{/each}
-
-									<!-- Acompañamientos por franja -->
-									{#if cfg.accompaniment_per_slot > 0}
-										<div class="pt-1.5 space-y-1.5 shrink-0"
-											style="border-top: 1px solid var(--surface-container-highest);">
-											{#each Array(cfg.accompaniment_per_slot) as _, aIdx}
-												{@const accSlot = getSlot(weekday, mealType, aIdx, 1)}
-												<div class="relative group/accslot">
-													<button
-														on:click|stopPropagation={() => openRecipePicker(weekday, mealType, aIdx, 1)}
-														class="w-full text-left text-[10px] transition-colors px-2 py-1.5 pr-12 rounded-lg"
-														style="{accSlot?.recipe
-															? `background: var(--secondary-container); color: var(--secondary);`
-															: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
-													>
-														<span class="{accSlot?.recipe ? 'font-semibold' : 'italic'}">
-															{accSlot?.recipe?.name ?? 'Elegir acompañamiento'}
-														</span>
-													</button>
-													<div class="absolute top-1/2 right-1.5 -translate-y-1/2 flex gap-1 opacity-0 group-hover/accslot:opacity-100 transition-opacity">
-														{#if accSlot?.recipe}
-															<button
-																on:click|stopPropagation={() => removeSlot(weekday, mealType, aIdx, 1)}
-																class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm text-xs font-bold"
-																style="background: rgba(255,255,255,0.92); color: var(--error); box-shadow: 0 2px 5px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(0,0,0,0.22);"
-																aria-label="Quitar receta"
-																title="Quitar receta"
-															>&times;</button>
-														{/if}
-														<button
-															on:click|stopPropagation={() => updateConfig(weekday, mealType, 'accompaniment_per_slot', Math.max(0, cfg.accompaniment_per_slot - 1))}
-															class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors"
-															style="background: var(--error); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.35);"
-															aria-label="Eliminar acompañamiento"
-															title="Eliminar acompañamiento"
-														><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
-													</div>
-												</div>
-											{/each}
-										</div>
-									{/if}
-
-									<!-- Botones añadir justo después del último slot -->
-									<div class="flex gap-1.5 pt-2 shrink-0 justify-center">
-										<button
-											on:click={() => incrementMealCount(weekday, mealType)}
-											class="text-[10px] font-semibold py-1.5 px-3 rounded-lg transition-all hover:opacity-80"
-											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
-										>+ plato</button>
-										<button
-											on:click={() => updateConfig(weekday, mealType, 'accompaniment_per_slot', cfg.accompaniment_per_slot + 1)}
-											class="text-[10px] font-semibold py-1.5 px-3 rounded-lg transition-all hover:opacity-80"
-											style="border: 1px dashed var(--border); color: var(--text-muted); background: transparent;"
-										>+ acomp.</button>
-									</div>
-							</div>
-							<!-- Nota de franja -->
-							<div class="px-2.5 pb-2 shrink-0 flex items-baseline gap-1"
-								on:click={(e) => (e.currentTarget.querySelector('[contenteditable]') as HTMLElement)?.focus()}>
-								<span class="text-[9px] font-black uppercase tracking-widest shrink-0" style="color: var(--text-muted); opacity: 0.5;">NOTA:</span>
-								{#key weekKey}
-								<div
-									contenteditable="true"
-									role="textbox"
-									aria-multiline="true"
-									aria-label="Nota de {mealType}"
-									on:blur={(e) => { const el = e.currentTarget as HTMLDivElement; const t = el.innerText.trim(); if (!t) el.innerHTML = ''; setMealNote(weekday, mealType, t); }}
-									data-placeholder="..."
-									class="meal-note flex-1 text-[11px] focus:outline-none px-1 py-0.5 rounded focus:bg-[var(--surface)] cursor-text"
-									style="color: var(--text); font-weight: 600;"
-								>{cfg.note ?? ''}</div>
-								{/key}
-							</div>
-						{/if}
-						</div>
-					{/each}
+						{#each ['comida', 'cena'] as mealTypeStr}
+							{@const meal = mealTypeStr as 'comida' | 'cena'}
+							<MealCell
+								{weekday}
+								mealType={meal}
+								col={i + 2}
+								{isToday}
+								{weekKey}
+								cfg={getDayConfig(weekday, meal)}
+								{allTags}
+								{editingTagKey}
+								{busySlots}
+								{isTouchDevice}
+								isMoveMode={!!moveSource}
+								{dnd}
+								slotSchedules={schedulesPerMeal[`${weekday}-${meal}-0`] ?? []}
+								{getSlot}
+								{slotKey}
+								{makeSlotCallbacks}
+								onIncrementMealCount={() => incrementMealCount(weekday, meal)}
+								onDecrementMealCount={() => decrementMealCount(weekday, meal)}
+								onUpdateConfig={(field, value) => updateConfig(weekday, meal, field, value)}
+								onSetDisabledComment={(t) => setDisabledComment(weekday, meal, t)}
+								onSetMealNote={(t) => setMealNote(weekday, meal, t)}
+								onOpenPicker={(slotIdx, isAcc) => openRecipePicker(weekday, meal, slotIdx, isAcc)}
+								onRemoveSlot={(slotIdx, isAcc) => removeSlot(weekday, meal, slotIdx, isAcc)}
+							/>
+						{/each}
 					{/if}
 					</div>
 				{/each}
@@ -1112,28 +905,5 @@
 	}
 	.select-none {
 		-webkit-touch-callout: none;
-	}
-	.disabled-reason {
-		font-weight: 600;
-	}
-	.disabled-reason:empty::before {
-		content: attr(data-placeholder);
-		color: var(--text-muted);
-		font-weight: 400;
-		font-style: italic;
-		pointer-events: none;
-	}
-	.disabled-reason:focus::before {
-		content: none;
-	}
-	.meal-note:empty::before {
-		content: attr(data-placeholder);
-		color: var(--text-muted);
-		font-weight: 400;
-		font-style: italic;
-		pointer-events: none;
-	}
-	.meal-note:focus::before {
-		content: none;
 	}
 </style>

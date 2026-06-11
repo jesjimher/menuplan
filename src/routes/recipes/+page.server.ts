@@ -1,5 +1,8 @@
 import { fail } from '@sveltejs/kit';
+import type { Actions } from './$types.js';
+import { getDb } from '$lib/db/index.js';
 import { getAllRecipes, getAllTags, createRecipe, updateRecipe, deleteRecipe, importPlantoeatRecipes } from '$lib/server/recipes.js';
+import { parseTags } from '$lib/utils/parseTags.js';
 
 export function load() {
 	return {
@@ -8,7 +11,7 @@ export function load() {
 	};
 }
 
-export const actions = {
+export const actions: Actions = {
 	create: async ({ request }) => {
 		const fd = await request.formData();
 		const name = fd.get('name')?.toString().trim();
@@ -54,18 +57,22 @@ export const actions = {
 		if (!tag || !ids?.length) return fail(400, { error: 'Datos incompletos' });
 
 		const allRecipes = getAllRecipes();
-		for (const id of ids) {
-			const recipe = allRecipes.find(r => r.id === id);
-			if (!recipe) continue;
-			const current = recipe.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-			if (current.includes(tag)) continue;
-			updateRecipe(id, { tags: [...current, tag].join(',') });
-		}
+		getDb().transaction(() => {
+			for (const id of ids) {
+				const recipe = allRecipes.find(r => r.id === id);
+				if (!recipe) continue;
+				const current = parseTags(recipe.tags);
+				if (current.includes(tag)) continue;
+				updateRecipe(id, { tags: [...current, tag].join(',') });
+			}
+		})();
 	},
 	bulkDelete: async ({ request }) => {
 		const fd = await request.formData();
 		const ids = fd.get('ids')?.toString().split(',').map(Number).filter(Boolean);
 		if (!ids?.length) return fail(400, { error: 'Datos incompletos' });
-		for (const id of ids) deleteRecipe(id);
+		getDb().transaction(() => {
+			for (const id of ids) deleteRecipe(id);
+		})();
 	}
 };

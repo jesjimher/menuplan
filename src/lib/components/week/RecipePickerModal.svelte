@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Recipe } from '$lib/types/index.js';
 	import TagInput from '$lib/components/TagInput.svelte';
+	import { parseTags } from '$lib/utils/parseTags.js';
 
 	let {
 		open = false,
@@ -23,6 +24,9 @@
 		onSelect: (recipeId: number, isLeftover?: boolean) => void;
 		onClose: () => void;
 	} = $props();
+
+	const FETCH_TIMEOUT_MS = 15_000;
+	const SEARCH_DEBOUNCE_MS = 200;
 
 	type Tab = 'search' | 'topDay' | 'topAll' | 'recent' | 'oldest' | 'discarded' | 'leftovers';
 	let activeTab = $state<Tab>('search');
@@ -68,7 +72,7 @@
 		pickerAbort?.abort();
 		const ctrl = new AbortController();
 		pickerAbort = ctrl;
-		const timeoutId = setTimeout(() => ctrl.abort(), 15000);
+		const timeoutId = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
 		pickerLoading = true;
 		pickerError = null;
 		try {
@@ -120,12 +124,12 @@
 			const discardedIds = new Set(discarded.map(d => d.recipe.id));
 			searchResults = raw.filter(r => {
 				if (discardedIds.has(r.id)) return false;
-				const tags = r.tags.split(',').map(t => t.trim().toLowerCase());
+				const tags = parseTags(r.tags);
 				if (searchTags.length > 0 && !searchTags.every(st => tags.includes(st))) return false;
 				if (excludeTags.length > 0 && excludeTags.some(et => tags.includes(et))) return false;
 				return true;
 			});
-		}, 200);
+		}, SEARCH_DEBOUNCE_MS);
 	}
 
 	$effect(() => {
@@ -158,7 +162,7 @@
 	function applyFilters<T extends Recipe>(items: T[]): T[] {
 		return items.filter(r => {
 			if (searchQuery && !r.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-			const tags = r.tags.split(',').map(t => t.trim().toLowerCase());
+			const tags = parseTags(r.tags);
 			if (searchTags.length > 0 && !searchTags.every(st => tags.includes(st))) return false;
 			if (excludeTags.length > 0 && excludeTags.some(et => tags.includes(et))) return false;
 			return true;
@@ -168,7 +172,7 @@
 	function applyFiltersDiscarded(items: Discarded[]): Discarded[] {
 		return items.filter(d => {
 			if (searchQuery && !d.recipe.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-			const tags = d.recipe.tags.split(',').map(t => t.trim().toLowerCase());
+			const tags = parseTags(d.recipe.tags);
 			if (searchTags.length > 0 && !searchTags.every(st => tags.includes(st))) return false;
 			if (excludeTags.length > 0 && excludeTags.some(et => tags.includes(et))) return false;
 			return true;
@@ -300,7 +304,7 @@
 						{#each searchResults as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
 								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
+									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
 								{:else}
 									<div class="recipe-thumb-placeholder"></div>
 								{/if}
@@ -324,7 +328,7 @@
 						{#each filtered as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id, true)}>
 								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
+									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
 								{:else}
 									<div class="recipe-thumb-placeholder"></div>
 								{/if}
@@ -353,7 +357,7 @@
 						{#each filtered as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
 								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
+									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
 								{:else}
 									<div class="recipe-thumb-placeholder"></div>
 								{/if}
@@ -383,7 +387,7 @@
 						{#each filtered as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
 								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
+									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
 								{:else}
 									<div class="recipe-thumb-placeholder"></div>
 								{/if}
@@ -413,7 +417,7 @@
 						{#each filtered as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
 								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
+									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
 								{:else}
 									<div class="recipe-thumb-placeholder"></div>
 								{/if}
@@ -443,7 +447,7 @@
 						{#each filtered as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
 								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" />
+									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
 								{:else}
 									<div class="recipe-thumb-placeholder"></div>
 								{/if}
@@ -473,7 +477,7 @@
 						{#each filtered as d}
 							<button class="recipe-row recipe-row-discarded" onclick={() => handleSelect(d.recipe.id)}>
 								{#if d.recipe.image_type}
-									<img src="/api/recipes/{d.recipe.id}/image" alt={d.recipe.name} class="recipe-thumb recipe-thumb-dim" />
+									<img src="/api/recipes/{d.recipe.id}/image" alt={d.recipe.name} class="recipe-thumb recipe-thumb-dim" loading="lazy" decoding="async" />
 								{:else}
 									<div class="recipe-thumb-placeholder"></div>
 								{/if}

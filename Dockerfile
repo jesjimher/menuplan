@@ -20,6 +20,7 @@ RUN npm ci --omit=dev --ignore-scripts && \
     npm rebuild better-sqlite3
 
 COPY --from=builder /app/build ./build
+COPY server ./server
 
 ENV DATABASE_PATH=/data/menuplan.db
 ENV NODE_ENV=production
@@ -27,4 +28,4 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["node", "build"]
+CMD ["node", "server/index.js"]

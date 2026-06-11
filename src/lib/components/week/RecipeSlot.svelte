@@ -118,7 +118,8 @@
 
 	function openMenu() { clearTimeout(closeTimer); menuOpen = true; }
 	function closeMenu() { menuOpen = false; }
-	function closeMenuDelayed() { closeTimer = setTimeout(() => { menuOpen = false; }, 2000); }
+	const MENU_AUTOCLOSE_MS = 2000;
+	function closeMenuDelayed() { closeTimer = setTimeout(() => { menuOpen = false; }, MENU_AUTOCLOSE_MS); }
 
 	const menuButtons = $derived.by(() => {
 		const items: { type: string }[] = [];
@@ -217,6 +218,7 @@
 				>
 					{#if slot?.recipe?.image_type}
 						<img src="/api/recipes/{slot.recipe.id}/image" alt={slot.recipe.name}
+							loading="lazy" decoding="async"
 							class="absolute inset-0 w-full h-full object-cover group-hover/slot:scale-105 transition-transform duration-500"
 							on:error={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
 						<span class="absolute bottom-0 left-0 right-0 px-2.5 py-2 font-bold text-sm leading-tight flex items-end gap-1.5 flex-wrap"
