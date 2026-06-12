@@ -11,6 +11,7 @@
 		onCalculate,
 		onRecalculate,
 		onClear,
+		onClearFuture,
 		onCopyPrevious
 	}: {
 		weekKey: string;
@@ -21,8 +22,19 @@
 		onCalculate: () => void;
 		onRecalculate: () => void;
 		onClear: () => void;
+		onClearFuture: () => void;
 		onCopyPrevious: () => void;
 	} = $props();
+
+	let clearMenuOpen = $state(false);
+
+	function toggleClearMenu() {
+		clearMenuOpen = !clearMenuOpen;
+	}
+
+	function closeClearMenu() {
+		clearMenuOpen = false;
+	}
 
 	const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -31,7 +43,7 @@
 	const weekDisplay = $derived(dates?.length === 7 ? `${dates[0].getUTCDate()} a ${dates[6].getUTCDate()} de ${MONTH_NAMES[dates[6].getUTCMonth()]}` : '');
 </script>
 
-<header class="px-4 sm:px-6 py-3 shrink-0 relative" style="background: rgba(255,248,243,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--surface-container-highest);">
+<header class="px-4 sm:px-6 py-3 shrink-0 relative" style="background: rgba(255,248,243,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--surface-container-highest); z-index: 100;">
 	<div class="flex items-center">
 		<div class="flex items-center gap-2 sm:gap-3 shrink-0" style="width: 14rem">
 			<button class="lg:hidden p-1.5 rounded-lg transition-colors shrink-0"
@@ -80,12 +92,45 @@
 					title="Copiar semana anterior">
 					<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
 				</button>
-				<button on:click={onClear}
-					class="icon-btn p-2 rounded-lg transition-colors"
-					aria-label="Limpiar plan"
-					title="Limpiar plan">
-					<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-				</button>
+				<div class="relative flex items-center">
+					{#if clearMenuOpen}
+						<button class="fixed inset-0 z-10" aria-label="Cerrar menú" on:click={closeClearMenu}></button>
+					{/if}
+					<button on:click={onClear}
+						class="icon-btn p-2 rounded-l-lg transition-colors"
+						aria-label="Limpiar plan"
+						title="Limpiar esta semana">
+						<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+					</button>
+					<button on:click={toggleClearMenu}
+						class="icon-btn px-1 py-2 rounded-r-lg transition-colors"
+						aria-label="Más opciones de limpieza"
+						title="Más opciones">
+						<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+					</button>
+					{#if clearMenuOpen}
+						<div class="absolute top-full right-0 z-20 mt-1 rounded-xl overflow-hidden"
+							style="background: var(--surface); box-shadow: 0 4px 24px rgba(0,0,0,0.18); min-width: 14rem; border: 1px solid var(--surface-container-highest);">
+							<button
+								on:click={() => { onClear(); closeClearMenu(); }}
+								class="w-full text-left px-4 py-3 text-sm font-semibold transition-colors clear-menu-item"
+								style="color: var(--text);"
+							>
+								Limpiar esta semana
+								<span class="block text-xs font-normal mt-0.5" style="color: var(--text-muted);">Elimina las recetas asignadas manualmente esta semana</span>
+							</button>
+							<div style="height: 1px; background: var(--surface-container-highest); margin: 0 1rem;"></div>
+							<button
+								on:click={() => { onClearFuture(); closeClearMenu(); }}
+								class="w-full text-left px-4 py-3 text-sm font-semibold transition-colors clear-menu-item"
+								style="color: var(--text);"
+							>
+								Limpiar desde esta semana en adelante
+								<span class="block text-xs font-normal mt-0.5" style="color: var(--text-muted);">Borra recetas manuales de esta semana y las futuras; las programaciones se mantienen</span>
+							</button>
+						</div>
+					{/if}
+				</div>
 			</div>
 			<button on:click={onRecalculate} disabled={calculating}
 				class="nav-btn hidden sm:inline-flex px-3 py-1.5 text-sm font-bold rounded-lg transition-colors disabled:opacity-40"
@@ -119,6 +164,9 @@
 	}
 	.icon-btn:hover {
 		background: var(--surface-container);
+	}
+	.clear-menu-item:hover {
+		background: var(--surface-container-low);
 	}
 	.calc-btn {
 		background: var(--primary);

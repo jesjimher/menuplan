@@ -30,6 +30,7 @@ export const removeBodySchema = z.object({
 
 export const clearBodySchema = z.object({
 	weekKey: weekKeySchema.optional(),
+	scope: z.enum(['week', 'future']).default('week'),
 });
 
 export const copyPreviousBodySchema = z.object({

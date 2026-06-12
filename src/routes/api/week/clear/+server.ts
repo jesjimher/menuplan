@@ -6,6 +6,6 @@ import { clearBodySchema } from '$lib/schemas/index.js';
 
 export async function POST({ request }) {
 	const body = await parseBody(request, clearBodySchema);
-	clearWeek(body.weekKey ?? getWeekKey());
+	clearWeek(body.weekKey ?? getWeekKey(), body.scope);
 	return json({ ok: true });
 }

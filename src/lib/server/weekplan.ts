@@ -290,9 +290,13 @@ export function hasManualEntry(weekKey: string, weekday: number, mealType: strin
 	return !!row;
 }
 
-export function clearWeek(weekKey: string): void {
+export function clearWeek(weekKey: string, scope: 'week' | 'future' = 'week'): void {
 	const db = getDb();
-	db.prepare('DELETE FROM week_plans WHERE week_key = ?').run(weekKey);
+	if (scope === 'future') {
+		db.prepare('DELETE FROM week_plans WHERE week_key >= ?').run(weekKey);
+	} else {
+		db.prepare('DELETE FROM week_plans WHERE week_key = ?').run(weekKey);
+	}
 }
 
 export function copyPreviousWeek(weekKey: string, previousWeekKey: string): void {

@@ -480,13 +480,16 @@
 		}
 	}
 
-	async function clearPlan() {
-		if (!confirm('¿Limpiar todo el plan de esta semana?')) return;
+	async function clearPlan(scope: 'week' | 'future' = 'week') {
+		const msg = scope === 'future'
+			? 'Esto eliminará todas las recetas añadidas manualmente desde esta semana en adelante. Las programaciones se mantienen. ¿Continuar?'
+			: '¿Limpiar todo el plan de esta semana?';
+		if (!confirm(msg)) return;
 		try {
 			const res = await fetch('/api/week/clear', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey })
+				body: JSON.stringify({ weekKey, scope })
 			});
 			if (!res.ok) { showError('Error al limpiar el plan'); return; }
 			await invalidateAll();
@@ -666,7 +669,8 @@
 		onNextWeek={nextWeek}
 		onCalculate={calculatePlan}
 		onRecalculate={recalculatePlan}
-		onClear={clearPlan}
+		onClear={() => clearPlan('week')}
+		onClearFuture={() => clearPlan('future')}
 		onCopyPrevious={copyPrevious}
 	/>
 
