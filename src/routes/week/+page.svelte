@@ -747,22 +747,28 @@
 			on:touchstart|passive={onContentTouchStart}
 			on:touchend|passive={onContentTouchEnd}>
 			<div class="week-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2.5rem_repeat(7,1fr)] gap-3 lg:gap-x-3 lg:gap-y-0">
+				<!-- Bandas de fondo de fila (solo desktop): pintan toda la fila de comida/cena
+					detrás de las celdas; la columna de "hoy" mantiene su fondo propio encima -->
+				<div class="hidden lg:block rounded-xl" style="grid-column: 1 / -1; grid-row: 2; background: var(--comida-band);"></div>
+				<div class="hidden lg:block rounded-xl lg:mt-3" style="grid-column: 1 / -1; grid-row: 3; background: var(--cena-band);"></div>
+
 				<!-- Etiquetas de fila (solo desktop) -->
 				<div class="hidden lg:block" style="grid-column: 1; grid-row: 1;"></div>
-				<div class="hidden lg:flex items-center justify-center"
+				<div class="hidden lg:flex flex-col items-center justify-center gap-2 rounded-l-xl"
 					style="grid-column: 1; grid-row: 2; background: var(--comida-header); border-left: 3px solid var(--comida-accent);">
-					<span style="writing-mode: vertical-rl; transform: rotate(180deg); color: var(--text);"
+					<svg viewBox="0 0 24 24" fill="none" stroke="var(--comida-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 shrink-0"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/></svg>
+					<span style="writing-mode: vertical-rl; transform: rotate(180deg); color: var(--comida-accent);"
 						class="text-[11px] font-black uppercase tracking-tight">Comida</span>
 				</div>
-				<div class="hidden lg:flex items-center justify-center mt-2 lg:mt-3"
+				<div class="hidden lg:flex flex-col items-center justify-center gap-2 rounded-l-xl mt-2 lg:mt-3"
 					style="grid-column: 1; grid-row: 3; background: var(--cena-header); border-left: 3px solid var(--cena-accent);">
-					<span style="writing-mode: vertical-rl; transform: rotate(180deg); color: var(--text);"
+					<svg viewBox="0 0 24 24" fill="none" stroke="var(--cena-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 shrink-0"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+					<span style="writing-mode: vertical-rl; transform: rotate(180deg); color: var(--cena-accent);"
 						class="text-[11px] font-black uppercase tracking-tight">Cena</span>
 				</div>
 
 				{#each [1,2,3,4,5,6,7] as weekday, i}
 					{@const date = weekDates[i]}
-					{@const isWeekend = i >= 5}
 					{@const isToday = date != null && date.getTime() === todayUTC.getTime()}
 					{@const dayComidaCfg = weekData?.configs[weekday]?.comida}
 					{@const dayCenaCfg = weekData?.configs[weekday]?.cena}
@@ -776,7 +782,7 @@
 							style="grid-column: {i+2}; grid-row: 1; background: {isToday ? 'var(--primary-light)' : 'var(--background)'}; {isToday ? 'border-top: 3px solid var(--primary);' : ''}">
 							<div class="flex flex-col items-center">
 								<div class="flex items-center gap-1">
-									<p class="font-semibold text-base leading-tight" style="font-family: 'Epilogue', sans-serif; color: {isWeekend ? 'var(--primary-hover)' : 'var(--primary)'};">{WEEKDAY_NAMES[i]}</p>
+									<p class="font-semibold text-base leading-tight" style="font-family: 'Epilogue', sans-serif; color: var(--primary);">{WEEKDAY_NAMES[i]}</p>
 									<button
 										on:click={() => disableDay(weekday)}
 										title={dayFullyDisabled ? 'Planificar este día' : 'No planificar este día'}
