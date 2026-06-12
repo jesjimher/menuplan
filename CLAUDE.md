@@ -33,6 +33,25 @@ await page.screenshot({ path: '/tmp/screenshot.png', fullPage: true });
 await browser.close();
 ```
 
+**Gotchas de Playwright:**
+- Los scripts deben ejecutarse desde el directorio del proyecto (`/home/jesus/git/menuplan`), no desde `/tmp`, porque `playwright` es devDependency local.
+- El día seleccionado en la tira de días móvil se detecta por el estilo inline `background: var(--primary)` **sin** `border` (el día de hoy sin seleccionar tiene `border: 1.5px solid var(--primary)` pero fondo distinto). No hay clase CSS para esto.
+- Orden de los botones `.nav-btn` en la página semana: `nth(0)`=semana anterior (←), `nth(1)`=Hoy, `nth(2)`=semana siguiente (→), `nth(3)`=Recalcular (oculto en móvil). Usar `nth(2)` para navegar adelante, **no** `nth(1)`.
+
+## Pantallas principales
+
+Menú lateral definido en `src/routes/+layout.svelte`. Orden de aparición:
+
+| Nombre en menú | Ruta | Fichero principal | Descripción |
+|---|---|---|---|
+| **Semana** | `/week` | `src/routes/week/+page.svelte` | Página más compleja. Vista semanal con slots comida/cena por día. Selector de días móvil (`sm:hidden`) en línea ~658. Estado `selectedDay` controla qué día se muestra en móvil. Actualizaciones optimistas, drag & drop. |
+| **Recetas** | `/recipes` | `src/routes/recipes/+page.svelte` | CRUD de recetas. Búsqueda/filtro por tags, importación desde Plantoeat, gestión de imagen (búsqueda DuckDuckGo + recorte). |
+| **Programaciones** | `/schedules` | `src/routes/schedules/+page.svelte` | Gestión de recetas programadas (cada N semanas, día y tipo de comida fijos). Muestra simulación de las próximas 9 semanas con conflictos resaltados. |
+| **Miembros** | `/members` | `src/routes/members/+page.svelte` | CRUD de miembros de la familia con sus restricciones dietéticas (tags). |
+| **Reglas** | `/rules` | `src/routes/rules/+page.svelte` | Reglas de planificación: `no_more_than` (máx. N veces por semana un tag) y `at_least` (mín. N veces). Se evalúan en cliente y servidor con `ruleChecker.ts`. |
+| **Histórico** | `/history` | `src/routes/history/+page.svelte` | Consulta de semanas pasadas en modo lectura. |
+| **Opciones** | `/options` | `src/routes/options/+page.svelte` | Ajustes globales de la app (tema de color, sidebar colapsado por defecto, etc.). |
+
 ## Arquitectura
 
 Aplicación **SvelteKit** con `@sveltejs/adapter-node` para despliegue en Docker. Todo el acceso a datos es síncrono mediante **better-sqlite3** — no hay llamadas asíncronas a la BD en el lado servidor.
