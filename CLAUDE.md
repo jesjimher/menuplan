@@ -21,35 +21,7 @@ docker compose up    # Build + arranque en puerto 3000, BD persistida en volumen
 
 Tests: `npm test` (vitest). Tests en `src/lib/utils/*.test.ts` y `src/lib/server/*.test.ts` (estos últimos usan BD SQLite en memoria — `src/test-setup.ts` fija `DATABASE_PATH=':memory:'` y `src/lib/server/test-helpers.ts` da seeds/reset).
 
-Verificación visual (Playwright): `playwright` está como devDependency. El binario de Chromium se instala una vez con `npx playwright install chromium` (queda en `~/.cache/ms-playwright`). Para verificar un cambio con el dev server corriendo:
-
-```js
-// ejemplo de script de verificación (node script.mjs)
-import { chromium } from 'playwright';
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage();
-await page.goto('http://localhost:5173/ruta');
-await page.screenshot({ path: '/tmp/screenshot.png', fullPage: true });
-await browser.close();
-```
-
-**Gotchas de Playwright:**
-- Los scripts deben ejecutarse desde el directorio del proyecto (`/home/jesus/git/menuplan`), no desde `/tmp`, porque `playwright` es devDependency local.
-- El día seleccionado en la tira de días móvil se detecta por el estilo inline `background: var(--primary)` **sin** `border` (el día de hoy sin seleccionar tiene `border: 1.5px solid var(--primary)` pero fondo distinto). No hay clase CSS para esto.
-- Orden de los botones `.nav-btn` en la página semana: `nth(0)`=semana anterior (←), `nth(1)`=Hoy, `nth(2)`=semana siguiente (→), `nth(3)`=Recalcular (oculto en móvil). Usar `nth(2)` para navegar adelante, **no** `nth(1)`.
-- **Selector `.overflow-auto` atrapa `<main>` antes que el div Svelte.** Usar `[...document.querySelectorAll('.overflow-auto')].find(e => e.tagName === 'DIV')` para llegar al contenedor correcto.
-- **Simular swipe táctil:** `page.touchscreen` no tiene API de swipe. Usar `page.evaluate()` con `new Touch()` + `new TouchEvent('touchstart'/'touchend', { bubbles: true, cancelable: true, touches/changedTouches: [...] })`. Despachar `touchstart` y `touchend` en un mismo `evaluate` usando `setTimeout` para que compartan la misma referencia al elemento:
-  ```js
-  await page.evaluate((dx) => {
-    const el = [...document.querySelectorAll('.overflow-auto')].find(e => e.tagName === 'DIV');
-    const cx = 200, cy = 400;
-    el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true,
-      touches: [new Touch({ identifier: 1, target: el, clientX: cx, clientY: cy })] }));
-    setTimeout(() => el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true,
-      changedTouches: [new Touch({ identifier: 1, target: el, clientX: cx + dx, clientY: cy })] })), 30);
-  }, deltaX);
-  await page.waitForTimeout(400);
-  ```
+Verificación visual (Playwright): `playwright` está como devDependency. El binario de Chromium se instala una vez con `npx playwright install chromium` (queda en `~/.cache/ms-playwright`). Consultar **[`docs/playwright-gotchas.md`](docs/playwright-gotchas.md)** antes de escribir un test — ahí están los problemas ya resueltos (selectores, media queries en headless, swipe táctil, Svelte). Cuando un test requiera varios intentos para funcionar, documentar el problema en ese fichero.
 
 ## Pantallas principales
 

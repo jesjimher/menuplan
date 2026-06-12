@@ -42,6 +42,7 @@
 		schedule,
 		slotSchedules = [],
 		onSchedule,
+		onEdit,
 	}: {
 		weekday: number;
 		mealType: string;
@@ -78,6 +79,7 @@
 		schedule?: ScheduleWithRecipe | null;
 		slotSchedules?: ScheduleWithRecipe[];
 		onSchedule?: () => void;
+		onEdit?: () => void;
 	} = $props();
 
 	function squareLimit(node: HTMLElement) {
@@ -329,12 +331,11 @@
 									</button>
 
 								{:else if btn.type === 'edit'}
-									<a
-										href="/recipes?edit={slot!.recipe!.id}"
-										on:click|stopPropagation={() => closeMenu()}
+									<button
+										on:click|stopPropagation={() => { onEdit?.(); closeMenu(); }}
 										class="vert-btn slot-action-btn"
 										aria-label="Editar receta"
-									><svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg><span>Editar</span></a>
+									><svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg><span>Editar</span></button>
 
 								{:else if btn.type === 'remove'}
 									<button
@@ -390,15 +391,14 @@
 								</button>
 
 							{:else if btn.type === 'edit'}
-								<a
-									href="/recipes?edit={slot!.recipe!.id}"
-									on:click|stopPropagation={() => closeMenu()}
+								<button
+									on:click|stopPropagation={() => { onEdit?.(); closeMenu(); }}
 									on:mouseenter={() => clearTimeout(closeTimer)}
 									class="circ-btn slot-action-btn"
 									class:circ-open={menuOpen}
 									style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
 									aria-label="Editar receta"
-								><span class="btn-label">Editar</span><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></a>
+								><span class="btn-label">Editar</span><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
 
 							{:else if btn.type === 'remove'}
 								<button

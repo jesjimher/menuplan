@@ -12,6 +12,7 @@
 	import ScheduleModal from '$lib/components/week/ScheduleModal.svelte';
 	import RemoveScheduledRecipeDialog from '$lib/components/week/RemoveScheduledRecipeDialog.svelte';
 	import MoveCopyLeftoverModal from '$lib/components/week/MoveCopyLeftoverModal.svelte';
+	import RecipeEditModal from '$lib/components/RecipeEditModal.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 	import { WeekDragDrop, type SlotCoord } from '$lib/utils/weekDragDrop.svelte.js';
 
@@ -95,6 +96,19 @@
 	type RemoveScheduleInfo = { scheduleId: number; recipeId: number | undefined; recipeName: string; everyNWeeks: number; weekday: number; mealType: string; slotIndex: number; isAcc: number };
 	let removeScheduleDialogOpen = $state(false);
 	let removeScheduleInfo = $state<RemoveScheduleInfo | null>(null);
+
+	// Recipe edit modal state
+	let recipeEditOpen = $state(false);
+	let recipeEditRecipe = $state<Recipe | null>(null);
+
+	async function openRecipeEditModal(weekday: number, mealType: string, slotIdx: number, isAcc: number) {
+		const slot = getSlot(weekday, mealType, slotIdx, isAcc);
+		if (!slot?.recipe) return;
+		// Fetch full recipe (slot may not have all fields like description/image_type)
+		const res = await fetch(`/api/recipes/${slot.recipe.id}`);
+		recipeEditRecipe = await res.json();
+		recipeEditOpen = true;
+	}
 
 	function openScheduleModal(weekday: number, mealType: string, slotIdx: number, isAcc: number) {
 		const slot = getSlot(weekday, mealType, slotIdx, isAcc);
@@ -651,6 +665,7 @@
 			onTouchEnd: () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } },
 			onTouchMove: () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } },
 			onSchedule: () => openScheduleModal(weekday, mealType, slotIdx, isAcc),
+			onEdit: () => openRecipeEditModal(weekday, mealType, slotIdx, isAcc),
 		};
 	}
 </script>
@@ -883,6 +898,14 @@
 			onCancel={() => { removeScheduleDialogOpen = false; removeScheduleInfo = null; }}
 		/>
 	{/if}
+
+	<RecipeEditModal
+		open={recipeEditOpen}
+		recipe={recipeEditRecipe}
+		allTags={data.allTags}
+		onSaved={async () => { recipeEditOpen = false; await invalidateAll(); }}
+		onClose={() => { recipeEditOpen = false; }}
+	/>
 
 	{#if dayDisableConfirm !== null}
 		{@const confirmDay = dayDisableConfirm}

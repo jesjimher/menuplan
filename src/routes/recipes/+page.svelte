@@ -2,11 +2,10 @@
 	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import { enhance } from '$app/forms';
-	import type { ActionResult } from '@sveltejs/kit';
 	import { SvelteSet } from 'svelte/reactivity';
 	import type { Recipe } from '$lib/types/index.js';
 	import TagInput from '$lib/components/TagInput.svelte';
-	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
+	import RecipeEditModal from '$lib/components/RecipeEditModal.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 	import { parseTags } from '$lib/utils/parseTags.js';
 
@@ -21,37 +20,6 @@
 	let importing = $state(false);
 	let searchQ = $state('');
 	let selectedTags: string[] = $state([]);
-
-	let form = $state({ name: '', description: '', tags: '', min_days: -1 });
-
-	// Image picker state
-	let showImageSearch = $state(false);
-	let imageSearchQ = $state('');
-	let imageResults: { url: string; thumbnail: string; title: string }[] = $state([]);
-	let imageSearching = $state(false);
-	let pendingImageUrl: string | null = $state(null);
-
-	async function openImageSearch() {
-		showImageSearch = true;
-		imageSearchQ = form.name;
-		if (imageSearchQ) await doImageSearch();
-	}
-
-	async function doImageSearch() {
-		if (!imageSearchQ.trim()) return;
-		imageSearching = true;
-		try {
-			const res = await fetch(`/api/image-search?q=${encodeURIComponent(imageSearchQ)}`);
-			imageResults = await res.json();
-		} finally {
-			imageSearching = false;
-		}
-	}
-
-	function pickImage(url: string) {
-		pendingImageUrl = url;
-		showImageSearch = false;
-	}
 
 	let checkedIds = new SvelteSet<number>();
 	let bulkTag = $state('');
@@ -97,40 +65,12 @@
 
 	function startEdit(r: Recipe) {
 		editingRecipe = r;
-		form = { name: r.name, description: r.description, tags: r.tags, min_days: r.min_days };
-		pendingImageUrl = null;
-		showImageSearch = false;
 		showForm = true;
-		document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 
 	function startNew() {
 		editingRecipe = null;
-		form = { name: '', description: '', tags: '', min_days: -1 };
-		pendingImageUrl = null;
-		showImageSearch = false;
 		showForm = true;
-	}
-
-	async function handleRecipeSubmit({ result, update }: { result: ActionResult; update: () => Promise<void> }) {
-		if (result.type === 'success') {
-			const savedId = (result.data?.createdId ?? result.data?.updatedId ?? editingRecipe?.id) as number | undefined;
-			if (pendingImageUrl && savedId) {
-				await fetch(`/api/recipes/${savedId}/image`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ url: pendingImageUrl })
-				});
-			}
-			showForm = false;
-			pendingImageUrl = null;
-		}
-		await update();
-	}
-
-	async function removeImage(id: number) {
-		await fetch(`/api/recipes/${id}/image`, { method: 'DELETE' });
-		await invalidateAll();
 	}
 </script>
 
@@ -238,117 +178,14 @@
 			</form>
 		{/if}
 
-		<!-- Formulario de receta -->
-		{#if showForm}
-			<form method="POST" action={editingRecipe ? '?/update' : '?/create'}
-				use:enhance={() => {
-					return async (event) => { await handleRecipeSubmit(event); };
-				}}
-				class="mb-6 p-5 rounded-2xl shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
-				{#if editingRecipe}
-					<input type="hidden" name="id" value={editingRecipe.id} />
-				{/if}
-				<input type="hidden" name="tags" value={form.tags} />
-				<input type="hidden" name="min_days" value={form.min_days} />
-				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Epilogue', sans-serif; color: var(--text);">{editingRecipe ? 'Editar receta' : 'Nueva receta'}</h3>
-				<div class="grid gap-3">
-					<input type="text" name="name" placeholder="Nombre *" bind:value={form.name}
-						class="px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
-						style="border: 1px solid var(--border); color: var(--text);" />
-					<textarea name="description" placeholder="Descripción" bind:value={form.description}
-						class="px-3 py-2.5 rounded-lg text-sm h-20 resize-none focus:outline-none transition-all"
-						style="border: 1px solid var(--border); color: var(--text);"></textarea>
-					<TagBadgeInput bind:value={form.tags} tags={allTags} placeholder="Tags (ej: comida,carne,rápido)" />
-					<div>
-						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">
-							Días mínimos entre ocurrencias
-						</label>
-						<p class="text-xs mb-1.5" style="color: var(--text-muted);">-1 = usar valor global</p>
-						<input type="number" bind:value={form.min_days} min="-1"
-							class="w-28 px-3 py-2 rounded-lg text-sm focus:outline-none transition-all"
-							style="border: 1px solid var(--border); color: var(--text);" />
-					</div>
-
-					<!-- Imagen -->
-					<div>
-						<label class="block text-xs font-medium uppercase tracking-wide mb-2" style="color: var(--text-secondary);">Imagen</label>
-						<div class="flex items-start gap-3">
-							{#if pendingImageUrl}
-								<div class="relative shrink-0">
-									<img src={pendingImageUrl} alt="" class="w-24 h-16 object-cover rounded-lg" style="border: 1px solid var(--border);" />
-									<button type="button" on:click={() => pendingImageUrl = null}
-										class="absolute -top-1.5 -right-1.5 w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold shadow"
-										style="background: var(--error); color: white;">&times;</button>
-								</div>
-							{:else if editingRecipe?.image_type}
-								<div class="relative shrink-0">
-									<img src="/api/recipes/{editingRecipe.id}/image" alt="" class="w-24 h-16 object-cover rounded-lg" style="border: 1px solid var(--border);" />
-									<button type="button" on:click={() => removeImage(editingRecipe!.id)}
-										class="absolute -top-1.5 -right-1.5 w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold shadow"
-										style="background: var(--error); color: white;">&times;</button>
-								</div>
-							{/if}
-							<button type="button" on:click={openImageSearch}
-								class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-								style="border: 1px solid var(--border); color: var(--text);"
-								on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container)'}
-								on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
-								{pendingImageUrl || editingRecipe?.image_type ? 'Cambiar imagen' : 'Buscar imagen'}
-							</button>
-						</div>
-
-						{#if showImageSearch}
-							<div class="mt-2 rounded-xl overflow-hidden" style="border: 1px solid var(--border);">
-								<div class="flex gap-2 p-2" style="border-bottom: 1px solid var(--border);">
-									<input type="text" bind:value={imageSearchQ}
-										on:keydown={(e) => e.key === 'Enter' && doImageSearch()}
-										placeholder="Buscar imágenes..."
-										class="flex-1 px-2.5 py-1.5 rounded-lg text-sm focus:outline-none"
-										style="border: 1px solid var(--border); color: var(--text);" />
-									<button type="button" on:click={doImageSearch} disabled={imageSearching}
-										class="px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
-										style="background: var(--primary); color: white;">
-										{imageSearching ? '...' : 'Buscar'}
-									</button>
-									<button type="button" on:click={() => showImageSearch = false}
-										class="px-2 py-1.5 rounded-lg text-sm"
-										style="color: var(--text-secondary);">&times;</button>
-								</div>
-								{#if imageSearching}
-									<p class="text-xs px-3 py-4 text-center" style="color: var(--text-muted);">Buscando...</p>
-								{:else if imageResults.length === 0}
-									<p class="text-xs px-3 py-4 text-center" style="color: var(--text-muted);">Sin resultados. Prueba otro término.</p>
-								{:else}
-									<div class="grid grid-cols-5 gap-1 p-2 max-h-52 overflow-y-auto">
-										{#each imageResults as img}
-											<button type="button" on:click={() => pickImage(img.thumbnail)}
-												class="rounded-lg overflow-hidden transition-opacity hover:opacity-80 focus:outline-none"
-												style="border: 2px solid transparent;"
-												title={img.title}>
-												<img src={img.thumbnail} alt={img.title} class="w-full h-14 object-cover" loading="lazy"
-													on:error={(e) => (e.currentTarget as HTMLImageElement).closest('button')!.style.display = 'none'} />
-											</button>
-										{/each}
-									</div>
-								{/if}
-							</div>
-						{/if}
-					</div>
-				</div>
-				<div class="flex gap-2 mt-4">
-					<button type="submit" disabled={!form.name}
-						class="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
-						style="background: var(--primary); color: white;">
-						Guardar
-					</button>
-					<button type="button" on:click={() => showForm = false}
-						class="px-4 py-2 rounded-lg text-sm transition-colors"
-						style="background: var(--surface-container); color: var(--text);">
-						Cancelar
-					</button>
-				</div>
-			</form>
-		{/if}
+		<!-- Modal de edición de receta -->
+		<RecipeEditModal
+			open={showForm}
+			recipe={editingRecipe}
+			{allTags}
+			onSaved={async () => { showForm = false; await invalidateAll(); }}
+			onClose={() => showForm = false}
+		/>
 
 		<!-- Cabecera de lista -->
 		<div class="flex flex-wrap items-center gap-2 mb-3 min-h-[2rem]">
