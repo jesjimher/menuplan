@@ -24,6 +24,8 @@
 	let checkedIds = new SvelteSet<number>();
 	let bulkTag = $state('');
 	let bulkAdding = $state(false);
+	let bulkImaging = $state(false);
+	let bulkImageProgress = $state({ done: 0, total: 0 });
 
 	let filteredRecipes = $derived(recipes.filter(r => {
 		const matchesText = !searchQ ||
@@ -68,6 +70,37 @@
 		showForm = true;
 	}
 
+	async function bulkFetchImages() {
+		// Solo las seleccionadas que NO tienen imagen
+		const targets = recipes.filter(r => checkedIds.has(r.id) && !r.image_type);
+		if (targets.length === 0) {
+			checkedIds.clear();
+			return;
+		}
+		bulkImaging = true;
+		bulkImageProgress = { done: 0, total: targets.length };
+		for (const r of targets) {
+			try {
+				const res = await fetch(`/api/image-search?q=${encodeURIComponent(r.name)}`);
+				const results = await res.json();
+				const url = results?.[0]?.thumbnail;
+				if (url) {
+					await fetch(`/api/recipes/${r.id}/image`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ url }),
+					});
+				}
+			} catch (e) {
+				// continuar con la siguiente receta aunque una falle
+			}
+			bulkImageProgress = { ...bulkImageProgress, done: bulkImageProgress.done + 1 };
+		}
+		bulkImaging = false;
+		checkedIds.clear();
+		await invalidateAll();
+	}
+
 	function startNew() {
 		editingRecipe = null;
 		showForm = true;
@@ -76,9 +109,11 @@
 
 <div class="min-h-full" style="background: var(--bg);">
 
-	<!-- Cabecera -->
-	<header class="sticky top-0 z-10 px-4 sm:px-6 py-3 shrink-0" style="background: rgba(255,248,243,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--surface-container-highest);">
-		<div class="max-w-4xl mx-auto flex items-center gap-3">
+	<!-- Área sticky: cabecera + buscador + controles -->
+	<div class="sticky top-0 z-10" style="background: rgba(255,248,243,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--surface-container-highest);">
+
+		<!-- Fila de título -->
+		<div class="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
 			<button class="lg:hidden p-1.5 rounded-lg transition-colors shrink-0"
 				style="color: var(--primary);"
 				on:click={() => $sidebarOpen = true}>
@@ -115,35 +150,107 @@
 				</button>
 			</div>
 		</div>
-	</header>
 
-	<div class="max-w-4xl mx-auto px-6 py-6">
-
-		<!-- Buscador -->
-		<div class="relative mb-4">
-			<svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-			</svg>
-			<input type="text" placeholder="Buscar por nombre, descripción o tag..."
-				bind:value={searchQ}
-				class="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm shadow-sm focus:outline-none transition-all"
-				style="background: var(--surface); border: 1px solid var(--border); color: var(--text);" />
-		</div>
-
-		<!-- Tags activos -->
-		{#if selectedTags.length > 0}
-			<div class="flex flex-wrap gap-1.5 mb-4">
-				{#each selectedTags as tag}
-					<button on:click={() => toggleTag(tag)}
-						class="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full font-medium transition-colors"
-						style="background: var(--primary); color: white;">
-						{tag}
-						<span class="opacity-70">&times;</span>
-					</button>
-				{/each}
+		<!-- Buscador + tags activos + controles de lista -->
+		<div class="max-w-4xl mx-auto px-4 sm:px-6 pb-3" style="border-top: 1px solid var(--surface-container-highest);">
+			<div class="relative mt-3">
+				<svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+				</svg>
+				<input type="text" placeholder="Buscar por nombre, descripción o tag..."
+					bind:value={searchQ}
+					class="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm shadow-sm focus:outline-none transition-all"
+					style="background: var(--surface); border: 1px solid var(--border); color: var(--text);" />
 			</div>
-		{/if}
+			{#if selectedTags.length > 0}
+				<div class="flex flex-wrap gap-1.5 mt-2">
+					{#each selectedTags as tag}
+						<button on:click={() => toggleTag(tag)}
+							class="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full font-medium transition-colors"
+							style="background: var(--primary); color: white;">
+							{tag}
+							<span class="opacity-70">&times;</span>
+						</button>
+					{/each}
+				</div>
+			{/if}
+			<!-- Acciones de lista -->
+			<div class="flex flex-wrap items-center gap-2 mt-2 min-h-[2rem]">
+				{#if checkedIds.size > 0}
+					<span class="text-sm font-medium shrink-0" style="color: var(--text);">{checkedIds.size} sel.</span>
+					<form method="POST" action="?/bulkTag"
+						use:enhance={() => {
+							bulkAdding = true;
+							return async ({ update }) => {
+								bulkTag = '';
+								checkedIds.clear();
+								bulkAdding = false;
+								await update();
+							};
+						}}
+						class="contents">
+						<input type="hidden" name="ids" value={[...checkedIds].join(',')} />
+						<input type="hidden" name="tag" value={bulkTag} />
+						<div class="relative flex-1 min-w-[120px]">
+							<TagInput
+								bind:value={bulkTag}
+								tags={allTags}
+								placeholder="Tag..."
+								class="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none"
+							/>
+						</div>
+						<button type="submit" disabled={!bulkTag.trim() || bulkAdding}
+							class="px-3 py-1 rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors"
+							title="Añadir tag"
+							style="background: var(--primary); color: white;">
+							{bulkAdding ? '...' : 'Añadir tag'}
+						</button>
+					</form>
+					<form method="POST" action="?/bulkDelete"
+						use:enhance={({ cancel }) => {
+							if (!confirm(`¿Eliminar ${checkedIds.size} receta${checkedIds.size !== 1 ? 's' : ''}?`)) { cancel(); return; }
+							return async ({ update }) => {
+								checkedIds.clear();
+								await update();
+							};
+						}}>
+						<input type="hidden" name="ids" value={[...checkedIds].join(',')} />
+						<button type="submit"
+							class="px-3 py-1 rounded-lg text-sm font-medium shrink-0 transition-colors"
+							style="background: var(--error, #dc2626); color: white;">
+							Eliminar
+						</button>
+					</form>
+					<button type="button" on:click={bulkFetchImages} disabled={bulkImaging}
+						class="px-3 py-1 rounded-lg text-sm font-medium shrink-0 transition-colors disabled:opacity-50"
+						title="Descargar imagen (primer resultado de búsqueda) para las seleccionadas que no tienen imagen"
+						style="background: var(--surface-container); color: var(--text);">
+						{bulkImaging ? `Imágenes ${bulkImageProgress.done}/${bulkImageProgress.total}` : 'Descargar imágenes'}
+					</button>
+				{:else}
+					<p class="text-sm" style="color: var(--text-secondary);">
+						{filteredRecipes.length} resultado{filteredRecipes.length !== 1 ? 's' : ''}
+					</p>
+				{/if}
+				<button on:click={toggleSelectAll}
+					class="text-xs font-medium transition-colors ml-auto shrink-0"
+					style="color: var(--text-secondary);">
+					{allVisibleSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
+				</button>
+			</div>
+		</div>
+	</div>
 
+	<!-- Modal de edición de receta -->
+	<RecipeEditModal
+		open={showForm}
+		recipe={editingRecipe}
+		{allTags}
+		onSaved={async () => { showForm = false; await invalidateAll(); }}
+		onClose={() => showForm = false}
+	/>
+
+	<div class="max-w-4xl mx-auto px-4 sm:px-6 py-4">
 
 		<!-- Panel de importación -->
 		{#if showImport}
@@ -178,74 +285,6 @@
 			</form>
 		{/if}
 
-		<!-- Modal de edición de receta -->
-		<RecipeEditModal
-			open={showForm}
-			recipe={editingRecipe}
-			{allTags}
-			onSaved={async () => { showForm = false; await invalidateAll(); }}
-			onClose={() => showForm = false}
-		/>
-
-		<!-- Cabecera de lista -->
-		<div class="flex flex-wrap items-center gap-2 mb-3 min-h-[2rem]">
-			{#if checkedIds.size > 0}
-				<span class="text-sm font-medium shrink-0" style="color: var(--text);">{checkedIds.size} sel.</span>
-				<form method="POST" action="?/bulkTag"
-					use:enhance={() => {
-						bulkAdding = true;
-						return async ({ update }) => {
-							bulkTag = '';
-							checkedIds.clear();
-							bulkAdding = false;
-							await update();
-						};
-					}}
-					class="contents">
-					<input type="hidden" name="ids" value={[...checkedIds].join(',')} />
-					<input type="hidden" name="tag" value={bulkTag} />
-					<div class="relative flex-1 min-w-[120px]">
-						<TagInput
-							bind:value={bulkTag}
-							tags={allTags}
-							placeholder="Tag..."
-							class="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none"
-						/>
-					</div>
-					<button type="submit" disabled={!bulkTag.trim() || bulkAdding}
-						class="px-3 py-1 rounded-lg text-sm font-medium disabled:opacity-50 shrink-0 transition-colors"
-						title="Añadir tag"
-						style="background: var(--primary); color: white;">
-						{bulkAdding ? '...' : 'Añadir tag'}
-					</button>
-				</form>
-				<form method="POST" action="?/bulkDelete"
-					use:enhance={({ cancel }) => {
-						if (!confirm(`¿Eliminar ${checkedIds.size} receta${checkedIds.size !== 1 ? 's' : ''}?`)) { cancel(); return; }
-						return async ({ update }) => {
-							checkedIds.clear();
-							await update();
-						};
-					}}>
-					<input type="hidden" name="ids" value={[...checkedIds].join(',')} />
-					<button type="submit"
-						class="px-3 py-1 rounded-lg text-sm font-medium shrink-0 transition-colors"
-						style="background: var(--error, #dc2626); color: white;">
-						Eliminar
-					</button>
-				</form>
-			{:else}
-				<p class="text-sm" style="color: var(--text-secondary);">
-					{filteredRecipes.length} resultado{filteredRecipes.length !== 1 ? 's' : ''}
-				</p>
-			{/if}
-			<button on:click={toggleSelectAll}
-				class="text-xs font-medium transition-colors ml-auto shrink-0"
-				style="color: var(--text-secondary);">
-				{allVisibleSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
-			</button>
-		</div>
-
 		<!-- Lista de recetas -->
 		<div class="space-y-2">
 			{#each filteredRecipes as recipe}
@@ -259,13 +298,17 @@
 						}}
 						class="mt-0.5 w-4 h-4 shrink-0" style="accent-color: var(--primary);" />
 					{#if recipe.image_type}
-						<img src="/api/recipes/{recipe.id}/image" alt={recipe.name}
-							class="w-14 h-10 object-cover rounded-lg shrink-0 mt-0.5"
-							style="border: 1px solid var(--border);"
-							on:error={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
+						<button on:click={() => startEdit(recipe)} class="shrink-0 mt-0.5 p-0 border-0 bg-transparent cursor-pointer">
+							<img src="/api/recipes/{recipe.id}/image" alt={recipe.name}
+								class="w-14 h-10 object-cover rounded-lg hover:opacity-80 transition-opacity"
+								style="border: 1px solid var(--border);"
+								on:error={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
+						</button>
 					{/if}
 					<div class="flex-1 min-w-0">
-						<p class="text-lg font-semibold leading-snug" style="font-family: 'Epilogue', sans-serif; color: var(--text);">{recipe.name}</p>
+						<button on:click={() => startEdit(recipe)}
+							class="text-lg font-semibold leading-snug text-left hover:underline cursor-pointer bg-transparent p-0 border-0"
+							style="font-family: 'Epilogue', sans-serif; color: var(--text);">{recipe.name}</button>
 						{#if recipe.description}
 							<p class="text-sm mt-0.5 line-clamp-2 leading-relaxed" style="color: var(--text-secondary);">{recipe.description}</p>
 						{/if}
@@ -287,16 +330,6 @@
 						{/if}
 					</div>
 					<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
-						<button on:click={() => startEdit(recipe)}
-							class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
-							style="color: var(--text-secondary);"
-							on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container)'}
-							on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
-							title="Editar">
-							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-							</svg>
-						</button>
 						<form method="POST" action="?/delete"
 							use:enhance={({ cancel }) => {
 								if (!confirm('¿Eliminar esta receta?')) { cancel(); return; }
