@@ -276,14 +276,7 @@
 					{s.on_conflict === 'overwrite' ? '↑' : '+'}
 				</span>
 			{/if}
-			<button on:click={() => openModal(s)}
-				class="w-4 h-4 flex items-center justify-center rounded transition-opacity opacity-50 hover:opacity-100"
-				style="color:var(--text-muted);" title="Editar">
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-3 h-3">
-					<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-					<path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-				</svg>
-			</button>
+
 			<button on:click={() => deleteSchedule(s.id)}
 				class="w-4 h-4 flex items-center justify-center rounded transition-opacity opacity-50 hover:opacity-100"
 				style="color:var(--error);" title="Eliminar">

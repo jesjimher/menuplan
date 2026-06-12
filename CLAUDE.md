@@ -21,6 +21,18 @@ docker compose up    # Build + arranque en puerto 3000, BD persistida en volumen
 
 Tests: `npm test` (vitest). Tests en `src/lib/utils/*.test.ts` y `src/lib/server/*.test.ts` (estos últimos usan BD SQLite en memoria — `src/test-setup.ts` fija `DATABASE_PATH=':memory:'` y `src/lib/server/test-helpers.ts` da seeds/reset).
 
+Verificación visual (Playwright): `playwright` está como devDependency. El binario de Chromium se instala una vez con `npx playwright install chromium` (queda en `~/.cache/ms-playwright`). Para verificar un cambio con el dev server corriendo:
+
+```js
+// ejemplo de script de verificación (node script.mjs)
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage();
+await page.goto('http://localhost:5173/ruta');
+await page.screenshot({ path: '/tmp/screenshot.png', fullPage: true });
+await browser.close();
+```
+
 ## Arquitectura
 
 Aplicación **SvelteKit** con `@sveltejs/adapter-node` para despliegue en Docker. Todo el acceso a datos es síncrono mediante **better-sqlite3** — no hay llamadas asíncronas a la BD en el lado servidor.
