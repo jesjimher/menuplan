@@ -176,6 +176,11 @@
 			{/if}
 			<!-- Acciones de lista -->
 			<div class="flex flex-wrap items-center gap-2 mt-2 min-h-[2rem]">
+				<button on:click={toggleSelectAll}
+					class="text-xs font-medium transition-colors shrink-0"
+					style="color: var(--text-secondary);">
+					{allVisibleSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
+				</button>
 				{#if checkedIds.size > 0}
 					<span class="text-sm font-medium shrink-0" style="color: var(--text);">{checkedIds.size} sel.</span>
 					<form method="POST" action="?/bulkTag"
@@ -228,15 +233,10 @@
 						{bulkImaging ? `Imágenes ${bulkImageProgress.done}/${bulkImageProgress.total}` : 'Descargar imágenes'}
 					</button>
 				{:else}
-					<p class="text-sm" style="color: var(--text-secondary);">
+					<p class="text-sm ml-auto" style="color: var(--text-secondary);">
 						{filteredRecipes.length} resultado{filteredRecipes.length !== 1 ? 's' : ''}
 					</p>
 				{/if}
-				<button on:click={toggleSelectAll}
-					class="text-xs font-medium transition-colors ml-auto shrink-0"
-					style="color: var(--text-secondary);">
-					{allVisibleSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
-				</button>
 			</div>
 		</div>
 	</div>
