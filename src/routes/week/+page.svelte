@@ -31,7 +31,6 @@
 	let selectedDay = $state(1);
 
 	$effect(() => {
-		void weekKey;
 		const now = new Date();
 		const jsDay = now.getDay();
 		selectedDay = jsDay === 0 ? 7 : jsDay;
@@ -147,6 +146,9 @@
 
 	function toToday() {
 		const today = getWeekKey();
+		const now = new Date();
+		const jsDay = now.getDay();
+		selectedDay = jsDay === 0 ? 7 : jsDay;
 		goto(`/week?weekKey=${today}`, { noScroll: true });
 	}
 
