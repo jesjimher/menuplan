@@ -119,6 +119,38 @@
 	let dayDisableConfirm = $state<number | null>(null);
 	let isTouchDevice = false;
 
+	// Swipe horizontal para cambiar de día en móvil
+	let swipeTouchStartX = 0;
+	let swipeTouchStartY = 0;
+
+	function onContentTouchStart(e: TouchEvent) {
+		swipeTouchStartX = e.touches[0].clientX;
+		swipeTouchStartY = e.touches[0].clientY;
+	}
+
+	function onContentTouchEnd(e: TouchEvent) {
+		const dx = e.changedTouches[0].clientX - swipeTouchStartX;
+		const dy = e.changedTouches[0].clientY - swipeTouchStartY;
+		if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+		if (dx < 0) {
+			// swipe izquierda → día siguiente
+			if (selectedDay < 7) {
+				selectedDay++;
+			} else {
+				nextWeek();
+				selectedDay = 1;
+			}
+		} else {
+			// swipe derecha → día anterior
+			if (selectedDay > 1) {
+				selectedDay--;
+			} else {
+				prevWeek();
+				selectedDay = 7;
+			}
+		}
+	}
+
 	// Move/copy/leftover modal
 	let moveCopyModalOpen = $state(false);
 	let moveCopySource = $state<SlotCoord | null>(null);
@@ -692,7 +724,9 @@
 		{#if !weekData}
 			<div class="text-center py-16 text-sm" style="color: var(--text-muted);">Cargando...</div>
 		{:else}
-		<div class="flex-1 overflow-auto p-3 sm:p-5 min-h-0">
+		<div class="flex-1 overflow-auto p-3 sm:p-5 min-h-0"
+			on:touchstart|passive={onContentTouchStart}
+			on:touchend|passive={onContentTouchEnd}>
 			<div class="week-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2.5rem_repeat(7,1fr)] gap-3 lg:gap-x-3 lg:gap-y-0">
 				<!-- Etiquetas de fila (solo desktop) -->
 				<div class="hidden lg:block" style="grid-column: 1; grid-row: 1;"></div>
