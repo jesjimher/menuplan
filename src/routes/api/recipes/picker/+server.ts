@@ -27,7 +27,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	const oldestPlanned = getOldestPlannedRecipes(mealType, 20);
 	const discarded = getDiscardedRecipes(weekKey, weekday, mealType, isAcc, slotIndex, currentSlots, slotRequiredTags);
 
-	const leftovers = isAcc ? [] : getRecipesPlannedNearDate(getWeekDates(weekKey)[weekday - 1], 5);
+	const leftovers = isAcc ? [] : getRecipesPlannedNearDate(getWeekDates(weekKey)[weekday - 1], 7);
 
 	return json({ topForDay, topOverall, recentForDay, oldestPlanned, discarded, leftovers });
 };

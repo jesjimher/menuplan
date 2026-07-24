@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { importPlantoeatRecipes, getAllTags, searchRecipes } from './recipes.js';
+import { importPlantoeatRecipes, getAllTags, searchRecipes, getRecipesPlannedNearDate } from './recipes.js';
 import { resetDb, seedRecipe } from './test-helpers.js';
+import { assignRecipe } from './weekplan.js';
+import { upsertSchedule } from './schedules.js';
+import { getWeekKey, weekKeyToIndex, indexToWeekKey, getWeekDates } from '$lib/utils/dates.js';
 
 beforeEach(() => resetDb());
 
@@ -46,5 +49,37 @@ describe('searchRecipes', () => {
 		expect(searchRecipes('lentejas').map(r => r.name)).toEqual(['Lentejas con chorizo']);
 		expect(searchRecipes('', 'cena').map(r => r.name)).toEqual(['Crema de calabacín']);
 		expect(searchRecipes('lentejas', 'cena')).toHaveLength(0);
+	});
+});
+
+describe('getRecipesPlannedNearDate', () => {
+	const NOW = weekKeyToIndex(getWeekKey());
+	const WEEK = indexToWeekKey(NOW + 8);
+
+	it('incluye recetas colocadas por una programación, no solo las asignadas manualmente', () => {
+		const recipe = seedRecipe('Lentejas', 'legumbres');
+		upsertSchedule(recipe.id, 1, 'comida', 0, 1, WEEK, 'skip', 1); // lunes
+		const dates = getWeekDates(WEEK);
+		const result = getRecipesPlannedNearDate(dates[2]); // miércoles
+		expect(result.map(r => r.id)).toContain(recipe.id);
+	});
+
+	it('cubre la separación completa de una semana (lunes -> domingo, 6 días)', () => {
+		const recipe = seedRecipe('Cocido', 'legumbres');
+		assignRecipe(WEEK, 1, 'comida', 0, 0, recipe.id, null); // lunes
+		const dates = getWeekDates(WEEK);
+		const result = getRecipesPlannedNearDate(dates[6]); // domingo
+		expect(result.map(r => r.id)).toContain(recipe.id);
+	});
+
+	it('no incluye acompañamientos ni recetas ya marcadas como restos', () => {
+		const acc = seedRecipe('Pan', 'acompañamiento');
+		const leftover = seedRecipe('Sobras', 'legumbres');
+		assignRecipe(WEEK, 1, 'comida', 0, 1, acc.id, null);
+		assignRecipe(WEEK, 1, 'comida', 1, 0, leftover.id, null, 1);
+		const dates = getWeekDates(WEEK);
+		const result = getRecipesPlannedNearDate(dates[2]);
+		expect(result.map(r => r.id)).not.toContain(acc.id);
+		expect(result.map(r => r.id)).not.toContain(leftover.id);
 	});
 });

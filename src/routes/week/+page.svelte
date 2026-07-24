@@ -413,7 +413,7 @@
 		const targetDate = dates[target.weekday - 1];
 		if (!sourceDate || !targetDate) return false;
 		const diffDays = Math.round((targetDate.getTime() - sourceDate.getTime()) / MS_PER_DAY);
-		return diffDays > 0 && diffDays <= 5;
+		return diffDays > 0 && diffDays <= 6;
 	}
 
 	function handleMoveCopyAction(action: 'move' | 'copy' | 'leftover') {

@@ -323,7 +323,7 @@
 					{#if pickerLoading}
 						<p class="empty-msg">Cargando...</p>
 					{:else if filtered.length === 0}
-						<p class="empty-msg">Sin recetas planificadas en los últimos 5 días</p>
+						<p class="empty-msg">Sin recetas planificadas en días anteriores</p>
 					{:else}
 						{#each filtered as r}
 							<button class="recipe-row" onclick={() => handleSelect(r.id, true)}>

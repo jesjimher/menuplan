@@ -3,6 +3,7 @@ import type { Recipe } from '$lib/types/index.js';
 import { buildSafeUpdate } from './utils.js';
 import { getWeekKey, getWeekDates, MS_PER_DAY } from '$lib/utils/dates.js';
 import { parseTags } from '$lib/utils/parseTags.js';
+import { getWeekData } from './weekplan.js';
 
 const RECIPE_COLS = 'id, name, description, tags, min_days, image_type, created_at';
 const DEFAULT_TOP_FOR_SLOT_LIMIT = 3;
@@ -142,9 +143,7 @@ export function getOldestPlannedRecipes(mealType: string, limit = DEFAULT_RECENT
 	`).all(mealType, mealType, limit) as (Recipe & { last_week: string | null })[];
 }
 
-export function getRecipesPlannedNearDate(targetDate: Date, daysBack = 5): Recipe[] {
-	const db = getDb();
-
+export function getRecipesPlannedNearDate(targetDate: Date, daysBack = 7): Recipe[] {
 	const startDate = new Date(targetDate.getTime() - daysBack * MS_PER_DAY);
 
 	const weekKeys = new Set<string>();
@@ -155,32 +154,25 @@ export function getRecipesPlannedNearDate(targetDate: Date, daysBack = 5): Recip
 	}
 	if (weekKeys.size === 0) return [];
 
-	const placeholders = Array.from(weekKeys).map(() => '?').join(', ');
-	const rows = db.prepare(`
-		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at,
-		       wp.week_key, wp.weekday
-		FROM week_plans wp
-		JOIN recipes r ON r.id = wp.recipe_id
-		WHERE wp.week_key IN (${placeholders})
-		  AND wp.is_accompaniment = 0
-		  AND wp.is_leftover = 0
-		  AND wp.recipe_id IS NOT NULL
-	`).all(...Array.from(weekKeys)) as (Recipe & { week_key: string; weekday: number })[];
-
 	const targetTime = targetDate.getTime();
 	const startTime = startDate.getTime();
 
+	// Usamos getWeekData (en vez de consultar week_plans directamente) porque también
+	// incluye las recetas colocadas por programaciones (schedules), que son slots
+	// virtuales que nunca se escriben en week_plans.
 	const seen = new Map<number, { recipe: Recipe; date: number }>();
-	for (const row of rows) {
-		const dates = getWeekDates(row.week_key);
-		const rowDate = dates[row.weekday - 1];
-		if (!rowDate) continue;
-		const rowTime = rowDate.getTime();
-		if (rowTime >= startTime && rowTime < targetTime) {
-			const existing = seen.get(row.id);
-			if (!existing || rowTime > existing.date) {
-				const recipe: Recipe = { id: row.id, name: row.name, description: row.description, tags: row.tags, min_days: row.min_days, image_type: row.image_type, created_at: row.created_at };
-				seen.set(row.id, { recipe, date: rowTime });
+	for (const weekKey of weekKeys) {
+		const dates = getWeekDates(weekKey);
+		for (const slot of getWeekData(weekKey).slots) {
+			if (!slot.recipe || slot.is_accompaniment !== 0 || slot.is_leftover !== 0) continue;
+			const rowDate = dates[slot.weekday - 1];
+			if (!rowDate) continue;
+			const rowTime = rowDate.getTime();
+			if (rowTime >= startTime && rowTime < targetTime) {
+				const existing = seen.get(slot.recipe.id);
+				if (!existing || rowTime > existing.date) {
+					seen.set(slot.recipe.id, { recipe: slot.recipe, date: rowTime });
+				}
 			}
 		}
 	}
