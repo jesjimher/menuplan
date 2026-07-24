@@ -743,7 +743,7 @@
 		{#if !weekData}
 			<div class="text-center py-16 text-sm" style="color: var(--text-muted);">Cargando...</div>
 		{:else}
-		<div class="flex-1 overflow-auto p-3 sm:p-5 min-h-0"
+		<div class="flex-1 overflow-y-auto overflow-x-hidden touch-pan-y p-3 sm:p-5 min-h-0"
 			on:touchstart|passive={onContentTouchStart}
 			on:touchend|passive={onContentTouchEnd}>
 			<div class="week-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2.5rem_repeat(7,1fr)] gap-3 lg:gap-x-3 lg:gap-y-0">
