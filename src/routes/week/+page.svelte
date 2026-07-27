@@ -136,6 +136,15 @@
 	// Swipe horizontal para cambiar de día en móvil
 	let swipeTouchStartX = 0;
 	let swipeTouchStartY = 0;
+	let slideAnim = $state(true);
+	let dayTrackWidth = $state(0);
+	let dayOffsetPx = $derived(-(selectedDay - 1) * dayTrackWidth);
+
+	function navNoAnim(navigate: () => void) {
+		slideAnim = false;
+		navigate();
+		requestAnimationFrame(() => requestAnimationFrame(() => { slideAnim = true; }));
+	}
 
 	function onContentTouchStart(e: TouchEvent) {
 		swipeTouchStartX = e.touches[0].clientX;
@@ -181,21 +190,27 @@
 	});
 
 	function prevWeek() {
-		const prev = getPreviousWeekKey(weekKey);
-		goto(`/week?weekKey=${prev}`, { noScroll: true });
+		navNoAnim(() => {
+			const prev = getPreviousWeekKey(weekKey);
+			goto(`/week?weekKey=${prev}`, { noScroll: true });
+		});
 	}
 
 	function nextWeek() {
-		const next = indexToWeekKey(weekKeyToIndex(weekKey) + 1);
-		goto(`/week?weekKey=${next}`, { noScroll: true });
+		navNoAnim(() => {
+			const next = indexToWeekKey(weekKeyToIndex(weekKey) + 1);
+			goto(`/week?weekKey=${next}`, { noScroll: true });
+		});
 	}
 
 	function toToday() {
-		const today = getWeekKey();
-		const now = new Date();
-		const jsDay = now.getDay();
-		selectedDay = jsDay === 0 ? 7 : jsDay;
-		goto(`/week?weekKey=${today}`, { noScroll: true });
+		navNoAnim(() => {
+			const today = getWeekKey();
+			const now = new Date();
+			const jsDay = now.getDay();
+			selectedDay = jsDay === 0 ? 7 : jsDay;
+			goto(`/week?weekKey=${today}`, { noScroll: true });
+		});
 	}
 
 	function getSlot(weekday: number, mealType: string, slotIndex: number, isAccompaniment: number) {
@@ -743,10 +758,13 @@
 		{#if !weekData}
 			<div class="text-center py-16 text-sm" style="color: var(--text-muted);">Cargando...</div>
 		{:else}
-		<div class="flex-1 overflow-y-auto overflow-x-hidden touch-pan-y p-3 sm:p-5 min-h-0"
+		<div class="flex-1 overflow-y-auto overflow-x-hidden touch-pan-y pt-3 pb-3 sm:p-5 min-h-0"
 			on:touchstart|passive={onContentTouchStart}
 			on:touchend|passive={onContentTouchEnd}>
-			<div class="week-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2.5rem_repeat(7,1fr)] gap-3 lg:gap-x-3 lg:gap-y-0">
+			<div class="week-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2.5rem_repeat(7,1fr)] gap-3 lg:gap-x-3 lg:gap-y-0"
+				class:no-slide-anim={!slideAnim}
+				style="--day-offset-px: {dayOffsetPx}px;"
+				bind:clientWidth={dayTrackWidth}>
 				<!-- Bandas de fondo de fila (solo desktop): pintan toda la fila de comida/cena
 					detrás de las celdas; la columna de "hoy" mantiene su fondo propio encima -->
 				<div class="hidden lg:block rounded-xl" style="grid-column: 1 / -1; grid-row: 2; background: var(--comida-band);"></div>
@@ -774,7 +792,7 @@
 					{@const dayCenaCfg = weekData?.configs[weekday]?.cena}
 					{@const dayFullyDisabled = dayComidaCfg?.disabled && dayCenaCfg?.disabled}
 
-					<div id="day-{weekday}" class="rounded-2xl overflow-hidden flex flex-col lg:contents {weekday !== selectedDay ? 'max-sm:hidden' : ''}"
+					<div id="day-{weekday}" class="day-col rounded-2xl overflow-hidden flex flex-col lg:contents max-sm:px-3"
 						style="{isToday ? 'background: var(--primary-light);' : ''}">
 
 						<!-- Cabecera del día -->
@@ -970,6 +988,28 @@
 		.week-grid {
 			min-height: 100%;
 			grid-template-rows: auto 1fr 1fr;
+		}
+	}
+	@media (max-width: 639px) {
+		.week-grid {
+			display: flex;
+			flex-wrap: nowrap;
+			gap: 0;
+			transform: translateX(var(--day-offset-px, 0px));
+			transition: transform 0.28s ease;
+			will-change: transform;
+		}
+		.week-grid.no-slide-anim {
+			transition: none;
+		}
+		.day-col {
+			flex: 0 0 100%;
+			width: 100%;
+		}
+	}
+	@media (max-width: 639px) and (prefers-reduced-motion: reduce) {
+		.week-grid {
+			transition: none;
 		}
 	}
 	.select-none {
