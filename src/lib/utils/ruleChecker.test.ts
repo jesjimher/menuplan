@@ -8,8 +8,8 @@ function makeSlot(tags: string, is_accompaniment = 0): SlotData {
 		meal_type: 'comida',
 		slot_index: 0,
 		is_accompaniment,
+		is_leftover: 0,
 		recipe: { id: 1, name: 'Test', description: '', tags, min_days: -1, image_type: null, created_at: '' },
-		member: null,
 		schedule: null
 	};
 }

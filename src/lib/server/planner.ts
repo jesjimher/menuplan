@@ -1,9 +1,8 @@
 import { getDb } from '$lib/db/index.js';
-import type { Recipe, Member, SlotData, Options, Rule, MealType } from '$lib/types/index.js';
+import type { Recipe, SlotData, Options, Rule, MealType } from '$lib/types/index.js';
 import { parseTags } from '$lib/utils/parseTags.js';
 import { weekKeyToIndex } from '$lib/utils/dates.js';
 import { getAllRules } from './rules.js';
-import { getAllMembers } from './members.js';
 import { getAllRecipes } from './recipes.js';
 import { getOptions } from './options.js';
 import { assignRecipe } from './weekplan.js';
@@ -17,7 +16,6 @@ interface SlotToFill {
 	meal_type: MealType;
 	slot_index: number;
 	is_accompaniment: number;
-	member_id: number | null;
 	required_tags?: string[];
 }
 
@@ -39,7 +37,6 @@ function wasPlannedRecently(
 export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], currentSlots: SlotData[]): void {
 	const db = getDb();
 	const rules = getAllRules();
-	const members = getAllMembers();
 	const options = getOptions();
 
 	// Batch: última semana planificada por receta (evita N+1)
@@ -69,12 +66,10 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 
 	db.transaction(() => {
 		for (const slot of slotsToFill) {
-			const member = slot.member_id ? (members.find(m => m.id === slot.member_id) ?? null) : null;
-
-			let candidates = fillCandidates(slot, allRecipes, member, members, options, rules, tagCounts, weekKey, lastWeekByRecipe, currentWeekIdx, false);
+			let candidates = fillCandidates(slot, allRecipes, options, rules, tagCounts, weekKey, lastWeekByRecipe, currentWeekIdx, false);
 
 			if (candidates.length === 0) {
-				candidates = fillCandidates(slot, allRecipes, member, members, options, rules, tagCounts, weekKey, lastWeekByRecipe, currentWeekIdx, true);
+				candidates = fillCandidates(slot, allRecipes, options, rules, tagCounts, weekKey, lastWeekByRecipe, currentWeekIdx, true);
 			}
 
 			// Filtro de required_tags (AND condition, solo platos principales)
@@ -102,7 +97,7 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 			const pool = helping.length > 0 ? helping : candidates;
 			const chosen = pool[Math.floor(Math.random() * pool.length)];
 
-			assignRecipe(weekKey, slot.weekday, slot.meal_type, slot.slot_index, slot.is_accompaniment, chosen.id, slot.member_id);
+			assignRecipe(weekKey, slot.weekday, slot.meal_type, slot.slot_index, slot.is_accompaniment, chosen.id);
 
 			const tags = parseTags(chosen.tags);
 			for (const tag of tags) {
@@ -123,7 +118,6 @@ export function getDiscardedRecipes(
 ): { recipe: Recipe; reason: string }[] {
 	const db = getDb();
 	const rules = getAllRules();
-	const members = getAllMembers();
 	const options = getOptions();
 
 	const tagCounts: Record<string, number> = {};
@@ -169,17 +163,6 @@ export function getDiscardedRecipes(
 		}
 
 		if (!reason) {
-			for (const m of members) {
-				const cannotEat = parseTags(m.cannot_eat);
-				const blocked = cannotEat.find(t => tags.includes(t));
-				if (blocked) {
-					reason = `restricción dietética (${blocked})`;
-					break;
-				}
-			}
-		}
-
-		if (!reason) {
 			const minDays = recipe.min_days === -1 ? options.default_min_days : recipe.min_days;
 			if (minDays > 0 && plannedWithin(recipe.id, minDays)) {
 				reason = `planificada recientemente (min. ${minDays} días)`;
@@ -210,8 +193,6 @@ export function getDiscardedRecipes(
 function fillCandidates(
 	slot: SlotToFill,
 	allRecipes: Recipe[],
-	member: Member | null,
-	allMembers: Member[],
 	options: Options,
 	rules: Rule[],
 	tagCounts: Record<string, number>,
@@ -226,12 +207,6 @@ function fillCandidates(
 		const tags = parseTags(recipe.tags);
 
 		if (!tags.includes(requiredTag)) return false;
-
-		const applicableMembers = member ? [member] : allMembers;
-		for (const m of applicableMembers) {
-			const cannotEat = parseTags(m.cannot_eat);
-			if (cannotEat.some(t => tags.includes(t))) return false;
-		}
 
 		const minDays = recipe.min_days === -1 ? options.default_min_days : recipe.min_days;
 		const effectiveMinDays = relaxMinDays ? Math.floor(minDays * MIN_DAYS_RELAXATION_FACTOR) : minDays;

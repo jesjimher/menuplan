@@ -16,7 +16,6 @@ export async function POST({ request }) {
 		meal_type,
 		slot_index,
 		is_accompaniment,
-		member_id: null,
 		required_tags: is_accompaniment === 0 ? (mealCfg?.required_tags[slot_index] ?? []) : []
 	};
 

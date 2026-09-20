@@ -10,7 +10,7 @@ export async function parseBody<T>(request: Request, schema: z.ZodType<T>): Prom
 	}
 	const result = schema.safeParse(raw);
 	if (!result.success) {
-		const msg = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+		const msg = result.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
 		throw error(400, msg);
 	}
 	return result.data;

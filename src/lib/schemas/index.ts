@@ -14,8 +14,7 @@ export const assignBodySchema = z.object({
 	slot_index: slotIndexSchema,
 	is_accompaniment: isAccompanimentSchema,
 	is_leftover: z.union([z.literal(0), z.literal(1)]).default(0),
-	recipe_id: z.number().int().positive().nullable(),
-	member_id: z.number().int().positive().nullable().default(null),
+	recipe_id: z.number().int().positive(),
 });
 
 export const removeBodySchema = z.object({
@@ -86,14 +85,6 @@ export const updateRecipeBodySchema = z.object({
 	description: z.string().max(10000).optional(),
 	tags: z.string().max(1000).optional(),
 	min_days: z.number().int().min(-1).optional(),
-});
-
-// Endpoints de miembros
-export const memberBodySchema = z.object({
-	name: z.string().min(1).max(200),
-	cannot_eat: z.string().max(500).default(''),
-	likes: z.string().max(500).default(''),
-	dislikes: z.string().max(500).default(''),
 });
 
 // Endpoints de reglas

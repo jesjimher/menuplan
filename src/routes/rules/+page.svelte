@@ -25,6 +25,7 @@
 	}
 
 	function ruleText(r: Rule) {
+		if (r.direction === 'no_more_than' && r.times === 0) return `Nunca "${r.tag}"`;
 		return r.direction === 'at_least'
 			? `Al menos ${r.times} ${r.times > 1 ? 'veces' : 'vez'} "${r.tag}" por semana`
 			: `No más de ${r.times} ${r.times > 1 ? 'veces' : 'vez'} "${r.tag}" por semana`;
@@ -94,7 +95,7 @@
 					</div>
 					<div>
 						<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">Número de veces</label>
-						<input type="number" name="times" bind:value={form.times} min="1"
+						<input type="number" name="times" bind:value={form.times} min="0"
 							class="w-28 px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
 							style="border: 1px solid var(--border); color: var(--text);" />
 					</div>

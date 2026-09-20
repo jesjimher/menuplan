@@ -7,6 +7,7 @@
 	import SlotAddButtons from './SlotAddButtons.svelte';
 	import type { MealConfig, SlotData, ScheduleWithRecipe } from '$lib/types/index.js';
 	import type { WeekDragDrop } from '$lib/utils/weekDragDrop.svelte.js';
+	import { recipeAccompanimentIndexes, mealAccompanimentIndexes } from '$lib/utils/mealCapacity.js';
 
 	let {
 		weekday, mealType, col, isToday, weekKey,
@@ -110,8 +111,7 @@
 
 				<!-- Acompañamientos por receta -->
 				{#if cfg.accompaniment_per_recipe > 0}
-					{#each Array(cfg.accompaniment_per_recipe) as _, aIdx}
-						{@const accSlotIdx = slotIdx * cfg.accompaniment_per_recipe + aIdx}
+					{#each recipeAccompanimentIndexes(cfg, slotIdx) as accSlotIdx}
 						{@const accSlot = getSlot(weekday, mealType, accSlotIdx, 1)}
 						{@const accKey = slotKey(weekday, mealType, accSlotIdx, 1)}
 						{@const accCallbacks = makeSlotCallbacks(weekday, mealType, accSlotIdx, 1)}
@@ -134,7 +134,7 @@
 			{#if cfg.accompaniment_per_slot > 0}
 				<div class="pt-1.5 space-y-1.5 shrink-0"
 					style="border-top: 1px solid var(--surface-container-highest);">
-					{#each Array(cfg.accompaniment_per_slot) as _, aIdx}
+					{#each mealAccompanimentIndexes(cfg) as aIdx}
 						{@const accSlot = getSlot(weekday, mealType, aIdx, 1)}
 						<div class="relative group/accslot">
 							<button

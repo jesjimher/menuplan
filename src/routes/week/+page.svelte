@@ -254,7 +254,7 @@
 					: s
 			);
 		} else if (recipe) {
-			newSlots = [...weekData.slots, { weekday, meal_type: mealType as 'comida' | 'cena', slot_index: slotIndex, is_accompaniment: isAcc, is_leftover: isLeftover, recipe, member: null, schedule: null }];
+			newSlots = [...weekData.slots, { weekday, meal_type: mealType as 'comida' | 'cena', slot_index: slotIndex, is_accompaniment: isAcc, is_leftover: isLeftover, recipe, schedule: null }];
 		} else {
 			return;
 		}
@@ -270,7 +270,7 @@
 			const res = await fetch('/api/week/assign', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, recipe_id: recipeId, member_id: null, is_leftover: isLeftover ? 1 : 0 })
+				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, recipe_id: recipeId, is_leftover: isLeftover ? 1 : 0 })
 			});
 			if (!res.ok) throw new Error();
 		} catch {
@@ -371,7 +371,7 @@
 			if (recipe) {
 				return fetch('/api/week/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ weekKey, weekday: coord.weekday, meal_type: coord.mealType,
-						slot_index: coord.slotIndex, is_accompaniment: coord.isAcc, recipe_id: recipe.id, member_id: null, is_leftover: 0 }) });
+						slot_index: coord.slotIndex, is_accompaniment: coord.isAcc, recipe_id: recipe.id, is_leftover: 0 }) });
 			} else {
 				return fetch('/api/week/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ weekKey, weekday: coord.weekday, meal_type: coord.mealType,
@@ -397,7 +397,7 @@
 		patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, fromRecipe, 0);
 		try {
 			const res = await fetch('/api/week/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday: to.weekday, meal_type: to.mealType, slot_index: to.slotIndex, is_accompaniment: to.isAcc, recipe_id: fromRecipe.id, member_id: null, is_leftover: 0 }) });
+				body: JSON.stringify({ weekKey, weekday: to.weekday, meal_type: to.mealType, slot_index: to.slotIndex, is_accompaniment: to.isAcc, recipe_id: fromRecipe.id, is_leftover: 0 }) });
 			if (!res.ok) throw new Error();
 		} catch {
 			patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, prevRecipe, prevIsLeftover as 0 | 1);
@@ -414,7 +414,7 @@
 		patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, fromRecipe, 1);
 		try {
 			const res = await fetch('/api/week/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday: to.weekday, meal_type: to.mealType, slot_index: to.slotIndex, is_accompaniment: to.isAcc, recipe_id: fromRecipe.id, member_id: null, is_leftover: 1 }) });
+				body: JSON.stringify({ weekKey, weekday: to.weekday, meal_type: to.mealType, slot_index: to.slotIndex, is_accompaniment: to.isAcc, recipe_id: fromRecipe.id, is_leftover: 1 }) });
 			if (!res.ok) throw new Error();
 		} catch {
 			patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, prevRecipe, prevIsLeftover as 0 | 1);

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { calculatePlan, getDiscardedRecipes } from './planner.js';
 import { assignRecipe, getWeekData } from './weekplan.js';
-import { resetDb, seedRecipe, seedMember, seedRule } from './test-helpers.js';
+import { resetDb, seedRecipe, seedRule } from './test-helpers.js';
 import { getWeekKey, weekKeyToIndex, indexToWeekKey } from '$lib/utils/dates.js';
 
 // Semanas relativas a la actual para que wasPlannedRecently se comporte igual
@@ -12,7 +12,7 @@ const ONE_WEEK_AGO = indexToWeekKey(NOW + 5);
 const TWO_WEEKS_AGO = indexToWeekKey(NOW + 4);
 
 function slot(weekday: number, mealType: 'comida' | 'cena', extra: Record<string, unknown> = {}) {
-	return { weekday, meal_type: mealType, slot_index: 0, is_accompaniment: 0, member_id: null, ...extra };
+	return { weekday, meal_type: mealType, slot_index: 0, is_accompaniment: 0, ...extra };
 }
 
 beforeEach(() => resetDb());
@@ -27,10 +27,10 @@ describe('calculatePlan', () => {
 		expect(slots[0].recipe?.id).toBe(r.id);
 	});
 
-	it('respeta las restricciones dietéticas de los miembros', () => {
+	it('excluye los tags prohibidos con una regla no_more_than 0', () => {
 		seedRecipe('Paella de marisco', 'comida,marisco');
 		const ok = seedRecipe('Arroz a la cubana', 'comida');
-		seedMember('Ana', 'marisco');
+		seedRule('marisco', 'no_more_than', 0);
 		calculatePlan(WEEK, [slot(1, 'comida')], []);
 		expect(getWeekData(WEEK).slots[0].recipe?.id).toBe(ok.id);
 	});
@@ -38,7 +38,7 @@ describe('calculatePlan', () => {
 	it('descarta recetas planificadas hace menos de min_days', () => {
 		const reciente = seedRecipe('Cocido', 'comida', 30);
 		const otra = seedRecipe('Ensalada', 'comida');
-		assignRecipe(ONE_WEEK_AGO, 1, 'comida', 0, 0, reciente.id, null);
+		assignRecipe(ONE_WEEK_AGO, 1, 'comida', 0, 0, reciente.id);
 		calculatePlan(WEEK, [slot(2, 'comida')], []);
 		expect(getWeekData(WEEK).slots[0].recipe?.id).toBe(otra.id);
 	});
@@ -47,7 +47,7 @@ describe('calculatePlan', () => {
 		// Planificada hace 2 semanas (~18 días): min_days 20 la excluye,
 		// pero el reintento relajado (10 días) la admite.
 		const unica = seedRecipe('Fabada', 'comida', 20);
-		assignRecipe(TWO_WEEKS_AGO, 1, 'comida', 0, 0, unica.id, null);
+		assignRecipe(TWO_WEEKS_AGO, 1, 'comida', 0, 0, unica.id);
 		calculatePlan(WEEK, [slot(1, 'comida')], []);
 		expect(getWeekData(WEEK).slots.some(s => s.recipe?.id === unica.id)).toBe(true);
 	});
@@ -87,8 +87,8 @@ describe('calculatePlan', () => {
 });
 
 describe('getDiscardedRecipes', () => {
-	it('explica el descarte por restricción dietética', () => {
-		seedMember('Ana', 'marisco');
+	it('explica el descarte por una regla no_more_than 0', () => {
+		seedRule('marisco', 'no_more_than', 0);
 		seedRecipe('Paella de marisco', 'comida,marisco');
 		const d = getDiscardedRecipes(WEEK, 1, 'comida', 0, 0, []);
 		expect(d).toHaveLength(1);
@@ -97,7 +97,7 @@ describe('getDiscardedRecipes', () => {
 
 	it('explica el descarte por min_days', () => {
 		const r = seedRecipe('Cocido', 'comida', 30);
-		assignRecipe(ONE_WEEK_AGO, 1, 'comida', 0, 0, r.id, null);
+		assignRecipe(ONE_WEEK_AGO, 1, 'comida', 0, 0, r.id);
 		const d = getDiscardedRecipes(WEEK, 1, 'comida', 0, 0, []);
 		expect(d).toHaveLength(1);
 		expect(d[0].reason).toContain('recientemente');

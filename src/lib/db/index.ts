@@ -17,14 +17,6 @@ CREATE TABLE IF NOT EXISTS recipes (
     created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS members (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT    NOT NULL,
-    cannot_eat  TEXT    NOT NULL DEFAULT '',
-    likes       TEXT    NOT NULL DEFAULT '',
-    dislikes    TEXT    NOT NULL DEFAULT ''
-);
-
 CREATE TABLE IF NOT EXISTS rules (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     tag         TEXT    NOT NULL,
@@ -40,12 +32,11 @@ CREATE TABLE IF NOT EXISTS week_plans (
     slot_index       INTEGER NOT NULL DEFAULT 0,
     is_accompaniment INTEGER NOT NULL DEFAULT 0,
     is_leftover      INTEGER NOT NULL DEFAULT 0,
-    recipe_id        INTEGER REFERENCES recipes(id) ON DELETE SET NULL,
-    member_id        INTEGER REFERENCES members(id) ON DELETE SET NULL
+    recipe_id        INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_week_plans_unique
-    ON week_plans(week_key, weekday, meal_type, is_accompaniment, slot_index, COALESCE(member_id, -1));
+    ON week_plans(week_key, weekday, meal_type, is_accompaniment, slot_index);
 
 CREATE INDEX IF NOT EXISTS idx_week_plans_recipe_id
     ON week_plans(recipe_id);
@@ -53,20 +44,33 @@ CREATE INDEX IF NOT EXISTS idx_week_plans_recipe_id
 CREATE INDEX IF NOT EXISTS idx_week_plans_weekday_meal
     ON week_plans(weekday, meal_type, is_accompaniment);
 
-CREATE TABLE IF NOT EXISTS week_day_config (
-    id                         INTEGER PRIMARY KEY AUTOINCREMENT,
-    week_key                   TEXT    NOT NULL,
-    weekday                    INTEGER NOT NULL,
-    meal_type                  TEXT    NOT NULL,
-    recipe_count               INTEGER NOT NULL DEFAULT 1,
-    accompaniment_per_recipe   INTEGER NOT NULL DEFAULT 1,
-    accompaniment_per_slot     INTEGER NOT NULL DEFAULT 0,
-    required_tag               TEXT    DEFAULT NULL,
-    disabled                   INTEGER NOT NULL DEFAULT 0,
-    disabled_comment           TEXT    DEFAULT NULL,
-    note                       TEXT    DEFAULT NULL,
-    sticky                     INTEGER NOT NULL DEFAULT 0,
-    UNIQUE(week_key, weekday, meal_type)
+CREATE TABLE IF NOT EXISTS meal_config (
+    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+    weekday                  INTEGER NOT NULL,
+    meal_type                TEXT    NOT NULL,
+    effective_from           TEXT    NOT NULL,
+    effective_to             TEXT    DEFAULT NULL,
+    recipe_count             INTEGER NOT NULL DEFAULT 1,
+    accompaniment_per_recipe INTEGER NOT NULL DEFAULT 1,
+    accompaniment_per_slot   INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(weekday, meal_type, effective_from)
+);
+
+CREATE TABLE IF NOT EXISTS meal_config_required_tags (
+    config_id  INTEGER NOT NULL REFERENCES meal_config(id) ON DELETE CASCADE,
+    slot_index INTEGER NOT NULL,
+    tag        TEXT    NOT NULL,
+    UNIQUE(config_id, slot_index, tag)
+);
+
+CREATE TABLE IF NOT EXISTS week_meal_state (
+    week_key         TEXT    NOT NULL,
+    weekday          INTEGER NOT NULL,
+    meal_type        TEXT    NOT NULL,
+    disabled         INTEGER NOT NULL DEFAULT 0,
+    disabled_comment TEXT    DEFAULT NULL,
+    note             TEXT    DEFAULT NULL,
+    PRIMARY KEY (week_key, weekday, meal_type)
 );
 
 CREATE TABLE IF NOT EXISTS options (

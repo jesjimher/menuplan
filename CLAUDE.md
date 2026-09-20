@@ -32,7 +32,6 @@ Menú lateral definido en `src/routes/+layout.svelte`. Orden de aparición:
 | **Semana** | `/week` | `src/routes/week/+page.svelte` | Página más compleja. Vista semanal con slots comida/cena por día. Selector de días móvil (`sm:hidden`) en línea ~658. Estado `selectedDay` controla qué día se muestra en móvil. Actualizaciones optimistas, drag & drop. |
 | **Recetas** | `/recipes` | `src/routes/recipes/+page.svelte` | CRUD de recetas. Búsqueda/filtro por tags, importación desde Plantoeat, gestión de imagen (búsqueda DuckDuckGo + recorte). |
 | **Programaciones** | `/schedules` | `src/routes/schedules/+page.svelte` | Gestión de recetas programadas (cada N semanas, día y tipo de comida fijos). Muestra simulación de las próximas 9 semanas con conflictos resaltados. |
-| **Miembros** | `/members` | `src/routes/members/+page.svelte` | CRUD de miembros de la familia con sus restricciones dietéticas (tags). |
 | **Reglas** | `/rules` | `src/routes/rules/+page.svelte` | Reglas de planificación: `no_more_than` (máx. N veces por semana un tag) y `at_least` (mín. N veces). Se evalúan en cliente y servidor con `ruleChecker.ts`. |
 | **Histórico** | `/history` | `src/routes/history/+page.svelte` | Consulta de semanas pasadas en modo lectura. |
 | **Opciones** | `/options` | `src/routes/options/+page.svelte` | Ajustes globales de la app (tema de color, sidebar colapsado por defecto, etc.). |
@@ -47,8 +46,8 @@ Singleton de conexión SQLite. El schema base está incrustado en `db/index.ts` 
 **Al modificar el schema de `recipes`:** regenerar `data/sample-recipes.sql` 
 
 **Decisiones clave del schema:**
-- `week_plans.member_id` es nullable (NULL = para todos los miembros). La restricción UNIQUE usa un `CREATE UNIQUE INDEX` separado con `COALESCE(member_id, -1)` porque SQLite no admite expresiones en restricciones `UNIQUE()` inline.
-- Los tags se almacenan como strings separados por comas en todas partes (recetas, restricciones de miembros, etc.). Todas las comparaciones de tags hacen lowercase y trim de cada elemento.
+- `week_plans` solo contiene filas con receta (`recipe_id NOT NULL`, `ON DELETE CASCADE`); vaciar un slot es borrar la fila. Su clave única es `(week_key, weekday, meal_type, is_accompaniment, slot_index)`. No existe el concepto de miembros: los tags prohibidos se expresan con una regla `no_more_than <tag> 0`.
+- Los tags se almacenan como strings separados por comas en todas partes (recetas, reglas, etc.). Todas las comparaciones de tags hacen lowercase y trim de cada elemento.
 - `week_plans.is_accompaniment` (0/1) distingue platos principales de acompañamientos dentro de la misma tabla.
 - `week_day_config` sobreescribe las opciones globales por combinación (week_key, weekday, meal_type). Los campos `disabled`/`disabled_comment` permiten desactivar un slot concreto (día+comida) para semanas en que no hace falta planificarlo.
 - `recipes.image_data` (BLOB) e `image_type` almacenan la imagen de la receta directamente en la BD. Desde la subida se redimensiona a máx. 800px y se guarda como WebP (sharp); `scripts/recompress-images.mjs` recomprime manualmente las imágenes antiguas.
@@ -56,7 +55,7 @@ Singleton de conexión SQLite. El schema base está incrustado en `db/index.ts` 
 ### Módulos de servidor (`src/lib/server/`)
 Funciones puras, sin estado. Cada módulo tiene helpers CRUD simples. Destacados:
 
-- **`weekplan.ts`** — `getWeekData()` devuelve la forma completa `WeekData` (slots + configuraciones por día + violaciones de reglas) con una única consulta JOIN. `assignRecipe()` usa `INSERT ... ON CONFLICT ... DO UPDATE` — el target del conflicto debe coincidir con el índice de expresión.
+- **`weekplan.ts`** — `getWeekData()` devuelve la forma completa `WeekData` (slots + configuraciones por día + violaciones de reglas) con una única consulta JOIN. `assignRecipe()` usa `INSERT ... ON CONFLICT ... DO UPDATE` — el target del conflicto debe coincidir con el índice único `idx_week_plans_unique`.
 - **`planner.ts`** — `calculatePlan()` rellena slots vacíos en orden (Lun→Dom, comida antes que cena). Filtra por tag de tipo de comida → restricciones dietéticas → min_days → reglas no_more_than → prioriza reglas at_least. Relaja min_days un 50% en el reintento si no hay candidatos.
 - **`recipes.ts`** — `importPlantoeatRecipes()` parsea el formato de exportación de Plantoeat. Los tags en Plantoeat se separan con ` ^ ` (espacio-acento-espacio), no con comas. `getRecipeImageData()`/`setRecipeImage()`/`clearRecipeImage()` gestionan el BLOB de imagen; las demás funciones usan `RECIPE_COLS` que excluye `image_data` para no cargar el BLOB en queries normales.
 

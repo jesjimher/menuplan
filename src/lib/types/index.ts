@@ -11,14 +11,6 @@ export interface Recipe {
 	created_at: string;
 }
 
-export interface Member {
-	id: number;
-	name: string;
-	cannot_eat: string;
-	likes: string;
-	dislikes: string;
-}
-
 export interface Rule {
 	id: number;
 	tag: string;
@@ -34,23 +26,31 @@ export interface WeekPlan {
 	slot_index: number;
 	is_accompaniment: number;
 	is_leftover: number;
-	recipe_id: number | null;
-	member_id: number | null;
+	recipe_id: number;
 }
 
-export interface WeekDayConfig {
+// Capacidad de una comida (día+tipo) a partir de `effective_from`. `effective_to` NULL = sin
+// límite; igual a `effective_from` = override de una sola semana (edición de una semana pasada).
+// Si varias vigencias cubren una semana, gana la de `effective_from` más reciente.
+export interface MealConfigRow {
 	id: number;
-	week_key: string;
 	weekday: number;
 	meal_type: MealType;
+	effective_from: string;
+	effective_to: string | null;
 	recipe_count: number;
 	accompaniment_per_recipe: number;
 	accompaniment_per_slot: number;
-	required_tag: string | null;
+}
+
+// Estado puntual de una comida en una semana concreta (sin herencia).
+export interface WeekMealState {
+	week_key: string;
+	weekday: number;
+	meal_type: MealType;
 	disabled: number;
 	disabled_comment: string | null;
 	note: string | null;
-	sticky: number;
 }
 
 export interface Options {
@@ -89,7 +89,6 @@ export interface SlotData {
 	is_accompaniment: number;
 	is_leftover: 0 | 1;
 	recipe: Recipe | null;
-	member: Member | null;
 	schedule: ScheduleWithRecipe | null;
 }
 
