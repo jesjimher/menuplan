@@ -6,7 +6,7 @@
 
 	const CONFLICT_OPTIONS: { value: ScheduleConflictMode; label: string; description: string }[] = [
 		{ value: 'skip', label: 'No planificar si ya hay receta', description: 'Si el día ya tiene una receta asignada, esta programación se salta.' },
-		{ value: 'overwrite', label: 'Sobreescribir la receta existente', description: 'Esta programación tiene prioridad y reemplaza cualquier receta que hubiera.' },
+		{ value: 'overwrite', label: 'Sobreescribir la receta existente', description: 'Tiene prioridad sobre otras programaciones que compitan por el mismo hueco, pero nunca sustituye una receta puesta a mano.' },
 		{ value: 'add', label: 'Añadir junto a la receta existente', description: 'Se añade como plato adicional en esa comida.' },
 	];
 
