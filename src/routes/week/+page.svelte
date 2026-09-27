@@ -893,6 +893,7 @@
 				selectRecipe(pickerSlot!.weekday, pickerSlot!.mealType, pickerSlot!.slotIndex, pickerSlot!.isAcc, id, isLeftover);
 			}}
 			onClose={() => { pickerOpen = false; }}
+			onRecipeSaved={() => invalidateAll()}
 		/>
 	{/if}
 

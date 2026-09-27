@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Recipe } from '$lib/types/index.js';
 	import TagInput from '$lib/components/TagInput.svelte';
+	import RecipeEditModal from '$lib/components/RecipeEditModal.svelte';
 	import { parseTags } from '$lib/utils/parseTags.js';
 
 	let {
@@ -13,6 +14,7 @@
 		allTags = [],
 		onSelect,
 		onClose,
+		onRecipeSaved,
 	}: {
 		open?: boolean;
 		weekKey: string;
@@ -23,6 +25,7 @@
 		allTags?: string[];
 		onSelect: (recipeId: number, isLeftover?: boolean) => void;
 		onClose: () => void;
+		onRecipeSaved?: () => void;
 	} = $props();
 
 	const FETCH_TIMEOUT_MS = 15_000;
@@ -183,12 +186,32 @@
 		onSelect(id, isLeftover);
 	}
 
+	// Edición de receta sin salir del selector
+	let editOpen = $state(false);
+	let editRecipe = $state<Recipe | null>(null);
+
+	async function openEdit(id: number) {
+		// Recarga la receta completa (las listas pueden no traer todos los campos)
+		const res = await fetch(`/api/recipes/${id}`);
+		if (!res.ok) return;
+		editRecipe = await res.json();
+		editOpen = true;
+	}
+
+	function handleEditSaved() {
+		editOpen = false;
+		// Tags/nombre pueden haber cambiado: refrescar listas y descartes
+		loadPickerData();
+		triggerSearch();
+		onRecipeSaved?.();
+	}
+
 	function handleBackdrop(e: MouseEvent) {
 		if (e.target === e.currentTarget) onClose();
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') onClose();
+		if (e.key === 'Escape' && !editOpen) onClose();
 	}
 
 	const ALL_TABS: { id: Tab; label: string; hideForAcc?: boolean }[] = [
@@ -218,6 +241,33 @@
 		return weekStr;
 	}
 </script>
+
+{#snippet editButton(r: Recipe)}
+	<button
+		class="recipe-edit-btn"
+		onclick={() => openEdit(r.id)}
+		title="Editar receta"
+		aria-label="Editar {r.name}"
+	><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+{/snippet}
+
+{#snippet recipeRow(r: Recipe, isLeftover: boolean, badge: string | null, badgeMuted: boolean)}
+	<div class="recipe-row">
+		<button class="recipe-pick" onclick={() => handleSelect(r.id, isLeftover)}>
+			{#if r.image_type}
+				<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
+			{:else}
+				<div class="recipe-thumb-placeholder"></div>
+			{/if}
+			<div class="recipe-info">
+				<span class="recipe-name">{r.name}</span>
+				{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
+			</div>
+			{#if badge}<span class="recipe-badge {badgeMuted ? 'recipe-badge-muted' : ''}">{badge}</span>{/if}
+		</button>
+		{@render editButton(r)}
+	</div>
+{/snippet}
 
 {#if open}
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -302,17 +352,7 @@
 						<p class="empty-msg">Sin resultados</p>
 					{:else}
 						{#each searchResults as r}
-							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
-								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
-								{:else}
-									<div class="recipe-thumb-placeholder"></div>
-								{/if}
-								<div class="recipe-info">
-									<span class="recipe-name">{r.name}</span>
-									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
-								</div>
-							</button>
+							{@render recipeRow(r, false, null, false)}
 						{/each}
 					{/if}
 				</div>
@@ -326,17 +366,7 @@
 						<p class="empty-msg">Sin recetas planificadas en días anteriores</p>
 					{:else}
 						{#each filtered as r}
-							<button class="recipe-row" onclick={() => handleSelect(r.id, true)}>
-								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
-								{:else}
-									<div class="recipe-thumb-placeholder"></div>
-								{/if}
-								<div class="recipe-info">
-									<span class="recipe-name">{r.name}</span>
-									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
-								</div>
-							</button>
+							{@render recipeRow(r, true, null, false)}
 						{/each}
 					{/if}
 				</div>
@@ -355,18 +385,7 @@
 						<p class="empty-msg">Sin resultados</p>
 					{:else}
 						{#each filtered as r}
-							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
-								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
-								{:else}
-									<div class="recipe-thumb-placeholder"></div>
-								{/if}
-								<div class="recipe-info">
-									<span class="recipe-name">{r.name}</span>
-									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
-								</div>
-								<span class="recipe-badge">{r.freq}×</span>
-							</button>
+							{@render recipeRow(r, false, `${r.freq}×`, false)}
 						{/each}
 					{/if}
 				</div>
@@ -385,18 +404,7 @@
 						<p class="empty-msg">Sin resultados</p>
 					{:else}
 						{#each filtered as r}
-							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
-								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
-								{:else}
-									<div class="recipe-thumb-placeholder"></div>
-								{/if}
-								<div class="recipe-info">
-									<span class="recipe-name">{r.name}</span>
-									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
-								</div>
-								<span class="recipe-badge">{r.freq}×</span>
-							</button>
+							{@render recipeRow(r, false, `${r.freq}×`, false)}
 						{/each}
 					{/if}
 				</div>
@@ -415,18 +423,7 @@
 						<p class="empty-msg">Sin resultados</p>
 					{:else}
 						{#each filtered as r}
-							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
-								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
-								{:else}
-									<div class="recipe-thumb-placeholder"></div>
-								{/if}
-								<div class="recipe-info">
-									<span class="recipe-name">{r.name}</span>
-									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
-								</div>
-								<span class="recipe-badge recipe-badge-muted">{weekLabel(r.last_week)}</span>
-							</button>
+							{@render recipeRow(r, false, weekLabel(r.last_week), true)}
 						{/each}
 					{/if}
 				</div>
@@ -445,18 +442,7 @@
 						<p class="empty-msg">Sin resultados</p>
 					{:else}
 						{#each filtered as r}
-							<button class="recipe-row" onclick={() => handleSelect(r.id)}>
-								{#if r.image_type}
-									<img src="/api/recipes/{r.id}/image" alt={r.name} class="recipe-thumb" loading="lazy" decoding="async" />
-								{:else}
-									<div class="recipe-thumb-placeholder"></div>
-								{/if}
-								<div class="recipe-info">
-									<span class="recipe-name">{r.name}</span>
-									{#if r.tags}<span class="recipe-tags">{r.tags}</span>{/if}
-								</div>
-								<span class="recipe-badge recipe-badge-muted">{weekLabel(r.last_week)}</span>
-							</button>
+							{@render recipeRow(r, false, weekLabel(r.last_week), true)}
 						{/each}
 					{/if}
 				</div>
@@ -475,17 +461,20 @@
 						<p class="empty-msg">Ninguna receta descartada</p>
 					{:else}
 						{#each filtered as d}
-							<button class="recipe-row recipe-row-discarded" onclick={() => handleSelect(d.recipe.id)}>
-								{#if d.recipe.image_type}
-									<img src="/api/recipes/{d.recipe.id}/image" alt={d.recipe.name} class="recipe-thumb recipe-thumb-dim" loading="lazy" decoding="async" />
-								{:else}
-									<div class="recipe-thumb-placeholder"></div>
-								{/if}
-								<div class="recipe-info">
-									<span class="recipe-name">{d.recipe.name}</span>
-									<span class="recipe-discard-reason">({d.reason})</span>
-								</div>
-							</button>
+							<div class="recipe-row recipe-row-discarded">
+								<button class="recipe-pick" onclick={() => handleSelect(d.recipe.id)}>
+									{#if d.recipe.image_type}
+										<img src="/api/recipes/{d.recipe.id}/image" alt={d.recipe.name} class="recipe-thumb recipe-thumb-dim" loading="lazy" decoding="async" />
+									{:else}
+										<div class="recipe-thumb-placeholder"></div>
+									{/if}
+									<div class="recipe-info">
+										<span class="recipe-name">{d.recipe.name}</span>
+										<span class="recipe-discard-reason">({d.reason})</span>
+									</div>
+								</button>
+								{@render editButton(d.recipe)}
+							</div>
 						{/each}
 					{/if}
 				</div>
@@ -494,6 +483,14 @@
 	</div>
 </div>
 {/if}
+
+<RecipeEditModal
+	open={editOpen}
+	recipe={editRecipe}
+	{allTags}
+	onSaved={handleEditSaved}
+	onClose={() => { editOpen = false; }}
+/>
 
 <style>
 	.modal-backdrop {
@@ -732,12 +729,37 @@
 	.recipe-row {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
 		width: 100%;
-		text-align: left;
-		padding: 0.5rem 1rem;
+		padding-right: 0.5rem;
 		transition: background 0.1s;
 		border-bottom: 1px solid var(--surface-container-highest);
+	}
+
+	.recipe-pick {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex: 1;
+		min-width: 0;
+		text-align: left;
+		padding: 0.5rem 0.5rem 0.5rem 1rem;
+	}
+
+	.recipe-edit-btn {
+		flex-shrink: 0;
+		width: 2.25rem;
+		height: 2.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+		color: var(--text-muted);
+		transition: background 0.15s, color 0.15s;
+	}
+
+	.recipe-edit-btn:hover {
+		background: var(--surface-container-highest);
+		color: var(--primary);
 	}
 
 	.recipe-row:hover {
