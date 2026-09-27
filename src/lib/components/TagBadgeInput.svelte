@@ -4,12 +4,14 @@
 		tags = [],
 		placeholder = '',
 		multiple = true,
+		showAll = false,
 		onchange
 	}: {
 		value?: string;
 		tags?: string[];
 		placeholder?: string;
 		multiple?: boolean;
+		showAll?: boolean;
 		onchange?: (value: string) => void;
 	} = $props();
 
@@ -31,6 +33,21 @@
 	let total = $derived(filtered.length);
 
 	let canAdd = $derived(multiple || selectedTags.length === 0);
+
+	// Catálogo completo (modo showAll): incluye tags seleccionados que aún no existen
+	let cloudTags = $derived(
+		[...new Set([...tags, ...selectedTags])]
+			.filter(t => !inputText || t.toLowerCase().includes(inputText.toLowerCase()))
+			.sort((a, b) => a.localeCompare(b, 'es'))
+	);
+
+	function toggleTag(tag: string) {
+		const next = selectedTags.includes(tag)
+			? selectedTags.filter(t => t !== tag)
+			: multiple ? [...selectedTags, tag] : [tag];
+		value = next.join(',');
+		onchange?.(value);
+	}
 
 	function addTag(raw: string) {
 		const tag = raw.trim().toLowerCase();
@@ -61,13 +78,15 @@
 	function handleKeydown(e: KeyboardEvent) {
 		if ((e.key === 'Enter' || e.key === ',') && inputText.trim()) {
 			e.preventDefault();
-			addTag(inputText);
+			const unselected = cloudTags.filter(t => !selectedTags.includes(t));
+			addTag(showAll && unselected.length === 1 ? unselected[0] : inputText);
 		} else if (e.key === 'Backspace' && !inputText && selectedTags.length > 0) {
 			removeTag(selectedTags[selectedTags.length - 1]);
 		}
 	}
 
 	function handleBlur() {
+		if (showAll) return;
 		setTimeout(() => {
 			if (inputText.trim()) addTag(inputText);
 			open = false;
@@ -111,7 +130,7 @@
 		{/if}
 	</div>
 
-	{#if open && suggestions.length > 0}
+	{#if open && suggestions.length > 0 && !showAll}
 		<ul class="absolute z-50 top-full left-0 right-0 mt-0.5 rounded-lg shadow-lg overflow-hidden text-sm"
 			style="background: var(--surface); border: 1px solid var(--border);"
 			role="listbox">
@@ -129,10 +148,48 @@
 			{/if}
 		</ul>
 	{/if}
+
+	{#if showAll}
+		<div class="mt-2">
+			<div class="text-xs font-medium uppercase tracking-wide mb-1.5" style="color: var(--text-secondary);">
+				Todos los tags ({selectedTags.length} de {new Set([...tags, ...selectedTags]).size} seleccionados)
+			</div>
+			<div class="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
+				{#each cloudTags as tag (tag)}
+					{@const selected = selectedTags.includes(tag)}
+					<button type="button"
+						class="cloud-chip px-2.5 py-1 rounded-full text-xs font-medium"
+						class:selected
+						aria-pressed={selected}
+						onmousedown={(e) => { e.preventDefault(); toggleTag(tag); }}
+					>{tag}</button>
+				{:else}
+					{#if inputText.trim()}
+						<span class="text-xs italic" style="color: var(--text-secondary);">
+							Enter para crear «{inputText.trim().toLowerCase()}»
+						</span>
+					{/if}
+				{/each}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style>
 	.suggestion-item:hover {
 		background: var(--surface-warm);
+	}
+	.cloud-chip {
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
+	}
+	.cloud-chip:hover {
+		background: var(--surface-warm);
+	}
+	.cloud-chip.selected {
+		border-color: var(--primary);
+		background: var(--primary);
+		color: white;
 	}
 </style>
