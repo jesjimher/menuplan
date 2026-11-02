@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { getAllSchedules, upsertSchedule } from '$lib/server/schedules.js';
 import { parseBody } from '$lib/utils/parseBody.js';
 import { scheduleBodySchema } from '$lib/schemas/index.js';
+import { withFrozenPast } from '$lib/server/scheduleFreeze.js';
 
 export async function GET() {
 	return json(getAllSchedules());
@@ -9,6 +10,8 @@ export async function GET() {
 
 export async function POST({ request }) {
 	const body = await parseBody(request, scheduleBodySchema);
-	const id = upsertSchedule(body.recipe_id, body.weekday, body.meal_type, body.is_accompaniment, body.every_n_weeks, body.anchor_week_key, body.on_conflict, body.priority);
+	const id = withFrozenPast(() =>
+		upsertSchedule(body.recipe_id, body.weekday, body.meal_type, body.is_accompaniment, body.every_n_weeks, body.anchor_week_key, body.on_conflict, body.priority)
+	);
 	return json({ ok: true, id });
 }

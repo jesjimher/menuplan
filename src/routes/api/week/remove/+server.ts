@@ -1,8 +1,10 @@
-import { json } from '@sveltejs/kit';
+import { json, error } from '@sveltejs/kit';
 import { removeRecipe, hasManualEntry } from '$lib/server/weekplan.js';
 import { getScheduleForMeal, getActiveSchedulesForWeek, deleteSchedule } from '$lib/server/schedules.js';
 import { parseBody } from '$lib/utils/parseBody.js';
 import { removeBodySchema } from '$lib/schemas/index.js';
+import { withFrozenPast, shiftScheduleRotation, countSchedulesForMeal } from '$lib/server/scheduleFreeze.js';
+import { getWeekKey, weekKeyToIndex } from '$lib/utils/dates.js';
 
 export async function POST({ request }) {
 	const body = await parseBody(request, removeBodySchema);
@@ -17,7 +19,16 @@ export async function POST({ request }) {
 
 	if (force === 'full_schedule') {
 		const sched = getScheduleForMeal(weekday, meal_type, is_accompaniment, recipe_id);
-		if (sched) deleteSchedule(sched.id);
+		if (sched) withFrozenPast(() => deleteSchedule(sched.id));
+		removeRecipe(weekKey, weekday, meal_type, slot_index, is_accompaniment);
+		return json({ ok: true, had_schedule: false });
+	}
+
+	if (force === 'shift_rotation') {
+		if (weekKeyToIndex(weekKey) < weekKeyToIndex(getWeekKey())) {
+			throw error(400, 'No se puede desplazar la rotación en una semana pasada');
+		}
+		shiftScheduleRotation(weekKey, weekday, meal_type, is_accompaniment);
 		removeRecipe(weekKey, weekday, meal_type, slot_index, is_accompaniment);
 		return json({ ok: true, had_schedule: false });
 	}
@@ -34,7 +45,10 @@ export async function POST({ request }) {
 			(recipe_id === undefined || s.recipe_id === recipe_id)
 		);
 		if (sched) {
-			return json({ ok: true, had_schedule: true, schedule_id: sched.id, every_n_weeks: sched.every_n_weeks });
+			// La rotación solo se puede adelantar desde la semana actual o futuras
+			const isPast = weekKeyToIndex(weekKey) < weekKeyToIndex(getWeekKey());
+			const rotation_size = isPast ? 0 : countSchedulesForMeal(weekday, meal_type, is_accompaniment);
+			return json({ ok: true, had_schedule: true, schedule_id: sched.id, every_n_weeks: sched.every_n_weeks, rotation_size });
 		}
 		return json({ ok: true, had_schedule: false });
 	}

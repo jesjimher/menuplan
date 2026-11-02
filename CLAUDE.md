@@ -57,6 +57,7 @@ Funciones puras, sin estado. Cada módulo tiene helpers CRUD simples. Destacados
 
 - **`weekplan.ts`** — `getWeekData()` devuelve la forma completa `WeekData` (slots + configuraciones por día + violaciones de reglas) con una única consulta JOIN. `assignRecipe()` usa `INSERT ... ON CONFLICT ... DO UPDATE` — el target del conflicto debe coincidir con el índice único `idx_week_plans_unique`.
 - **`planner.ts`** — `calculatePlan()` rellena slots vacíos en orden (Lun→Dom, comida antes que cena). Filtra por tag de tipo de comida → restricciones dietéticas → min_days → reglas no_more_than → prioriza reglas at_least. Relaja min_days un 50% en el reintento si no hay candidatos.
+- **`scheduleFreeze.ts`** — las programaciones se resuelven al vuelo también en semanas pasadas, así que toda mutación de programaciones debe ir envuelta en `withFrozenPast()`: materializa en `week_plans` lo que mostraban las semanas anteriores a la actual y adelanta las anclas a su primera aparición ≥ semana actual. `shiftScheduleRotation()` implementa «Pasar a la siguiente» (adelanta una semana todas las programaciones del mismo día+comida).
 - **`recipes.ts`** — `importPlantoeatRecipes()` parsea el formato de exportación de Plantoeat. Los tags en Plantoeat se separan con ` ^ ` (espacio-acento-espacio), no con comas. `getRecipeImageData()`/`setRecipeImage()`/`clearRecipeImage()` gestionan el BLOB de imagen; las demás funciones usan `RECIPE_COLS` que excluye `image_data` para no cargar el BLOB en queries normales.
 
 ### Utilidades compartidas (`src/lib/utils/`)

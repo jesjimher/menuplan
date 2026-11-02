@@ -93,7 +93,7 @@
 	let scheduleModalSlot = $state<ScheduleSlot | null>(null);
 
 	// Remove scheduled recipe dialog state
-	type RemoveScheduleInfo = { scheduleId: number; recipeId: number | undefined; recipeName: string; everyNWeeks: number; weekday: number; mealType: string; slotIndex: number; isAcc: number };
+	type RemoveScheduleInfo = { scheduleId: number; recipeId: number | undefined; recipeName: string; everyNWeeks: number; rotationSize: number; weekday: number; mealType: string; slotIndex: number; isAcc: number };
 	let removeScheduleDialogOpen = $state(false);
 	let removeScheduleInfo = $state<RemoveScheduleInfo | null>(null);
 
@@ -297,6 +297,7 @@
 					recipeId: prev?.id,
 					recipeName: prev?.name ?? '',
 					everyNWeeks: responseData.every_n_weeks,
+					rotationSize: responseData.rotation_size ?? 0,
 					weekday, mealType, slotIndex, isAcc
 				};
 				removeScheduleDialogOpen = true;
@@ -351,6 +352,24 @@
 			await invalidateAll();
 		} catch {
 			showError('Error al quitar receta');
+		}
+		removeScheduleInfo = null;
+	}
+
+	async function handleShiftRotation() {
+		if (!removeScheduleInfo) return;
+		const { weekday, mealType, slotIndex, isAcc } = removeScheduleInfo;
+		removeScheduleDialogOpen = false;
+		try {
+			const res = await fetch('/api/week/remove', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, force: 'shift_rotation' })
+			});
+			if (!res.ok) throw new Error();
+			await invalidateAll();
+		} catch {
+			showError('Error al adelantar la rotación');
 		}
 		removeScheduleInfo = null;
 	}
@@ -918,6 +937,8 @@
 			open={removeScheduleDialogOpen}
 			recipeName={removeScheduleInfo.recipeName}
 			everyNWeeks={removeScheduleInfo.everyNWeeks}
+			rotationSize={removeScheduleInfo.rotationSize}
+			onShiftRotation={handleShiftRotation}
 			onOnlyThisWeek={handleRemoveOnlyThisWeek}
 			onFullSchedule={handleRemoveFullSchedule}
 			onCancel={() => { removeScheduleDialogOpen = false; removeScheduleInfo = null; }}

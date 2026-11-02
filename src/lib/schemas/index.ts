@@ -24,7 +24,7 @@ export const removeBodySchema = z.object({
 	slot_index: slotIndexSchema,
 	is_accompaniment: isAccompanimentSchema,
 	recipe_id: z.number().int().positive().optional(),
-	force: z.enum(['only_week', 'full_schedule', 'move']).optional(),
+	force: z.enum(['only_week', 'full_schedule', 'shift_rotation', 'move']).optional(),
 });
 
 export const clearBodySchema = z.object({

@@ -3,14 +3,18 @@
 		open,
 		recipeName,
 		everyNWeeks,
+		rotationSize = 0,
 		onOnlyThisWeek,
+		onShiftRotation,
 		onFullSchedule,
 		onCancel,
 	}: {
 		open: boolean;
 		recipeName: string;
 		everyNWeeks: number;
+		rotationSize?: number;
 		onOnlyThisWeek: () => void;
+		onShiftRotation?: () => void;
 		onFullSchedule: () => void;
 		onCancel: () => void;
 	} = $props();
@@ -46,6 +50,19 @@
 						La programación continúa en semanas futuras
 					</span>
 				</button>
+
+				{#if rotationSize >= 2 && onShiftRotation}
+					<button
+						on:click={onShiftRotation}
+						class="w-full py-2.5 rounded-xl font-bold text-sm text-left px-4 transition-colors"
+						style="background: var(--surface-container-low); color: var(--text);"
+					>
+						Pasar a la siguiente
+						<span class="block text-xs font-normal mt-0.5" style="color: var(--text-muted);">
+							Las siguientes recetas programadas se adelantan una semana
+						</span>
+					</button>
+				{/if}
 
 				<button
 					on:click={onFullSchedule}
