@@ -62,12 +62,11 @@
 						Pasar a la siguiente
 						<span class="block text-xs font-normal mt-0.5" style="color: var(--text-muted);">
 							{#if nextInRotation.length > 0}
-								En su lugar se pondrá
-								<span class="font-semibold" style="color: var(--text);">{nextInRotation.join(', ')}</span>
-								(la de la próxima semana) y el resto de la rotación se adelanta una semana
+								La próxima es: <span class="font-semibold" style="color: var(--text);">{nextInRotation.join(', ')}</span>.
 							{:else}
-								La próxima semana no hay nada programado: este hueco quedará vacío y el resto de la rotación se adelanta una semana
+								No hay próxima: el hueco quedará vacío.
 							{/if}
+							Las siguientes se adelantarán una semana
 						</span>
 					</button>
 				{/if}
