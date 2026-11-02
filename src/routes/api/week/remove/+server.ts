@@ -4,7 +4,7 @@ import { getScheduleForMeal, getActiveSchedulesForWeek, deleteSchedule } from '$
 import { parseBody } from '$lib/utils/parseBody.js';
 import { removeBodySchema } from '$lib/schemas/index.js';
 import { withFrozenPast, shiftScheduleRotation, countSchedulesForMeal } from '$lib/server/scheduleFreeze.js';
-import { getWeekKey, weekKeyToIndex } from '$lib/utils/dates.js';
+import { getWeekKey, weekKeyToIndex, indexToWeekKey } from '$lib/utils/dates.js';
 
 export async function POST({ request }) {
 	const body = await parseBody(request, removeBodySchema);
@@ -48,7 +48,14 @@ export async function POST({ request }) {
 			// La rotación solo se puede adelantar desde la semana actual o futuras
 			const isPast = weekKeyToIndex(weekKey) < weekKeyToIndex(getWeekKey());
 			const rotation_size = isPast ? 0 : countSchedulesForMeal(weekday, meal_type, is_accompaniment);
-			return json({ ok: true, had_schedule: true, schedule_id: sched.id, every_n_weeks: sched.every_n_weeks, rotation_size });
+			// Al adelantar la rotación, esta semana pasa a tener lo programado para la siguiente
+			// (las excepciones de la semana siguiente también se adelantan, así que se respetan)
+			const next_in_rotation = rotation_size >= 2
+				? getActiveSchedulesForWeek(indexToWeekKey(weekKeyToIndex(weekKey) + 1))
+					.filter(s => s.weekday === weekday && s.meal_type === meal_type && s.is_accompaniment === is_accompaniment)
+					.map(s => s.recipe.name)
+				: [];
+			return json({ ok: true, had_schedule: true, schedule_id: sched.id, every_n_weeks: sched.every_n_weeks, rotation_size, next_in_rotation });
 		}
 		return json({ ok: true, had_schedule: false });
 	}

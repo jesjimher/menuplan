@@ -93,7 +93,7 @@
 	let scheduleModalSlot = $state<ScheduleSlot | null>(null);
 
 	// Remove scheduled recipe dialog state
-	type RemoveScheduleInfo = { scheduleId: number; recipeId: number | undefined; recipeName: string; everyNWeeks: number; rotationSize: number; weekday: number; mealType: string; slotIndex: number; isAcc: number };
+	type RemoveScheduleInfo = { scheduleId: number; recipeId: number | undefined; recipeName: string; everyNWeeks: number; rotationSize: number; nextInRotation: string[]; weekday: number; mealType: string; slotIndex: number; isAcc: number };
 	let removeScheduleDialogOpen = $state(false);
 	let removeScheduleInfo = $state<RemoveScheduleInfo | null>(null);
 
@@ -298,6 +298,7 @@
 					recipeName: prev?.name ?? '',
 					everyNWeeks: responseData.every_n_weeks,
 					rotationSize: responseData.rotation_size ?? 0,
+					nextInRotation: responseData.next_in_rotation ?? [],
 					weekday, mealType, slotIndex, isAcc
 				};
 				removeScheduleDialogOpen = true;
@@ -938,6 +939,7 @@
 			recipeName={removeScheduleInfo.recipeName}
 			everyNWeeks={removeScheduleInfo.everyNWeeks}
 			rotationSize={removeScheduleInfo.rotationSize}
+			nextInRotation={removeScheduleInfo.nextInRotation}
 			onShiftRotation={handleShiftRotation}
 			onOnlyThisWeek={handleRemoveOnlyThisWeek}
 			onFullSchedule={handleRemoveFullSchedule}

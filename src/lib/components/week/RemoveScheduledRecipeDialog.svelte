@@ -4,6 +4,7 @@
 		recipeName,
 		everyNWeeks,
 		rotationSize = 0,
+		nextInRotation = [],
 		onOnlyThisWeek,
 		onShiftRotation,
 		onFullSchedule,
@@ -13,6 +14,7 @@
 		recipeName: string;
 		everyNWeeks: number;
 		rotationSize?: number;
+		nextInRotation?: string[];
 		onOnlyThisWeek: () => void;
 		onShiftRotation?: () => void;
 		onFullSchedule: () => void;
@@ -59,7 +61,13 @@
 					>
 						Pasar a la siguiente
 						<span class="block text-xs font-normal mt-0.5" style="color: var(--text-muted);">
-							Las siguientes recetas programadas se adelantan una semana
+							{#if nextInRotation.length > 0}
+								En su lugar se pondrá
+								<span class="font-semibold" style="color: var(--text);">{nextInRotation.join(', ')}</span>
+								(la de la próxima semana) y el resto de la rotación se adelanta una semana
+							{:else}
+								La próxima semana no hay nada programado: este hueco quedará vacío y el resto de la rotación se adelanta una semana
+							{/if}
 						</span>
 					</button>
 				{/if}
