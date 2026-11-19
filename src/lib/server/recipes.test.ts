@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { importPlantoeatRecipes, getAllTags, searchRecipes, getRecipesPlannedNearDate } from './recipes.js';
+import { importPlantoeatRecipes, exportPlantoeatRecipes, getAllRecipes, createRecipe, getAllTags, searchRecipes, getRecipesPlannedNearDate } from './recipes.js';
 import { resetDb, seedRecipe } from './test-helpers.js';
 import { assignRecipe } from './weekplan.js';
 import { upsertSchedule } from './schedules.js';
@@ -31,6 +31,35 @@ describe('importPlantoeatRecipes', () => {
 
 	it('ignora bloques sin título', () => {
 		expect(importPlantoeatRecipes('Tags: huérfano')).toHaveLength(0);
+	});
+
+	it('no corta las instrucciones con líneas «Algo: …» que no son claves de Plantoeat', () => {
+		const text = 'Title: Sopa\nDirections: Hervir.\nNota: sin sal\nPaso final: servir';
+		const [r] = importPlantoeatRecipes(text);
+		expect(r.description).toBe('Hervir.\nNota: sin sal\nPaso final: servir');
+	});
+
+	it('lee el campo Min Days', () => {
+		const [r] = importPlantoeatRecipes('Title: Lentejas\nMin Days: 10');
+		expect(r.min_days).toBe(10);
+	});
+});
+
+describe('exportPlantoeatRecipes', () => {
+	it('genera texto que se reimporta sin pérdidas', () => {
+		createRecipe({ name: 'Tortilla', description: 'Batir.\nNota: poco aceite\n-----\nFreír.', tags: 'comida,huevo', min_days: 7 });
+		createRecipe({ name: 'Ensalada', description: '', tags: '', min_days: -1 });
+		createRecipe({ name: 'Crema', description: 'Triturar', tags: 'cena, Verano', min_days: 0 });
+		const strip = () => getAllRecipes().map(r => ({ name: r.name, description: r.description, tags: r.tags, min_days: r.min_days }));
+		const before = strip().map(r => r.name === 'Tortilla'
+			? { ...r, description: 'Batir.\nNota: poco aceite\n----\nFreír.' }
+			: r.name === 'Crema' ? { ...r, tags: 'cena,verano' } : r);
+
+		const text = exportPlantoeatRecipes();
+		expect(text).toContain('Tags: comida ^ huevo');
+		resetDb();
+		expect(importPlantoeatRecipes(text)).toHaveLength(3);
+		expect(strip()).toEqual(before);
 	});
 });
 

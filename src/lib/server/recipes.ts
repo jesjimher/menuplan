@@ -182,8 +182,18 @@ export function getRecipesPlannedNearDate(targetDate: Date, daysBack = 7): Recip
 		.map(v => v.recipe);
 }
 
+// Claves reconocidas en el formato de exportación de Plantoeat (más «min days», propia).
+// Cualquier otra línea «Algo: …» se trata como continuación del campo actual, para no
+// truncar instrucciones que contengan cosas como «Nota: sin sal».
+const PLANTOEAT_KEYS = new Set([
+	'title', 'description', 'source', 'original_url', 'url', 'yield', 'servings',
+	'prep_time', 'cook_time', 'total_time', 'course', 'cuisine', 'main_ingredient',
+	'tags', 'ingredients', 'directions', 'notes', 'nutrition', 'rating', 'photo_url',
+	'image_url', 'min_days'
+]);
+
 export function importPlantoeatRecipes(text: string): Recipe[] {
-	const blocks = text.split(/\n-{5,}\n/).filter(b => b.trim());
+	const blocks = text.replace(/\r\n/g, '\n').split(/\n-{5,}\n/).filter(b => b.trim());
 	const created: Recipe[] = [];
 
 	for (const block of blocks) {
@@ -193,14 +203,16 @@ export function importPlantoeatRecipes(text: string): Recipe[] {
 
 		for (const line of lines) {
 			const match = line.match(/^([A-Za-z ]+):\s*(.*)$/);
-			if (match) {
-				currentKey = match[1].toLowerCase().replace(/ /g, '_');
-				data[currentKey] = match[2].trim();
+			const key = match?.[1].trim().toLowerCase().replace(/ +/g, '_');
+			if (match && key && PLANTOEAT_KEYS.has(key)) {
+				currentKey = key;
+				data[currentKey] = match[2].trimStart();
 			} else if (currentKey) {
 				data[currentKey] = (data[currentKey] || '') + '\n' + line;
 			}
 		}
 
+		for (const k of Object.keys(data)) if (k !== 'directions' && k !== 'description') data[k] = data[k].trim();
 		if (!data.title) continue;
 
 		const tags: string[] = [];
@@ -208,17 +220,39 @@ export function importPlantoeatRecipes(text: string): Recipe[] {
 		if (data.tags) {
 			// Plantoeat uses " ^ " as tag separator, also support comma
 			const sep = data.tags.includes('^') ? /\s*\^\s*/ : /,/;
-			tags.push(...data.tags.split(sep).map(t => t.trim().toLowerCase()).filter(Boolean));
+			for (const t of data.tags.split(sep).map(t => t.trim().toLowerCase()).filter(Boolean)) {
+				if (!tags.includes(t)) tags.push(t);
+			}
 		}
+
+		const minDays = parseInt(data.min_days ?? '');
 
 		const recipe = createRecipe({
 			name: data.title,
 			description: (data.directions || data.description || '').trim(),
 			tags: tags.join(','),
-			min_days: -1
+			min_days: Number.isNaN(minDays) ? -1 : minDays
 		});
 		created.push(recipe);
 	}
 
 	return created;
+}
+
+/** Exporta todas las recetas en formato Plantoeat, reimportable con importPlantoeatRecipes. */
+export function exportPlantoeatRecipes(): string {
+	return getAllRecipes().map(r => {
+		const lines = [`Title: ${r.name.replace(/\s*\n\s*/g, ' ').trim()}`];
+		const tags = parseTags(r.tags);
+		if (tags.length) lines.push(`Tags: ${tags.join(' ^ ')}`);
+		if (r.min_days !== -1) lines.push(`Min Days: ${r.min_days}`);
+		const directions = (r.description || '')
+			.replace(/\r\n/g, '\n')
+			.split('\n')
+			.map(l => (/^-{5,}$/.test(l.trim()) ? '----' : l))
+			.join('\n')
+			.trim();
+		if (directions) lines.push(`Directions: ${directions}`);
+		return lines.join('\n');
+	}).join('\n\n-----\n\n') + '\n';
 }

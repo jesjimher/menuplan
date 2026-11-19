@@ -137,6 +137,17 @@
 					</svg>
 					<span class="hidden sm:inline text-sm font-medium">Importar</span>
 				</button>
+				<a href="/api/recipes/export" download data-sveltekit-reload
+					class="p-2 sm:px-4 sm:py-2 rounded-lg transition-colors"
+					style="color: var(--text); border: 1px solid var(--surface-container-highest);"
+					on:mouseenter={(e) => e.currentTarget.style.background = 'var(--surface-container)'}
+					on:mouseleave={(e) => e.currentTarget.style.background = 'transparent'}
+					title="Exportar todas las recetas (formato Plantoeat)">
+					<svg class="sm:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4M17 8l-5-5-5 5M12 3v12" />
+					</svg>
+					<span class="hidden sm:inline text-sm font-medium">Exportar</span>
+				</a>
 				<button on:click={startNew}
 					class="p-2 sm:px-4 sm:py-2 rounded-lg transition-colors"
 					style="background: var(--primary); color: white;"
