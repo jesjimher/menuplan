@@ -321,6 +321,39 @@ const MIGRATIONS: Migration[] = [
 			}
 			db.exec('DROP TABLE week_day_config');
 		}
+	},
+	{
+		version: 18,
+		name: 'create_people',
+		up: (db) => {
+			// Personas y para quién es cada receta. Sin filas en las tablas de unión = para todos.
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS people (
+					id          INTEGER PRIMARY KEY AUTOINCREMENT,
+					name        TEXT    NOT NULL,
+					sort_order  INTEGER NOT NULL DEFAULT 0,
+					archived    INTEGER NOT NULL DEFAULT 0,
+					image_data  BLOB    DEFAULT NULL,
+					image_type  TEXT    DEFAULT NULL,
+					created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+				);
+				CREATE TABLE IF NOT EXISTS week_plan_people (
+					week_plan_id INTEGER NOT NULL REFERENCES week_plans(id) ON DELETE CASCADE,
+					person_id    INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+					PRIMARY KEY (week_plan_id, person_id)
+				);
+				CREATE TABLE IF NOT EXISTS schedule_people (
+					schedule_id INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+					person_id   INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+					PRIMARY KEY (schedule_id, person_id)
+				);
+				CREATE TABLE IF NOT EXISTS rule_people (
+					rule_id   INTEGER NOT NULL REFERENCES rules(id) ON DELETE CASCADE,
+					person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+					PRIMARY KEY (rule_id, person_id)
+				);
+			`);
+		}
 	}
 ];
 

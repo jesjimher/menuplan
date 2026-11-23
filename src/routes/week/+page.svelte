@@ -13,6 +13,8 @@
 	import RemoveScheduledRecipeDialog from '$lib/components/week/RemoveScheduledRecipeDialog.svelte';
 	import MoveCopyLeftoverModal from '$lib/components/week/MoveCopyLeftoverModal.svelte';
 	import RecipeEditModal from '$lib/components/RecipeEditModal.svelte';
+	import SlotPeopleDialog from '$lib/components/week/SlotPeopleDialog.svelte';
+	import PersonFilter from '$lib/components/people/PersonFilter.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 	import { WeekDragDrop, type SlotCoord } from '$lib/utils/weekDragDrop.svelte.js';
 
@@ -30,6 +32,17 @@
 	let errorMsg = $state<string | null>(null);
 	let errorTimeout: ReturnType<typeof setTimeout>;
 	let selectedDay = $state(1);
+
+	// Personas activas (vienen con la semana) y vista por persona (null = todos)
+	let people = $derived(weekData?.people ?? []);
+	let viewPerson = $state<number | null>(null);
+	$effect(() => {
+		// Si la persona vista se archiva o se borra, volver a la vista general
+		if (viewPerson !== null && !people.some(p => p.id === viewPerson)) viewPerson = null;
+	});
+	let visibleViolations = $derived((weekData?.violations ?? []).filter(v =>
+		viewPerson === null || v.people.length === 0 || v.people.includes(viewPerson)
+	));
 
 	$effect(() => {
 		const now = new Date();
@@ -233,7 +246,8 @@
 		pickerOpen = true;
 	}
 
-	function patchSlot(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipe: Recipe | null, isLeftover: 0 | 1 = 0) {
+	// `slotPeople` omitido = conservar las personas que ya tuviera el hueco
+	function patchSlot(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipe: Recipe | null, isLeftover: 0 | 1 = 0, slotPeople?: number[]) {
 		if (!weekData) return;
 		const exists = weekData.slots.some(s =>
 			s.weekday === weekday && s.meal_type === mealType &&
@@ -250,31 +264,32 @@
 			newSlots = weekData.slots.map(s =>
 				s.weekday === weekday && s.meal_type === mealType &&
 				s.slot_index === slotIndex && s.is_accompaniment === isAcc
-					? { ...s, recipe, is_leftover: isLeftover }
+					? { ...s, recipe, is_leftover: isLeftover, people: slotPeople ?? s.people }
 					: s
 			);
 		} else if (recipe) {
-			newSlots = [...weekData.slots, { weekday, meal_type: mealType as 'comida' | 'cena', slot_index: slotIndex, is_accompaniment: isAcc, is_leftover: isLeftover, recipe, schedule: null }];
+			newSlots = [...weekData.slots, { weekday, meal_type: mealType as 'comida' | 'cena', slot_index: slotIndex, is_accompaniment: isAcc, is_leftover: isLeftover, recipe, schedule: null, people: slotPeople ?? [] }];
 		} else {
 			return;
 		}
-		weekData = { ...weekData, slots: newSlots, violations: checkRules(newSlots, rules) };
+		weekData = { ...weekData, slots: newSlots, violations: checkRules(newSlots, rules, weekData.people) };
 	}
 
-	async function selectRecipe(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipeId: number, isLeftover = false) {
+	async function selectRecipe(weekday: number, mealType: string, slotIndex: number, isAcc: number, recipeId: number, isLeftover = false, slotPeople?: number[]) {
 		const prevSlot = getSlot(weekday, mealType, slotIndex, isAcc);
 		const prev = prevSlot?.recipe ?? null;
 		const prevIsLeftover = prevSlot?.is_leftover ?? 0;
-		patchSlot(weekday, mealType, slotIndex, isAcc, recipes.find(r => r.id === recipeId) ?? null, isLeftover ? 1 : 0);
+		const prevPeople = prevSlot?.people ?? [];
+		patchSlot(weekday, mealType, slotIndex, isAcc, recipes.find(r => r.id === recipeId) ?? null, isLeftover ? 1 : 0, slotPeople);
 		try {
 			const res = await fetch('/api/week/assign', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, recipe_id: recipeId, is_leftover: isLeftover ? 1 : 0 })
+				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, recipe_id: recipeId, is_leftover: isLeftover ? 1 : 0, people: slotPeople })
 			});
 			if (!res.ok) throw new Error();
 		} catch {
-			patchSlot(weekday, mealType, slotIndex, isAcc, prev, prevIsLeftover as 0 | 1);
+			patchSlot(weekday, mealType, slotIndex, isAcc, prev, prevIsLeftover as 0 | 1, prevPeople);
 			showError('Error al asignar receta');
 		}
 	}
@@ -384,14 +399,17 @@
 		const toRecipe   = toSlot?.recipe ?? null;
 		const fromIsLeftover = fromSlot?.is_leftover ?? 0;
 		const toIsLeftover   = toSlot?.is_leftover ?? 0;
+		// Las personas viajan con la receta
+		const fromPeople = fromSlot?.people ?? [];
+		const toPeople   = toSlot?.people ?? [];
 		if (!fromRecipe) return;
-		patchSlot(to.weekday,   to.mealType,   to.slotIndex,   to.isAcc,   fromRecipe, 0);
-		patchSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc, toRecipe,   0);
-		const doAssign = (coord: SlotCoord, recipe: Recipe | null) => {
+		patchSlot(to.weekday,   to.mealType,   to.slotIndex,   to.isAcc,   fromRecipe, 0, fromPeople);
+		patchSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc, toRecipe,   0, toPeople);
+		const doAssign = (coord: SlotCoord, recipe: Recipe | null, slotPeople: number[]) => {
 			if (recipe) {
 				return fetch('/api/week/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ weekKey, weekday: coord.weekday, meal_type: coord.mealType,
-						slot_index: coord.slotIndex, is_accompaniment: coord.isAcc, recipe_id: recipe.id, is_leftover: 0 }) });
+						slot_index: coord.slotIndex, is_accompaniment: coord.isAcc, recipe_id: recipe.id, is_leftover: 0, people: slotPeople }) });
 			} else {
 				return fetch('/api/week/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ weekKey, weekday: coord.weekday, meal_type: coord.mealType,
@@ -399,45 +417,51 @@
 			}
 		};
 		try {
-			const results = await Promise.all([doAssign(to, fromRecipe), doAssign(from, toRecipe)]);
+			const results = await Promise.all([doAssign(to, fromRecipe, fromPeople), doAssign(from, toRecipe, toPeople)]);
 			if (results.some(r => !r.ok)) throw new Error();
 		} catch {
-			patchSlot(to.weekday,   to.mealType,   to.slotIndex,   to.isAcc,   toRecipe,   toIsLeftover as 0 | 1);
-			patchSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc, fromRecipe, fromIsLeftover as 0 | 1);
+			patchSlot(to.weekday,   to.mealType,   to.slotIndex,   to.isAcc,   toRecipe,   toIsLeftover as 0 | 1, toPeople);
+			patchSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc, fromRecipe, fromIsLeftover as 0 | 1, fromPeople);
 			showError('Error al mover receta');
 		}
 	}
 
 	async function copySlot(from: SlotCoord, to: SlotCoord) {
-		const fromRecipe = getSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc)?.recipe ?? null;
+		const fromSlot = getSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc);
+		const fromRecipe = fromSlot?.recipe ?? null;
 		if (!fromRecipe) return;
+		const fromPeople = fromSlot?.people ?? [];
 		const prevSlot = getSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc);
 		const prevRecipe = prevSlot?.recipe ?? null;
 		const prevIsLeftover = prevSlot?.is_leftover ?? 0;
-		patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, fromRecipe, 0);
+		const prevPeople = prevSlot?.people ?? [];
+		patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, fromRecipe, 0, fromPeople);
 		try {
 			const res = await fetch('/api/week/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday: to.weekday, meal_type: to.mealType, slot_index: to.slotIndex, is_accompaniment: to.isAcc, recipe_id: fromRecipe.id, is_leftover: 0 }) });
+				body: JSON.stringify({ weekKey, weekday: to.weekday, meal_type: to.mealType, slot_index: to.slotIndex, is_accompaniment: to.isAcc, recipe_id: fromRecipe.id, is_leftover: 0, people: fromPeople }) });
 			if (!res.ok) throw new Error();
 		} catch {
-			patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, prevRecipe, prevIsLeftover as 0 | 1);
+			patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, prevRecipe, prevIsLeftover as 0 | 1, prevPeople);
 			showError('Error al copiar receta');
 		}
 	}
 
 	async function markAsLeftover(from: SlotCoord, to: SlotCoord) {
-		const fromRecipe = getSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc)?.recipe ?? null;
+		const fromSlot = getSlot(from.weekday, from.mealType, from.slotIndex, from.isAcc);
+		const fromRecipe = fromSlot?.recipe ?? null;
 		if (!fromRecipe) return;
+		const fromPeople = fromSlot?.people ?? [];
 		const prevSlot = getSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc);
 		const prevRecipe = prevSlot?.recipe ?? null;
 		const prevIsLeftover = prevSlot?.is_leftover ?? 0;
-		patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, fromRecipe, 1);
+		const prevPeople = prevSlot?.people ?? [];
+		patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, fromRecipe, 1, fromPeople);
 		try {
 			const res = await fetch('/api/week/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ weekKey, weekday: to.weekday, meal_type: to.mealType, slot_index: to.slotIndex, is_accompaniment: to.isAcc, recipe_id: fromRecipe.id, is_leftover: 1 }) });
+				body: JSON.stringify({ weekKey, weekday: to.weekday, meal_type: to.mealType, slot_index: to.slotIndex, is_accompaniment: to.isAcc, recipe_id: fromRecipe.id, is_leftover: 1, people: fromPeople }) });
 			if (!res.ok) throw new Error();
 		} catch {
-			patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, prevRecipe, prevIsLeftover as 0 | 1);
+			patchSlot(to.weekday, to.mealType, to.slotIndex, to.isAcc, prevRecipe, prevIsLeftover as 0 | 1, prevPeople);
 			showError('Error al marcar como restos');
 		}
 	}
@@ -667,6 +691,58 @@
 		await setSlotTags(weekday, mealType, slotIdx, current.filter(t => t !== tag));
 	}
 
+	// --- Personas por hueco ---
+
+	/** Plato principal del que cuelga un acompañamiento «por receta» (null si es «por franja»). */
+	function parentMainIndex(weekday: number, mealType: string, accIdx: number): number | null {
+		const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena');
+		if (cfg.accompaniment_per_recipe <= 0) return null;
+		const parent = Math.floor(accIdx / cfg.accompaniment_per_recipe);
+		return parent < cfg.recipe_count ? parent : null;
+	}
+
+	/** Para quién es la receta: la suya o, si es un acompañamiento sin personas, las de su plato. */
+	function slotPeopleInfo(weekday: number, mealType: string, slotIdx: number, isAcc: number): { ids: number[]; inherited: boolean } {
+		const own = getSlot(weekday, mealType, slotIdx, isAcc)?.people ?? [];
+		if (own.length > 0 || !isAcc) return { ids: own, inherited: false };
+		const parent = parentMainIndex(weekday, mealType, slotIdx);
+		if (parent === null) return { ids: [], inherited: false };
+		const parentSlot = getSlot(weekday, mealType, parent, 0);
+		return { ids: parentSlot?.recipe ? parentSlot.people : [], inherited: true };
+	}
+
+	function isSlotHidden(weekday: number, mealType: string, slotIdx: number, isAcc: number): boolean {
+		if (viewPerson === null || !getSlot(weekday, mealType, slotIdx, isAcc)?.recipe) return false;
+		const { ids } = slotPeopleInfo(weekday, mealType, slotIdx, isAcc);
+		return ids.length > 0 && !ids.includes(viewPerson);
+	}
+
+	type PeopleSlot = { weekday: number; mealType: string; slotIndex: number; isAcc: number };
+	let peopleSlot = $state<PeopleSlot | null>(null);
+
+	async function setSlotPeople(weekday: number, mealType: string, slotIndex: number, isAcc: number, ids: number[]) {
+		const slot = getSlot(weekday, mealType, slotIndex, isAcc);
+		if (!slot?.recipe) return;
+		const prevPeople = slot.people;
+		patchSlot(weekday, mealType, slotIndex, isAcc, slot.recipe, slot.is_leftover, ids);
+		try {
+			const res = await fetch('/api/week/people', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ weekKey, weekday, meal_type: mealType, slot_index: slotIndex, is_accompaniment: isAcc, recipe_id: slot.recipe.id, people: ids })
+			});
+			if (!res.ok) throw new Error();
+		} catch {
+			patchSlot(weekday, mealType, slotIndex, isAcc, slot.recipe, slot.is_leftover, prevPeople);
+			showError('Error al guardar para quién es la receta');
+		}
+	}
+
+	/** Texto de «sin selección» en el selector de personas del hueco. */
+	function allPeopleLabel(weekday: number, mealType: string, slotIdx: number, isAcc: number): string {
+		return isAcc && parentMainIndex(weekday, mealType, slotIdx) !== null ? 'Como el plato' : 'Todos';
+	}
+
 	// Helpers for creating slot callbacks
 	function makeSlotCallbacks(weekday: number, mealType: string, slotIdx: number, isAcc: number) {
 		const key = slotKey(weekday, mealType, slotIdx, isAcc);
@@ -701,6 +777,7 @@
 			onTouchMove: () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } },
 			onSchedule: () => openScheduleModal(weekday, mealType, slotIdx, isAcc),
 			onEdit: () => openRecipeEditModal(weekday, mealType, slotIdx, isAcc),
+			onOpenPeople: () => { peopleSlot = { weekday, mealType, slotIndex: slotIdx, isAcc }; },
 		};
 	}
 </script>
@@ -722,6 +799,9 @@
 		onClear={() => clearPlan('week')}
 		onClearFuture={() => clearPlan('future')}
 		onCopyPrevious={copyPrevious}
+		{people}
+		{viewPerson}
+		onViewPerson={(id) => viewPerson = id}
 	/>
 
 	{#if errorMsg}
@@ -772,6 +852,13 @@
 			</button>
 		{/each}
 	</div>
+
+	{#if people.length > 0}
+		<div class="sm:hidden flex items-center gap-2 px-3 pt-2 shrink-0">
+			<span class="text-[10px] font-black uppercase tracking-widest" style="color: var(--text-muted);">Ver</span>
+			<PersonFilter {people} value={viewPerson} onchange={(id) => viewPerson = id} size={26} />
+		</div>
+	{/if}
 
 	<!-- Grid semanal -->
 	<div class="flex-1 overflow-hidden flex flex-col min-h-0">
@@ -878,6 +965,9 @@
 								{getSlot}
 								{slotKey}
 								{makeSlotCallbacks}
+								{people}
+								{slotPeopleInfo}
+								{isSlotHidden}
 								onIncrementMealCount={() => incrementMealCount(weekday, meal)}
 								onDecrementMealCount={() => decrementMealCount(weekday, meal)}
 								onUpdateConfig={(field, value) => updateConfig(weekday, meal, field, value)}
@@ -894,7 +984,7 @@
 		</div>
 
 		{#if weekData}
-			<ViolationBanner violations={weekData.violations ?? []} />
+			<ViolationBanner violations={visibleViolations} />
 		{/if}
 		{/if}
 	</div>
@@ -908,13 +998,36 @@
 			slotIndex={pickerSlot.slotIndex}
 			isAcc={pickerSlot.isAcc}
 			{allTags}
-			onSelect={(id, isLeftover) => {
+			{people}
+			initialPeople={getSlot(pickerSlot.weekday, pickerSlot.mealType, pickerSlot.slotIndex, pickerSlot.isAcc)?.people
+				?? (viewPerson !== null ? [viewPerson] : [])}
+			allPeopleLabel={allPeopleLabel(pickerSlot.weekday, pickerSlot.mealType, pickerSlot.slotIndex, pickerSlot.isAcc)}
+			onPeopleChange={getSlot(pickerSlot.weekday, pickerSlot.mealType, pickerSlot.slotIndex, pickerSlot.isAcc)?.recipe
+				? (ids) => setSlotPeople(pickerSlot!.weekday, pickerSlot!.mealType, pickerSlot!.slotIndex, pickerSlot!.isAcc, ids)
+				: undefined}
+			onSelect={(id, isLeftover, slotPeople) => {
 				pickerOpen = false;
-				selectRecipe(pickerSlot!.weekday, pickerSlot!.mealType, pickerSlot!.slotIndex, pickerSlot!.isAcc, id, isLeftover);
+				selectRecipe(pickerSlot!.weekday, pickerSlot!.mealType, pickerSlot!.slotIndex, pickerSlot!.isAcc, id, isLeftover, slotPeople);
 			}}
 			onClose={() => { pickerOpen = false; }}
 			onRecipeSaved={() => invalidateAll()}
 		/>
+	{/if}
+
+	{#if peopleSlot}
+		{@const ps = peopleSlot}
+		{@const psSlot = getSlot(ps.weekday, ps.mealType, ps.slotIndex, ps.isAcc)}
+		{#if psSlot?.recipe}
+			<SlotPeopleDialog
+				recipeName={psSlot.recipe.name}
+				{people}
+				value={psSlot.people}
+				allLabel={allPeopleLabel(ps.weekday, ps.mealType, ps.slotIndex, ps.isAcc)}
+				hint={psSlot.schedule ? 'Receta programada: el cambio solo afecta a esta semana. Para todas, edita la programación.' : undefined}
+				onchange={(ids) => setSlotPeople(ps.weekday, ps.mealType, ps.slotIndex, ps.isAcc, ids)}
+				onClose={() => peopleSlot = null}
+			/>
+		{/if}
 	{/if}
 
 	{#if scheduleModalSlot}
@@ -927,6 +1040,8 @@
 			isAccompaniment={scheduleModalSlot.isAcc}
 			recipe={scheduleModalSlot.recipe}
 			schedule={scheduleModalSlot.schedule}
+			{people}
+			slotPeople={getSlot(scheduleModalSlot.weekday, scheduleModalSlot.mealType, scheduleModalSlot.slotIndex, scheduleModalSlot.isAcc)?.people ?? []}
 			onSaved={async () => { scheduleModalOpen = false; scheduleModalSlot = null; await invalidateAll(); }}
 			onDeleted={async () => { scheduleModalOpen = false; scheduleModalSlot = null; await invalidateAll(); }}
 			onClose={() => { scheduleModalOpen = false; scheduleModalSlot = null; }}

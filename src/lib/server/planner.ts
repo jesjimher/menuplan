@@ -6,6 +6,8 @@ import { getAllRules } from './rules.js';
 import { getAllRecipes } from './recipes.js';
 import { getOptions } from './options.js';
 import { assignRecipe } from './weekplan.js';
+import { getActivePeople } from './people.js';
+import { countTagsPerPerson, countBuckets, addTagCounts, ruleTargets, type TagCounts } from '$lib/utils/ruleChecker.js';
 
 // Heurística: asumimos que la receta fue planificada a mitad de la semana anterior
 const MIDWEEK_DAY_OFFSET = 4;
@@ -51,25 +53,20 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 
 	const currentWeekIdx = weekKeyToIndex(weekKey);
 
-	// Count current tag occurrences
-	const tagCounts: Record<string, number> = {};
-	for (const slot of currentSlots) {
-		if (slot.recipe && !slot.is_accompaniment) {
-			const tags = parseTags(slot.recipe.tags);
-			for (const tag of tags) {
-				tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-			}
-		}
-	}
+	// Contadores de tags por persona. El planificador deja sus recetas para todos, así que
+	// cada receta nueva suma a todos los contadores.
+	const personIds = getActivePeople().map(p => p.id);
+	const allBuckets = countBuckets(personIds);
+	const tagCounts = countTagsPerPerson(currentSlots, personIds, { includeLeftovers: true });
 
 	const allRecipes = getAllRecipes();
 
 	db.transaction(() => {
 		for (const slot of slotsToFill) {
-			let candidates = fillCandidates(slot, allRecipes, options, rules, tagCounts, weekKey, lastWeekByRecipe, currentWeekIdx, false);
+			let candidates = fillCandidates(slot, allRecipes, options, rules, tagCounts, personIds, weekKey, lastWeekByRecipe, currentWeekIdx, false);
 
 			if (candidates.length === 0) {
-				candidates = fillCandidates(slot, allRecipes, options, rules, tagCounts, weekKey, lastWeekByRecipe, currentWeekIdx, true);
+				candidates = fillCandidates(slot, allRecipes, options, rules, tagCounts, personIds, weekKey, lastWeekByRecipe, currentWeekIdx, true);
 			}
 
 			// Filtro de required_tags (AND condition, solo platos principales)
@@ -88,10 +85,10 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 			const atLeastRules = rules.filter(r => r.direction === 'at_least');
 			const helping = candidates.filter(r => {
 				const tags = parseTags(r.tags);
-				return atLeastRules.some(rule => {
-					const count = tagCounts[rule.tag] || 0;
-					return count < rule.times && tags.includes(rule.tag);
-				});
+				return atLeastRules.some(rule =>
+					tags.includes(rule.tag) &&
+					ruleTargets(rule, personIds).some(p => (tagCounts.get(p)?.[rule.tag] || 0) < rule.times)
+				);
 			});
 
 			const pool = helping.length > 0 ? helping : candidates;
@@ -99,10 +96,7 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 
 			assignRecipe(weekKey, slot.weekday, slot.meal_type, slot.slot_index, slot.is_accompaniment, chosen.id);
 
-			const tags = parseTags(chosen.tags);
-			for (const tag of tags) {
-				tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-			}
+			if (!slot.is_accompaniment) addTagCounts(tagCounts, parseTags(chosen.tags), allBuckets);
 		}
 	})();
 }
@@ -120,15 +114,8 @@ export function getDiscardedRecipes(
 	const rules = getAllRules();
 	const options = getOptions();
 
-	const tagCounts: Record<string, number> = {};
-	for (const slot of currentSlots) {
-		if (slot.recipe && !slot.is_accompaniment) {
-			const tags = parseTags(slot.recipe.tags);
-			for (const tag of tags) {
-				tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-			}
-		}
-	}
+	const personIds = getActivePeople().map(p => p.id);
+	const tagCounts = countTagsPerPerson(currentSlots, personIds, { includeLeftovers: true });
 
 	const requiredTag = isAcc ? 'acompañamiento' : mealType;
 	const allRecipes = getAllRecipes();
@@ -172,12 +159,11 @@ export function getDiscardedRecipes(
 		if (!reason) {
 			const noMoreThanRules = rules.filter(r => r.direction === 'no_more_than');
 			for (const rule of noMoreThanRules) {
-				if (tags.includes(rule.tag)) {
-					const count = tagCounts[rule.tag] || 0;
-					if (count >= rule.times) {
-						reason = `regla no_more_than: ${rule.tag} (${count}/${rule.times})`;
-						break;
-					}
+				if (!tags.includes(rule.tag)) continue;
+				const count = maxRuleCount(rule, tagCounts, personIds);
+				if (count >= rule.times) {
+					reason = `regla no_more_than: ${rule.tag} (${count}/${rule.times})`;
+					break;
 				}
 			}
 		}
@@ -195,7 +181,8 @@ function fillCandidates(
 	allRecipes: Recipe[],
 	options: Options,
 	rules: Rule[],
-	tagCounts: Record<string, number>,
+	tagCounts: TagCounts,
+	personIds: number[],
 	weekKey: string,
 	lastWeekByRecipe: Map<number, string>,
 	currentWeekIdx: number,
@@ -214,12 +201,16 @@ function fillCandidates(
 
 		const noMoreThanRules = rules.filter(r => r.direction === 'no_more_than');
 		for (const rule of noMoreThanRules) {
-			if (tags.includes(rule.tag)) {
-				const count = tagCounts[rule.tag] || 0;
-				if (count >= rule.times) return false;
-			}
+			if (tags.includes(rule.tag) && maxRuleCount(rule, tagCounts, personIds) >= rule.times) return false;
 		}
 
 		return true;
 	});
+}
+
+/** Mayor contador del tag de la regla entre las personas a las que aplica (-1 si a ninguna). */
+function maxRuleCount(rule: Rule, tagCounts: TagCounts, personIds: number[]): number {
+	const targets = ruleTargets(rule, personIds);
+	if (targets.length === 0) return -1;
+	return Math.max(...targets.map(p => tagCounts.get(p)?.[rule.tag] || 0));
 }

@@ -1,5 +1,7 @@
 <script lang="ts">
-	import type { ScheduleWithRecipe, ScheduleConflictMode } from '$lib/types/index.js';
+	import type { ScheduleWithRecipe, ScheduleConflictMode, Person } from '$lib/types/index.js';
+	import PeopleSelector from '$lib/components/people/PeopleSelector.svelte';
+	import PeopleAvatars from '$lib/components/people/PeopleAvatars.svelte';
 	import { weekKeyToIndex, indexToWeekKey, getWeekKey, getWeekDates, WEEKDAY_NAMES } from '$lib/utils/dates.js';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { sidebarOpen } from '$lib/stores/ui.js';
@@ -14,12 +16,14 @@
 	let { data } = $props();
 	let schedules = $state<ScheduleWithRecipe[]>(data.schedules);
 	$effect(() => { schedules = data.schedules; });
+	let people = $derived(data.people as Person[]);
 
 	// ---- Modal state ----
 	let editScheduleId = $state<number | null>(null);
 	let editN = $state(1);
 	let editOnConflict = $state<ScheduleConflictMode>('skip');
 	let editPriority = $state(5);
+	let editPeople = $state<number[]>([]);
 
 	let editSchedule = $derived(
 		editScheduleId !== null ? (schedules.find(s => s.id === editScheduleId) ?? null) : null
@@ -30,6 +34,7 @@
 		editN = s.every_n_weeks;
 		editOnConflict = s.on_conflict ?? 'skip';
 		editPriority = s.priority ?? 5;
+		editPeople = [...s.people];
 	}
 
 	function closeModal() {
@@ -45,7 +50,7 @@
 				recipe_id: editSchedule.recipe_id, weekday: editSchedule.weekday, meal_type: editSchedule.meal_type,
 				is_accompaniment: editSchedule.is_accompaniment,
 				every_n_weeks: editN, anchor_week_key: editSchedule.anchor_week_key,
-				on_conflict: editOnConflict, priority: editPriority,
+				on_conflict: editOnConflict, priority: editPriority, people: editPeople,
 			})
 		});
 		closeModal();
@@ -264,6 +269,9 @@
 				on:click={() => openModal(s)}>
 				{s.recipe.name}
 			</button>
+			{#if s.people.length > 0}
+				<span class="shrink-0 inline-flex"><PeopleAvatars {people} ids={s.people} size={14} max={3} /></span>
+			{/if}
 			<span class="text-[10px] font-bold shrink-0 px-1 rounded"
 				style="background:{rgba(rc(s.recipe_id),0.18)};color:{rc(s.recipe_id)};"
 				title="Prioridad: {s.priority ?? 5}">
@@ -497,6 +505,13 @@
 					<span>Más prioritaria</span>
 				</div>
 			</div>
+
+			{#if people.length > 0}
+				<div class="px-5 py-4" style="border-bottom:1px solid var(--surface-container-low);">
+					<p class="text-[11px] font-bold uppercase tracking-wider mb-3" style="color:var(--text-muted);">Para quién</p>
+					<PeopleSelector {people} value={editPeople} onchange={(ids) => editPeople = ids} size={28} />
+				</div>
+			{/if}
 
 			<!-- Excepciones -->
 			{#if editSchedule.exceptions.length > 0}

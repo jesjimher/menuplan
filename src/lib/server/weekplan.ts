@@ -3,6 +3,7 @@ import type { WeekPlan, MealConfigRow, WeekMealState, MealConfig, Options, SlotD
 import { getAllRules } from './rules.js';
 import { checkRules } from '$lib/utils/ruleChecker.js';
 import { getOptions } from './options.js';
+import { getActivePeople, loadPeopleLinks, setPeopleLinks } from './people.js';
 import { getActiveSchedulesForWeek } from './schedules.js';
 import { getWeekKey, weekKeyToIndex } from '$lib/utils/dates.js';
 import { maxSlots } from '$lib/utils/mealCapacity.js';
@@ -131,6 +132,7 @@ export function getWeekData(weekKey: string): WeekData {
 	const activeSchedules = getActiveSchedulesForWeek(weekKey);
 
 	// Construir slots manuales desde week_plans
+	const peopleByPlan = loadPeopleLinks('week_plan_people', plans.map(p => p.id));
 	const manualSlots: SlotData[] = plans
 		.map(p => ({
 			weekday: p.weekday,
@@ -147,7 +149,8 @@ export function getWeekData(weekKey: string): WeekData {
 				image_type: (p.image_type as string | null) ?? null,
 				created_at: p.created_at as string
 			},
-			schedule: null as ScheduleWithRecipe | null
+			schedule: null as ScheduleWithRecipe | null,
+			people: peopleByPlan.get(p.id) ?? []
 		}));
 
 	// Agrupar slots manuales por comida: "wd-mt-ia" → SlotData[]
@@ -205,7 +208,8 @@ export function getWeekData(weekKey: string): WeekData {
 				is_accompaniment: sched.is_accompaniment,
 				is_leftover: 0,
 				recipe: sched.recipe,
-				schedule: sched
+				schedule: sched,
+				people: sched.people
 			};
 			mealArr.push(newSlot);
 			mealSlots.set(key, mealArr);
@@ -216,7 +220,7 @@ export function getWeekData(weekKey: string): WeekData {
 			const idx0 = mealArr.findIndex(s => s.slot_index === 0);
 			const isManual = manualOccupied.get(key)?.has(0) ?? false;
 			if (idx0 >= 0 && !isManual) {
-				mealArr[idx0] = { ...mealArr[idx0], recipe: sched.recipe, is_leftover: 0, schedule: sched };
+				mealArr[idx0] = { ...mealArr[idx0], recipe: sched.recipe, is_leftover: 0, schedule: sched, people: sched.people };
 				mealSlots.set(key, mealArr);
 			}
 		} else if (sched.on_conflict === 'add') {
@@ -230,7 +234,8 @@ export function getWeekData(weekKey: string): WeekData {
 				is_accompaniment: sched.is_accompaniment,
 				is_leftover: 0,
 				recipe: sched.recipe,
-				schedule: sched
+				schedule: sched,
+				people: sched.people
 			});
 		}
 		// on_conflict === 'skip': no hacer nada si la comida está llena
@@ -241,9 +246,10 @@ export function getWeekData(weekKey: string): WeekData {
 		.sort((a, b) => a.weekday - b.weekday || a.meal_type.localeCompare(b.meal_type) || a.is_accompaniment - b.is_accompaniment || a.slot_index - b.slot_index);
 
 	const rules = getAllRules();
-	const violations = checkRules(slots, rules);
+	const people = getActivePeople();
+	const violations = checkRules(slots, rules, people);
 
-	return { week_key: weekKey, slots, configs, violations };
+	return { week_key: weekKey, slots, configs, violations, people };
 }
 
 export interface ScheduleSlotResolution {
@@ -267,14 +273,40 @@ export function getScheduleResolutionsForWeeks(weekKeys: string[]): ScheduleSlot
 	return out;
 }
 
-export function assignRecipe(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number, recipeId: number, isLeftover = 0): void {
+/**
+ * Pone una receta en un hueco. `people` sustituye para quién es (vacío = para todos);
+ * omitido, el hueco conserva las personas que ya tuviera (el upsert mantiene el id de la fila).
+ */
+export function assignRecipe(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number, recipeId: number, isLeftover = 0, people?: number[]): void {
 	const db = getDb();
-	db.prepare(`
-		INSERT INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, is_leftover, recipe_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(week_key, weekday, meal_type, is_accompaniment, slot_index)
-		DO UPDATE SET recipe_id = excluded.recipe_id, is_leftover = excluded.is_leftover
-	`).run(weekKey, weekday, mealType, slotIndex, isAccompaniment, isLeftover, recipeId);
+	db.transaction(() => {
+		const { id } = db.prepare(`
+			INSERT INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, is_leftover, recipe_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(week_key, weekday, meal_type, is_accompaniment, slot_index)
+			DO UPDATE SET recipe_id = excluded.recipe_id, is_leftover = excluded.is_leftover
+			RETURNING id
+		`).get(weekKey, weekday, mealType, slotIndex, isAccompaniment, isLeftover, recipeId) as { id: number };
+		if (people) setPeopleLinks('week_plan_people', id, people);
+	})();
+}
+
+/**
+ * Cambia para quién es la receta de un hueco. Si el hueco no tiene fila propia (la receta
+ * viene de una programación), se materializa con esa receta para guardar las personas solo
+ * en esta semana.
+ */
+export function setSlotPeople(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number, recipeId: number, people: number[]): void {
+	const db = getDb();
+	const row = db.prepare(`
+		SELECT id FROM week_plans
+		WHERE week_key = ? AND weekday = ? AND meal_type = ? AND slot_index = ? AND is_accompaniment = ?
+	`).get(weekKey, weekday, mealType, slotIndex, isAccompaniment) as { id: number } | undefined;
+	if (row) {
+		db.transaction(() => setPeopleLinks('week_plan_people', row.id, people))();
+	} else {
+		assignRecipe(weekKey, weekday, mealType, slotIndex, isAccompaniment, recipeId, 0, people);
+	}
 }
 
 export function removeRecipe(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number): void {
@@ -308,12 +340,15 @@ export function copyPreviousWeek(weekKey: string, previousWeekKey: string): void
 		db.prepare('DELETE FROM week_plans WHERE week_key = ?').run(weekKey);
 
 		const plans = db.prepare('SELECT * FROM week_plans WHERE week_key = ?').all(previousWeekKey) as WeekPlan[];
+		const peopleByPlan = loadPeopleLinks('week_plan_people', plans.map(p => p.id));
 		const insertPlan = db.prepare(`
 			INSERT OR IGNORE INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, is_leftover, recipe_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`);
 		for (const plan of plans) {
-			insertPlan.run(weekKey, plan.weekday, plan.meal_type, plan.slot_index, plan.is_accompaniment, plan.is_leftover ?? 0, plan.recipe_id);
+			const res = insertPlan.run(weekKey, plan.weekday, plan.meal_type, plan.slot_index, plan.is_accompaniment, plan.is_leftover ?? 0, plan.recipe_id);
+			const people = peopleByPlan.get(plan.id);
+			if (res.changes > 0 && people) setPeopleLinks('week_plan_people', res.lastInsertRowid as number, people);
 		}
 	})();
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { Recipe, ScheduleWithRecipe, ScheduleConflictMode } from '$lib/types/index.js';
+	import type { Recipe, ScheduleWithRecipe, ScheduleConflictMode, Person } from '$lib/types/index.js';
+	import PeopleSelector from '$lib/components/people/PeopleSelector.svelte';
 	import { WEEKDAY_NAMES, getWeekDates } from '$lib/utils/dates.js';
 
 	const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -24,6 +25,8 @@
 		isAccompaniment,
 		recipe,
 		schedule,
+		people = [],
+		slotPeople = [],
 		onSaved,
 		onDeleted,
 		onClose,
@@ -36,6 +39,10 @@
 		isAccompaniment: number;
 		recipe: Recipe;
 		schedule: ScheduleWithRecipe | null;
+		/** Personas activas. */
+		people?: Person[];
+		/** Personas del hueco, como valor inicial al crear una programación nueva. */
+		slotPeople?: number[];
 		onSaved: () => void;
 		onDeleted: () => void;
 		onClose: () => void;
@@ -44,6 +51,7 @@
 	let everyNWeeks = $state(schedule?.every_n_weeks ?? 2);
 	let onConflict = $state<ScheduleConflictMode>(schedule?.on_conflict ?? 'skip');
 	let priority = $state(schedule?.priority ?? 5);
+	let schedPeople = $state<number[]>(schedule?.people ?? slotPeople);
 	let saving = $state(false);
 	let deleting = $state(false);
 
@@ -51,6 +59,7 @@
 		everyNWeeks = schedule?.every_n_weeks ?? 2;
 		onConflict = schedule?.on_conflict ?? 'skip';
 		priority = schedule?.priority ?? 5;
+		schedPeople = schedule?.people ?? slotPeople;
 	});
 
 	async function save() {
@@ -68,6 +77,7 @@
 					anchor_week_key: weekKey,
 					on_conflict: onConflict,
 					priority,
+					people: schedPeople,
 				}),
 			});
 			onSaved();
@@ -169,6 +179,13 @@
 					<span>Más prioritaria</span>
 				</div>
 			</div>
+
+			{#if people.length > 0}
+				<div>
+					<label class="block text-sm font-semibold mb-2" style="color: var(--text);">Para quién</label>
+					<PeopleSelector {people} value={schedPeople} onchange={(ids) => schedPeople = ids} size={28} />
+				</div>
+			{/if}
 
 			<!-- Botones -->
 			<div class="flex flex-col gap-2 pt-2">

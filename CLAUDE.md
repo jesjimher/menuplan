@@ -33,6 +33,7 @@ Menú lateral definido en `src/routes/+layout.svelte`. Orden de aparición:
 | **Recetas** | `/recipes` | `src/routes/recipes/+page.svelte` | CRUD de recetas. Búsqueda/filtro por tags, importación desde Plantoeat, gestión de imagen (búsqueda DuckDuckGo + recorte). |
 | **Programaciones** | `/schedules` | `src/routes/schedules/+page.svelte` | Gestión de recetas programadas (cada N semanas, día y tipo de comida fijos). Muestra simulación de las próximas 9 semanas con conflictos resaltados. |
 | **Reglas** | `/rules` | `src/routes/rules/+page.svelte` | Reglas de planificación: `no_more_than` (máx. N veces por semana un tag) y `at_least` (mín. N veces). Se evalúan en cliente y servidor con `ruleChecker.ts`. |
+| **Personas** | `/people` | `src/routes/people/+page.svelte` | Alta, renombrado, orden, archivo y foto de las personas. La foto se recorta en el cliente (`PhotoCropper.svelte`: círculo sobre la cara, zoom con rueda) y se sube ya reducida. |
 | **Histórico** | `/history` | `src/routes/history/+page.svelte` | Consulta de semanas pasadas en modo lectura. |
 | **Opciones** | `/options` | `src/routes/options/+page.svelte` | Ajustes globales de la app (tema de color, sidebar colapsado por defecto, etc.). |
 
@@ -46,10 +47,12 @@ Singleton de conexión SQLite. El schema base está incrustado en `db/index.ts` 
 **Al modificar el schema de `recipes`:** regenerar `data/sample-recipes.sql` 
 
 **Decisiones clave del schema:**
-- `week_plans` solo contiene filas con receta (`recipe_id NOT NULL`, `ON DELETE CASCADE`); vaciar un slot es borrar la fila. Su clave única es `(week_key, weekday, meal_type, is_accompaniment, slot_index)`. No existe el concepto de miembros: los tags prohibidos se expresan con una regla `no_more_than <tag> 0`.
+- `week_plans` solo contiene filas con receta (`recipe_id NOT NULL`, `ON DELETE CASCADE`); vaciar un slot es borrar la fila. Su clave única es `(week_key, weekday, meal_type, is_accompaniment, slot_index)`. Los tags prohibidos se expresan con una regla `no_more_than <tag> 0` (limitada a ciertas personas si hace falta).
 - Los tags se almacenan como strings separados por comas en todas partes (recetas, reglas, etc.). Todas las comparaciones de tags hacen lowercase y trim de cada elemento.
 - `week_plans.is_accompaniment` (0/1) distingue platos principales de acompañamientos dentro de la misma tabla.
 - `week_day_config` sobreescribe las opciones globales por combinación (week_key, weekday, meal_type). Los campos `disabled`/`disabled_comment` permiten desactivar un slot concreto (día+comida) para semanas en que no hace falta planificarlo.
+- **Personas**: tabla `people` (con `archived` y foto BLOB) y tablas de unión `week_plan_people`, `schedule_people` y `rule_people` (migración 18). **Sin filas en la unión = para todos.** `week_plan_people` cuelga de `week_plans.id` (`ON DELETE CASCADE`), así que el upsert de `assignRecipe()` conserva las personas si no se le pasan. Cambiar las personas de un slot programado lo materializa en `week_plans` (`setSlotPeople()`). En la UI, un acompañamiento «por receta» sin personas hereda las de su plato principal (solo visual: los acompañamientos no cuentan para reglas).
+- **Reglas por persona**: `ruleChecker.ts` cuenta tags con un contador por persona activa (una receta para todos suma a cada una); sin personas activas hay un único contador global (`EVERYONE`). Una regla sin personas se exige a cada persona por separado; con personas, solo a esas. El planificador usa los mismos contadores y deja sus recetas para todos.
 - `recipes.image_data` (BLOB) e `image_type` almacenan la imagen de la receta directamente en la BD. Desde la subida se redimensiona a máx. 800px y se guarda como WebP (sharp); `scripts/recompress-images.mjs` recomprime manualmente las imágenes antiguas.
 
 ### Módulos de servidor (`src/lib/server/`)

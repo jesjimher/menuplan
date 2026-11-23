@@ -1,5 +1,6 @@
 import { getAllSchedules } from '$lib/server/schedules.js';
 import { getScheduleResolutionsForWeeks } from '$lib/server/weekplan.js';
+import { getActivePeople } from '$lib/server/people.js';
 import { getWeekKey, weekKeyToIndex, indexToWeekKey } from '$lib/utils/dates.js';
 
 const SIM_N = 9;
@@ -10,6 +11,7 @@ export function load() {
 
 	return {
 		schedules: getAllSchedules(),
-		resolutions: getScheduleResolutionsForWeeks(simWeeks)
+		resolutions: getScheduleResolutionsForWeeks(simWeeks),
+		people: getActivePeople()
 	};
 }

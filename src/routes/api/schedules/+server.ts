@@ -11,7 +11,7 @@ export async function GET() {
 export async function POST({ request }) {
 	const body = await parseBody(request, scheduleBodySchema);
 	const id = withFrozenPast(() =>
-		upsertSchedule(body.recipe_id, body.weekday, body.meal_type, body.is_accompaniment, body.every_n_weeks, body.anchor_week_key, body.on_conflict, body.priority)
+		upsertSchedule(body.recipe_id, body.weekday, body.meal_type, body.is_accompaniment, body.every_n_weeks, body.anchor_week_key, body.on_conflict, body.priority, body.people)
 	);
 	return json({ ok: true, id });
 }

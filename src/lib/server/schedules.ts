@@ -2,6 +2,7 @@ import { getDb } from '$lib/db/index.js';
 import { weekKeyToIndex } from '$lib/utils/dates.js';
 import type { ScheduleWithRecipe, ScheduleConflictMode, MealType } from '$lib/types/index.js';
 import { mapRowToRecipe } from './mappers.js';
+import { loadPeopleLinks, setPeopleLinks } from './people.js';
 import Database from 'better-sqlite3';
 
 interface ScheduleRow {
@@ -35,7 +36,7 @@ function loadAllExceptions(db: Database.Database): Map<number, string[]> {
 	return map;
 }
 
-function rowToScheduleWithRecipe(s: ScheduleRow, exceptions: string[]): ScheduleWithRecipe {
+function rowToScheduleWithRecipe(s: ScheduleRow, exceptions: string[], people: number[]): ScheduleWithRecipe {
 	return {
 		id: s.id,
 		recipe_id: s.recipe_id,
@@ -47,6 +48,7 @@ function rowToScheduleWithRecipe(s: ScheduleRow, exceptions: string[]): Schedule
 		on_conflict: s.on_conflict ?? 'skip',
 		priority: s.priority ?? 5,
 		created_at: s.created_at,
+		people,
 		recipe: mapRowToRecipe(s as unknown as Record<string, unknown>, 'r_'),
 		exceptions
 	};
@@ -75,7 +77,8 @@ export function getAllSchedules(): ScheduleWithRecipe[] {
 	`).all() as ScheduleRow[];
 
 	const exceptionsMap = loadAllExceptions(db);
-	return rows.map(s => rowToScheduleWithRecipe(s, exceptionsMap.get(s.id) ?? []));
+	const peopleMap = loadPeopleLinks('schedule_people');
+	return rows.map(s => rowToScheduleWithRecipe(s, exceptionsMap.get(s.id) ?? [], peopleMap.get(s.id) ?? []));
 }
 
 export function getScheduleForMeal(
@@ -107,7 +110,7 @@ export function getScheduleForMeal(
 		'SELECT week_key FROM schedule_exceptions WHERE schedule_id = ?'
 	).all(s.id) as { week_key: string }[]).map(r => r.week_key);
 
-	return rowToScheduleWithRecipe(s, exceptions);
+	return rowToScheduleWithRecipe(s, exceptions, loadPeopleLinks('schedule_people', [s.id]).get(s.id) ?? []);
 }
 
 export function getActiveSchedulesForWeek(weekKey: string): ScheduleWithRecipe[] {
@@ -125,13 +128,14 @@ export function getActiveSchedulesForWeek(weekKey: string): ScheduleWithRecipe[]
 	`).all() as ScheduleRow[];
 
 	const exceptionsMap = loadAllExceptions(db);
+	const peopleMap = loadPeopleLinks('schedule_people');
 
 	return rows.filter(s => {
 		const diff = targetIdx - weekKeyToIndex(s.anchor_week_key);
 		if (diff < 0 || diff % s.every_n_weeks !== 0) return false;
 		const exceptions = exceptionsMap.get(s.id) ?? [];
 		return !exceptions.includes(weekKey);
-	}).map(s => rowToScheduleWithRecipe(s, exceptionsMap.get(s.id) ?? []));
+	}).map(s => rowToScheduleWithRecipe(s, exceptionsMap.get(s.id) ?? [], peopleMap.get(s.id) ?? []));
 }
 
 export function upsertSchedule(
@@ -142,10 +146,11 @@ export function upsertSchedule(
 	everyNWeeks: number,
 	anchorWeekKey: string,
 	onConflict: ScheduleConflictMode,
-	priority: number
+	priority: number,
+	people?: number[]
 ): number {
 	const db = getDb();
-	const result = db.prepare(`
+	db.prepare(`
 		INSERT INTO schedules (recipe_id, weekday, meal_type, is_accompaniment, every_n_weeks, anchor_week_key, on_conflict, priority)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(recipe_id, weekday, meal_type, is_accompaniment)
@@ -155,11 +160,12 @@ export function upsertSchedule(
 		              priority = excluded.priority
 	`).run(recipeId, weekday, mealType, isAccompaniment, everyNWeeks, anchorWeekKey, onConflict, priority);
 
-	if (result.lastInsertRowid) return result.lastInsertRowid as number;
-	const existing = db.prepare(
+	// En un upsert que actualiza, lastInsertRowid no es fiable: se busca la fila por su clave
+	const { id } = db.prepare(
 		'SELECT id FROM schedules WHERE recipe_id = ? AND weekday = ? AND meal_type = ? AND is_accompaniment = ?'
 	).get(recipeId, weekday, mealType, isAccompaniment) as { id: number };
-	return existing.id;
+	if (people) setPeopleLinks('schedule_people', id, people);
+	return id;
 }
 
 export function moveSchedule(scheduleId: number, weekday: number, anchorWeekKey?: string): { ok: true } | { ok: false; error: 'not_found' | 'conflict' } {

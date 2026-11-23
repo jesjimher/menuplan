@@ -14,6 +14,7 @@ export function resetDb(): void {
 		DELETE FROM week_meal_state;
 		DELETE FROM rules;
 		DELETE FROM recipes;
+		DELETE FROM people;
 	`);
 }
 
@@ -21,6 +22,6 @@ export function seedRecipe(name: string, tags: string, minDays = 0): Recipe {
 	return createRecipe({ name, description: '', tags, min_days: minDays });
 }
 
-export function seedRule(tag: string, direction: Rule['direction'], times: number): Rule {
-	return createRule({ tag, direction, times });
+export function seedRule(tag: string, direction: Rule['direction'], times: number, people: number[] = []): Rule {
+	return createRule({ tag, direction, times, people });
 }

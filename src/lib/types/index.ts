@@ -11,11 +11,22 @@ export interface Recipe {
 	created_at: string;
 }
 
+export interface Person {
+	id: number;
+	name: string;
+	sort_order: number;
+	archived: number;
+	image_type: string | null;
+	created_at: string;
+}
+
 export interface Rule {
 	id: number;
 	tag: string;
 	direction: 'at_least' | 'no_more_than';
 	times: number;
+	/** Personas a las que se limita la regla; vacío = se aplica a cada persona por separado. */
+	people: number[];
 }
 
 export interface WeekPlan {
@@ -75,6 +86,8 @@ export interface Schedule {
 	on_conflict: ScheduleConflictMode;
 	priority: number;
 	created_at: string;
+	/** Para quién es la receta programada; vacío = para todos. */
+	people: number[];
 }
 
 export interface ScheduleWithRecipe extends Schedule {
@@ -90,6 +103,8 @@ export interface SlotData {
 	is_leftover: 0 | 1;
 	recipe: Recipe | null;
 	schedule: ScheduleWithRecipe | null;
+	/** Para quién es esta receta; vacío = para todos. */
+	people: number[];
 }
 
 export interface MealConfig {
@@ -112,10 +127,14 @@ export interface WeekData {
 	slots: SlotData[];
 	configs: Record<number, DayConfig>;
 	violations: RuleViolation[];
+	/** Personas activas (no archivadas), en orden de visualización. */
+	people: Person[];
 }
 
 export interface RuleViolation {
 	rule: Rule;
 	current: number;
 	message: string;
+	/** Personas que incumplen la regla; vacío = sin personas dadas de alta (cuenta global). */
+	people: number[];
 }

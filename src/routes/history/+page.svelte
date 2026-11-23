@@ -1,10 +1,12 @@
 <script lang="ts">
-	import type { WeekData } from '$lib/types/index.js';
+	import type { WeekData, Person } from '$lib/types/index.js';
+	import PeopleAvatars from '$lib/components/people/PeopleAvatars.svelte';
 	import { WEEKDAY_NAMES } from '$lib/utils/dates.js';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 
 	let { data } = $props();
 	let history = $derived(data.history);
+	let people = $derived(data.people as Person[]);
 
 	let selectedWeek: string | null = $state(null);
 	let weekData: WeekData | null = $state(null);
@@ -81,7 +83,12 @@
 											<p class="text-xs font-medium uppercase tracking-wide mb-1" style="color: {isComida ? 'var(--comida-accent)' : 'var(--cena-accent)'};">{mealType}</p>
 											{#each getSlots(weekData, weekday, mealType) as slot}
 												{#if slot.recipe}
-													<p class="text-xs font-medium leading-snug line-clamp-2" style="color: var(--text); font-family: 'Epilogue', sans-serif;">{slot.recipe.name}</p>
+													<div class="flex items-start gap-1.5">
+														<p class="flex-1 text-xs font-medium leading-snug line-clamp-2" style="color: var(--text); font-family: 'Epilogue', sans-serif;">{slot.recipe.name}</p>
+														{#if slot.people.length > 0}
+															<span class="shrink-0 inline-flex"><PeopleAvatars {people} ids={slot.people} size={16} max={3} /></span>
+														{/if}
+													</div>
 												{/if}
 											{/each}
 										</div>

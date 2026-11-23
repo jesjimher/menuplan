@@ -1,26 +1,29 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import type { Rule } from '$lib/types/index.js';
+	import type { Rule, Person } from '$lib/types/index.js';
 	import TagBadgeInput from '$lib/components/TagBadgeInput.svelte';
+	import PeopleSelector from '$lib/components/people/PeopleSelector.svelte';
+	import PeopleAvatars from '$lib/components/people/PeopleAvatars.svelte';
 	import { sidebarOpen } from '$lib/stores/ui.js';
 
 	let { data } = $props();
 	let rules = $derived(data.rules);
 	let allTags = $derived(data.allTags);
+	let people = $derived(data.people as Person[]);
 
 	let showForm = $state(false);
 	let editingRule: Rule | null = $state(null);
-	let form = $state({ tag: '', direction: 'at_least' as 'at_least' | 'no_more_than', times: 1 });
+	let form = $state({ tag: '', direction: 'at_least' as 'at_least' | 'no_more_than', times: 1, people: [] as number[] });
 
 	function startEdit(r: Rule) {
 		editingRule = r;
-		form = { tag: r.tag, direction: r.direction, times: r.times };
+		form = { tag: r.tag, direction: r.direction, times: r.times, people: [...r.people] };
 		showForm = true;
 	}
 
 	function startNew() {
 		editingRule = null;
-		form = { tag: '', direction: 'at_least', times: 1 };
+		form = { tag: '', direction: 'at_least', times: 1, people: [] };
 		showForm = true;
 	}
 
@@ -78,6 +81,9 @@
 					<input type="hidden" name="id" value={editingRule.id} />
 				{/if}
 				<input type="hidden" name="tag" value={form.tag} />
+				{#each form.people as pid}
+					<input type="hidden" name="people" value={pid} />
+				{/each}
 				<h3 class="text-lg font-semibold mb-4" style="font-family: 'Epilogue', sans-serif; color: var(--text);">{editingRule ? 'Editar regla' : 'Nueva regla'}</h3>
 				<div class="grid gap-3">
 					<div>
@@ -99,6 +105,17 @@
 							class="w-28 px-3 py-2.5 rounded-lg text-sm focus:outline-none transition-all"
 							style="border: 1px solid var(--border); color: var(--text);" />
 					</div>
+					{#if people.length > 0}
+						<div>
+							<label class="block text-xs font-medium uppercase tracking-wide mb-1" style="color: var(--text-secondary);">Para quién</label>
+							<PeopleSelector {people} value={form.people} onchange={(ids) => form.people = ids} size={28} allLabel="Cada persona" />
+							<p class="text-xs mt-1.5" style="color: var(--text-muted);">
+								{form.people.length === 0
+									? 'Se cuenta por separado para cada persona: lo que es para todos cuenta para cada una.'
+									: 'Solo se cuentan las recetas de esas personas y las que son para todos.'}
+							</p>
+						</div>
+					{/if}
 				</div>
 				<div class="flex gap-2 mt-4">
 					<button type="submit" disabled={!form.tag}
@@ -132,7 +149,12 @@
 							</svg>
 						</div>
 						<div>
-							<p class="text-sm font-medium" style="color: var(--text);">{ruleText(rule)}</p>
+							<p class="text-sm font-medium flex items-center gap-2" style="color: var(--text);">
+								{ruleText(rule)}
+								{#if rule.people.length > 0}
+									<PeopleAvatars {people} ids={rule.people} size={20} />
+								{/if}
+							</p>
 							<span class="text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block"
 								style="{rule.direction === 'at_least'
 									? 'background: var(--success-bg); color: var(--success);'

@@ -5,6 +5,8 @@ export const weekdaySchema = z.number().int().min(1).max(7);
 export const mealTypeSchema = z.enum(['comida', 'cena']);
 export const slotIndexSchema = z.number().int().min(0);
 export const isAccompanimentSchema = z.union([z.literal(0), z.literal(1)]).default(0);
+// Para quién es una receta/regla; vacío = para todos
+export const peopleSchema = z.array(z.number().int().positive()).max(100);
 
 // Endpoints de semana
 export const assignBodySchema = z.object({
@@ -15,6 +17,19 @@ export const assignBodySchema = z.object({
 	is_accompaniment: isAccompanimentSchema,
 	is_leftover: z.union([z.literal(0), z.literal(1)]).default(0),
 	recipe_id: z.number().int().positive(),
+	// Omitido = conservar las personas que ya tuviera el hueco
+	people: peopleSchema.optional(),
+});
+
+export const slotPeopleBodySchema = z.object({
+	weekKey: weekKeySchema,
+	weekday: weekdaySchema,
+	meal_type: mealTypeSchema,
+	slot_index: slotIndexSchema,
+	is_accompaniment: isAccompanimentSchema,
+	// Receta visible en el hueco: si viene de una programación, se materializa con ella
+	recipe_id: z.number().int().positive(),
+	people: peopleSchema,
 });
 
 export const removeBodySchema = z.object({
@@ -92,6 +107,7 @@ export const ruleBodySchema = z.object({
 	tag: z.string().min(1).max(200),
 	direction: z.enum(['at_least', 'no_more_than']),
 	times: z.number().int().min(0),
+	people: peopleSchema.default([]),
 });
 
 // Endpoints de programaciones
@@ -104,6 +120,7 @@ export const scheduleBodySchema = z.object({
 	anchor_week_key: weekKeySchema,
 	on_conflict: z.enum(['skip', 'overwrite', 'add']).default('skip'),
 	priority: z.number().int().min(1).max(10).default(5),
+	people: peopleSchema.optional(),
 });
 
 export const scheduleMoveBodySchema = z.object({
@@ -113,6 +130,20 @@ export const scheduleMoveBodySchema = z.object({
 
 export const exceptionBodySchema = z.object({
 	week_key: weekKeySchema,
+});
+
+// Endpoints de personas
+export const createPersonBodySchema = z.object({
+	name: z.string().trim().min(1).max(100),
+});
+
+export const updatePersonBodySchema = z.object({
+	name: z.string().trim().min(1).max(100).optional(),
+	archived: z.boolean().optional(),
+});
+
+export const reorderPeopleBodySchema = z.object({
+	ids: z.array(z.number().int().positive()),
 });
 
 // Endpoint de options

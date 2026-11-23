@@ -1,6 +1,7 @@
 <script lang="ts">
-	import type { SlotData, MealConfig, ScheduleWithRecipe } from '$lib/types/index.js';
+	import type { SlotData, MealConfig, ScheduleWithRecipe, Person } from '$lib/types/index.js';
 	import TagInput from '$lib/components/TagInput.svelte';
+	import PeopleAvatars from '$lib/components/people/PeopleAvatars.svelte';
 	import { weekdayDateFromWeekKey, formatShortDate, computeNextOccurrenceWeekKey } from '$lib/utils/dates.js';
 
 	let {
@@ -43,6 +44,11 @@
 		slotSchedules = [],
 		onSchedule,
 		onEdit,
+		// Personas
+		people = [],
+		slotPeople = [],
+		peopleInherited = false,
+		onOpenPeople,
 	}: {
 		weekday: number;
 		mealType: string;
@@ -80,7 +86,15 @@
 		slotSchedules?: ScheduleWithRecipe[];
 		onSchedule?: () => void;
 		onEdit?: () => void;
+		/** Personas activas. */
+		people?: Person[];
+		/** Para quién es la receta (las propias o, en acompañamientos, las heredadas del plato). */
+		slotPeople?: number[];
+		peopleInherited?: boolean;
+		onOpenPeople?: () => void;
 	} = $props();
+
+	let canSetPeople = $derived(!!slot?.recipe && people.length > 0 && !!onOpenPeople);
 
 	function squareLimit(node: HTMLElement) {
 		function update() {
@@ -128,6 +142,7 @@
 		if (editingTagKey !== slotTagEditKey) items.push({ type: 'tag' });
 		items.push({ type: 'random' });
 		if (slot?.recipe && onSchedule) items.push({ type: 'schedule' });
+		if (canSetPeople) items.push({ type: 'people' });
 		if (slot?.recipe) items.push({ type: 'edit' });
 		if (slot?.recipe) items.push({ type: 'remove' });
 		const r = 44;
@@ -138,6 +153,10 @@
 		});
 	});
 </script>
+
+{#snippet usersIcon(cls: string)}
+	<svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+{/snippet}
 
 {#if isAcc}
 	<!-- Accompaniment slot -->
@@ -165,12 +184,28 @@
 					? `background: var(--secondary-container); color: var(--secondary);`
 					: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
 			>
-				<span class="leading-snug {slot?.recipe ? 'font-semibold' : 'italic'}">
-					{slot?.recipe?.name ?? 'Elegir acompañamiento'}
+				<span class="flex items-center gap-1.5">
+					<span class="flex-1 leading-snug {slot?.recipe ? 'font-semibold' : 'italic'}">
+						{slot?.recipe?.name ?? 'Elegir acompañamiento'}
+					</span>
+					{#if slot?.recipe && people.length > 0}
+						<span class="shrink-0 inline-flex" class:opacity-50={peopleInherited}>
+							<PeopleAvatars {people} ids={slotPeople} size={16} max={3} />
+						</span>
+					{/if}
 				</span>
 			</button>
 			{#if slot?.recipe}
-				<div class="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/acc:opacity-100 transition-opacity">
+				<div class="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/acc:opacity-100 transition-opacity flex gap-1">
+					{#if canSetPeople}
+						<button
+							on:click|stopPropagation={onOpenPeople}
+							class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors"
+							style="background: rgba(255,255,255,0.9); color: var(--primary);"
+							aria-label="Para quién"
+							title="Para quién"
+						>{@render usersIcon('w-3 h-3')}</button>
+					{/if}
 					<button
 						on:click|stopPropagation={onRemove}
 						class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors text-xs"
@@ -213,7 +248,7 @@
 					on:touchend={onTouchEnd}
 					on:touchmove={onTouchMove}
 					on:contextmenu|preventDefault={() => {}}
-					class="w-full text-left text-xs transition-all select-none empty-recipe-slot lg:flex-1 {slot?.recipe?.image_type ? `relative overflow-hidden rounded-xl shadow-sm hover:shadow-md ${imgH}` : slot?.recipe ? 'recipe-without-image px-3 py-2.5 rounded-xl shadow-sm min-h-[2.5rem] flex items-start' : `px-2.5 py-3 rounded-xl ${emptyH} flex flex-col items-center justify-center gap-1`}"
+					class="w-full text-left text-xs transition-all select-none empty-recipe-slot lg:flex-1 {slot?.recipe?.image_type ? `relative overflow-hidden rounded-xl shadow-sm hover:shadow-md ${imgH}` : slot?.recipe ? `recipe-without-image px-3 py-2.5 rounded-xl shadow-sm min-h-[2.5rem] flex items-start ${people.length > 0 ? 'pb-8' : ''}` : `px-2.5 py-3 rounded-xl ${emptyH} flex flex-col items-center justify-center gap-1`}"
 					style="{slot?.recipe
 						? (slot.recipe.image_type ? 'background: var(--surface);' : `background: var(--surface); color: var(--text);`)
 						: `background: var(--surface-container-low); border: 2px dashed var(--border); color: var(--text-muted);`}"
@@ -279,6 +314,14 @@
 						<span class="text-[9px] font-black leading-none">{slotSchedules.length}</span>
 					</div>
 				{/if}
+				{#if slot?.recipe && people.length > 0}
+					<button
+						on:click|stopPropagation={() => onOpenPeople?.()}
+						class="absolute z-10 inline-flex rounded-full left-1/2 -translate-x-1/2 {slot.recipe.image_type ? 'top-1.5' : 'bottom-1.5'}"
+						disabled={!canSetPeople}
+						aria-label="Cambiar para quién es"
+					><PeopleAvatars {people} ids={slotPeople} size={22} /></button>
+				{/if}
 				<!-- Backdrop para cerrar el menú al tocar fuera (solo en móvil vía CSS) -->
 				{#if menuOpen}
 					<button
@@ -329,6 +372,13 @@
 										</svg>
 										<span>{schedule ? `Cada ${schedule.every_n_weeks} sem.` : 'Programar'}</span>
 									</button>
+
+								{:else if btn.type === 'people'}
+									<button
+										on:click|stopPropagation={() => { onOpenPeople?.(); closeMenu(); }}
+										class="vert-btn slot-action-btn"
+										aria-label="Para quién"
+									>{@render usersIcon('w-3.5 h-3.5 shrink-0')}<span>Para quién</span></button>
 
 								{:else if btn.type === 'edit'}
 									<button
@@ -389,6 +439,16 @@
 										<line x1="3" y1="10" x2="21" y2="10"/>
 									</svg>
 								</button>
+
+							{:else if btn.type === 'people'}
+								<button
+									on:click|stopPropagation={() => { onOpenPeople?.(); closeMenu(); }}
+									on:mouseenter={() => clearTimeout(closeTimer)}
+									class="circ-btn slot-action-btn"
+									class:circ-open={menuOpen}
+									style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
+									aria-label="Para quién"
+								><span class="btn-label">Para quién</span>{@render usersIcon('w-3.5 h-3.5')}</button>
 
 							{:else if btn.type === 'edit'}
 								<button

@@ -17,6 +17,15 @@ await page.screenshot({ path: '/tmp/screenshot.png', fullPage: true });
 await browser.close();
 ```
 
+- **Scripts fuera del proyecto** (p. ej. en un directorio temporal): `import 'playwright'` no resuelve porque Node busca desde el directorio del script. Cargarlo con la ruta del proyecto:
+  ```js
+  import { createRequire } from 'module';
+  const { chromium } = createRequire('/home/jesus/git/menuplan/package.json')('playwright');
+  ```
+- **Tras `npm install`** puede cambiar la versión de Playwright y pedir otro Chromium (`Executable doesn't exist ...`): volver a ejecutar `npx playwright install chromium`.
+- **Servidor de prueba sobre una copia de la BD**: copiarla con `db.backup()` de better-sqlite3 (la BD está en modo WAL; copiar solo el `.db` puede dejarla incompleta) y arrancar con `DATABASE_PATH=<copia> PORT=4178 ORIGIN=http://localhost:4178 node server/index.js`. Para pararlo, `kill $(lsof -t -i:4178)`; **no** `pkill -f "node server/index.js"`, que mata también el propio shell que lanza el comando.
+- **POST multipart con `curl` devuelve 403**: es la protección CSRF de SvelteKit. Añadir `-H "Origin: http://localhost:4178"`.
+
 ## Media queries y capacidades del dispositivo
 
 **`@media (hover: none)` aplica en Chromium headless.** Playwright headless no declara capacidad de hover del puntero, así que `@media (hover: hover)` **no** aplica y `@media (hover: none)` **sí** aplica. Consecuencias en `RecipeSlot`:
@@ -55,6 +64,11 @@ await page.evaluate((dx) => {
 }, deltaX);
 await page.waitForTimeout(400);
 ```
+
+## Recortador de fotos (`PhotoCropper`)
+
+- Subir el fichero con `locator('input[type=file]').nth(i).setInputFiles(path)` y esperar a `[aria-label="Zona de la cara"]`.
+- El zoom es con `page.mouse.wheel(0, -100)` con el ratón sobre `.crop-area`; mover el círculo y el fondo con `mouse.down/move/up` (pointer events). El tirador de tamaño es `.handle`.
 
 ## Svelte
 

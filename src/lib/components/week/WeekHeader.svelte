@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { sidebarOpen } from '$lib/stores/ui.js';
 	import { getWeekDates } from '$lib/utils/dates.js';
+	import PersonFilter from '$lib/components/people/PersonFilter.svelte';
+	import type { Person } from '$lib/types/index.js';
 
 	let {
 		weekKey,
@@ -12,7 +14,10 @@
 		onRecalculate,
 		onClear,
 		onClearFuture,
-		onCopyPrevious
+		onCopyPrevious,
+		people = [],
+		viewPerson = null,
+		onViewPerson
 	}: {
 		weekKey: string;
 		calculating: boolean;
@@ -24,6 +29,9 @@
 		onClear: () => void;
 		onClearFuture: () => void;
 		onCopyPrevious: () => void;
+		people?: Person[];
+		viewPerson?: number | null;
+		onViewPerson?: (id: number | null) => void;
 	} = $props();
 
 	let clearMenuOpen = $state(false);
@@ -85,6 +93,11 @@
 		</nav>
 
 		<div class="ml-auto flex gap-1 sm:gap-2 items-center">
+			{#if people.length > 0 && onViewPerson}
+				<div class="hidden sm:flex items-center pr-2 mr-1" style="border-right: 1px solid var(--surface-container-highest);">
+					<PersonFilter {people} value={viewPerson} onchange={onViewPerson} />
+				</div>
+			{/if}
 			<div class="hidden sm:flex items-center gap-1 pr-2 mr-1" style="border-right: 1px solid var(--surface-container-highest);">
 				<button on:click={onCopyPrevious}
 					class="icon-btn p-2 rounded-lg transition-colors"

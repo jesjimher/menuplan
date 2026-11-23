@@ -37,7 +37,7 @@ function materializePast(cutoffWeekKey: string, ids?: number[], fromWeekKey?: st
 		const wk = indexToWeekKey(idx);
 		for (const slot of getWeekData(wk).slots) {
 			if (slot.schedule && idSet.has(slot.schedule.id) && slot.recipe) {
-				assignRecipe(wk, slot.weekday, slot.meal_type, slot.slot_index, slot.is_accompaniment, slot.recipe.id, slot.is_leftover);
+				assignRecipe(wk, slot.weekday, slot.meal_type, slot.slot_index, slot.is_accompaniment, slot.recipe.id, slot.is_leftover, slot.people);
 			}
 		}
 	}

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { Recipe } from '$lib/types/index.js';
+	import type { Recipe, Person } from '$lib/types/index.js';
+	import PeopleSelector from '$lib/components/people/PeopleSelector.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import RecipeEditModal from '$lib/components/RecipeEditModal.svelte';
 	import { parseTags } from '$lib/utils/parseTags.js';
@@ -12,6 +13,10 @@
 		slotIndex,
 		isAcc = 0,
 		allTags = [],
+		people = [],
+		initialPeople = [],
+		allPeopleLabel = 'Todos',
+		onPeopleChange,
 		onSelect,
 		onClose,
 		onRecipeSaved,
@@ -23,7 +28,13 @@
 		slotIndex: number;
 		isAcc?: number;
 		allTags?: string[];
-		onSelect: (recipeId: number, isLeftover?: boolean) => void;
+		/** Personas activas; si hay, se elige para quién es la receta al seleccionarla. */
+		people?: Person[];
+		initialPeople?: number[];
+		allPeopleLabel?: string;
+		/** Si el hueco ya tiene receta, el cambio de personas se guarda al momento con esto. */
+		onPeopleChange?: (people: number[]) => void;
+		onSelect: (recipeId: number, isLeftover: boolean, people: number[]) => void;
 		onClose: () => void;
 		onRecipeSaved?: () => void;
 	} = $props();
@@ -58,8 +69,11 @@
 	let pickerError = $state<string | null>(null);
 	let pickerAbort: AbortController | null = null;
 
+	let selectedPeople = $state<number[]>([]);
+
 	$effect(() => {
 		if (!open) return;
+		selectedPeople = [...initialPeople];
 		// Reset search on open
 		searchQuery = '';
 		searchTags = [];
@@ -183,7 +197,7 @@
 	}
 
 	function handleSelect(id: number, isLeftover = false) {
-		onSelect(id, isLeftover);
+		onSelect(id, isLeftover, selectedPeople);
 	}
 
 	// Edición de receta sin salir del selector
@@ -287,6 +301,14 @@
 			</h2>
 			<button class="modal-close" onclick={onClose} aria-label="Cerrar">&times;</button>
 		</div>
+
+		{#if people.length > 0}
+			<div class="people-bar">
+				<span class="tag-filter-label">Para:</span>
+				<PeopleSelector {people} value={selectedPeople} size={26} allLabel={allPeopleLabel}
+					onchange={(ids) => { selectedPeople = ids; onPeopleChange?.(ids); }} />
+			</div>
+		{/if}
 
 		<!-- Tabs -->
 		<div class="tabs-bar">
@@ -514,6 +536,15 @@
 		height: min(85vh, 700px);
 		overflow: hidden;
 		border: 1px solid var(--border);
+	}
+
+	.people-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem 1.25rem;
+		border-bottom: 1px solid var(--border);
+		flex-shrink: 0;
 	}
 
 	.modal-header {
