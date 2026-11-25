@@ -2,6 +2,9 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# Por si better-sqlite3 no puede descargar su binario precompilado y tiene que compilarse
+RUN apk add --no-cache python3 make g++
+
 COPY package*.json ./
 RUN npm ci
 
