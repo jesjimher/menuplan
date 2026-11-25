@@ -6,7 +6,7 @@ function makeSlot(tags: string, is_accompaniment = 0, people: number[] = []): Sl
 	return {
 		weekday: 1,
 		meal_type: 'comida',
-		slot_index: 0,
+		slot_id: 1,
 		is_accompaniment,
 		is_leftover: 0,
 		recipe: { id: 1, name: 'Test', description: '', tags, min_days: -1, image_type: null, created_at: '' },

@@ -3,18 +3,16 @@ import { z } from 'zod';
 export const weekKeySchema = z.string().regex(/^\d{4}-W\d{2}$/, 'weekKey debe tener formato YYYY-Www');
 export const weekdaySchema = z.number().int().min(1).max(7);
 export const mealTypeSchema = z.enum(['comida', 'cena']);
-export const slotIndexSchema = z.number().int().min(0);
 export const isAccompanimentSchema = z.union([z.literal(0), z.literal(1)]).default(0);
+// Hueco: slot_id de meal_slots; negativo = hueco virtual de una programación «add» (-schedule_id)
+export const slotIdSchema = z.number().int();
 // Para quién es una receta/regla; vacío = para todos
 export const peopleSchema = z.array(z.number().int().positive()).max(100);
 
 // Endpoints de semana
 export const assignBodySchema = z.object({
 	weekKey: weekKeySchema,
-	weekday: weekdaySchema,
-	meal_type: mealTypeSchema,
-	slot_index: slotIndexSchema,
-	is_accompaniment: isAccompanimentSchema,
+	slot_id: slotIdSchema,
 	is_leftover: z.union([z.literal(0), z.literal(1)]).default(0),
 	recipe_id: z.number().int().positive(),
 	// Omitido = conservar las personas que ya tuviera el hueco
@@ -23,10 +21,7 @@ export const assignBodySchema = z.object({
 
 export const slotPeopleBodySchema = z.object({
 	weekKey: weekKeySchema,
-	weekday: weekdaySchema,
-	meal_type: mealTypeSchema,
-	slot_index: slotIndexSchema,
-	is_accompaniment: isAccompanimentSchema,
+	slot_id: slotIdSchema,
 	// Receta visible en el hueco: si viene de una programación, se materializa con ella
 	recipe_id: z.number().int().positive(),
 	people: peopleSchema,
@@ -34,10 +29,7 @@ export const slotPeopleBodySchema = z.object({
 
 export const removeBodySchema = z.object({
 	weekKey: weekKeySchema,
-	weekday: weekdaySchema,
-	meal_type: mealTypeSchema,
-	slot_index: slotIndexSchema,
-	is_accompaniment: isAccompanimentSchema,
+	slot_id: slotIdSchema,
 	recipe_id: z.number().int().positive().optional(),
 	force: z.enum(['only_week', 'full_schedule', 'shift_rotation', 'move']).optional(),
 });
@@ -57,34 +49,40 @@ export const calculateBodySchema = z.object({
 
 export const calculateSlotBodySchema = z.object({
 	weekKey: weekKeySchema,
-	weekday: weekdaySchema,
-	meal_type: mealTypeSchema,
-	slot_index: slotIndexSchema,
-	is_accompaniment: isAccompanimentSchema,
+	slot_id: slotIdSchema,
 });
 
-export const configBodySchema = z.union([
-	// Actualización de required_tags por slot
-	z.object({
-		weekKey: weekKeySchema,
-		weekday: weekdaySchema,
-		meal_type: mealTypeSchema,
-		slot_index: slotIndexSchema,
-		required_tags: z.array(z.string()),
-	}),
-	// Actualización de configuración de día/comida
-	z.object({
-		weekKey: weekKeySchema,
-		weekday: weekdaySchema,
-		meal_type: mealTypeSchema,
-		recipe_count: z.number().int().min(0).optional(),
-		accompaniment_per_recipe: z.number().int().min(0).optional(),
-		accompaniment_per_slot: z.number().int().min(0).optional(),
-		disabled: z.boolean().optional(),
-		disabled_comment: z.string().nullable().optional(),
-		note: z.string().nullable().optional(),
-	}),
-]);
+// Estado puntual de una comida en una semana
+export const configBodySchema = z.object({
+	weekKey: weekKeySchema,
+	weekday: weekdaySchema,
+	meal_type: mealTypeSchema,
+	disabled: z.boolean().optional(),
+	disabled_comment: z.string().nullable().optional(),
+	note: z.string().nullable().optional(),
+});
+
+// Huecos de una comida
+export const addSlotBodySchema = z.object({
+	weekKey: weekKeySchema,
+	weekday: weekdaySchema,
+	meal_type: mealTypeSchema,
+	kind: z.enum(['main', 'acc']),
+	// Plato del que cuelga un acompañamiento; omitido/null = de toda la comida
+	parent_id: z.number().int().positive().nullable().optional(),
+	tags: z.array(z.string()).optional(),
+});
+
+export const removeSlotBodySchema = z.object({
+	weekKey: weekKeySchema,
+	slot_id: z.number().int().positive(),
+});
+
+export const slotTagsBodySchema = z.object({
+	weekKey: weekKeySchema,
+	slot_id: z.number().int().positive(),
+	tags: z.array(z.string()),
+});
 
 // Endpoints de recetas
 export const createRecipeBodySchema = z.object({

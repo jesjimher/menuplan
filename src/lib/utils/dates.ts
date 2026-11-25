@@ -80,3 +80,19 @@ export function weekKeyToIndex(weekKey: string): number {
 	monday.setUTCDate(startOfYear.getUTCDate() + (weekNum - 1) * 7);
 	return Math.round(monday.getTime() / (7 * 24 * 60 * 60 * 1000));
 }
+
+/** Fecha (YYYY-MM-DD) de un día (1=Lun … 7=Dom) de una semana ISO. */
+export function weekdayDateKey(weekKey: string, weekday: number): string {
+	return weekdayDateFromWeekKey(weekKey, weekday).toISOString().slice(0, 10);
+}
+
+/** Fecha local (YYYY-MM-DD) de hoy desplazada `offsetDays` días. */
+export function localDateKey(offsetDays = 0, now: Date = new Date()): string {
+	return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + offsetDays)).toISOString().slice(0, 10);
+}
+
+/** Semana ISO a la que pertenece una fecha YYYY-MM-DD. */
+export function dateKeyToWeekKey(dateKey: string): string {
+	const [y, m, d] = dateKey.split('-').map(Number);
+	return getWeekKey(new Date(y, m - 1, d));
+}

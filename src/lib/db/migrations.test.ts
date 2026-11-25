@@ -46,7 +46,7 @@ describe('migración 16: drop_members_and_rebuild_week_plans', () => {
 				('2026-W10', 3, 'cena',   0, 0, 0, NULL, NULL); -- fantasma: se descarta
 		`);
 
-		runMigrations(db);
+		runMigrations(db, 18);
 
 		const rows = db.prepare('SELECT week_key, weekday, meal_type, is_leftover, recipe_id FROM week_plans ORDER BY weekday').all();
 		expect(rows).toEqual([
@@ -62,7 +62,7 @@ describe('migración 16: drop_members_and_rebuild_week_plans', () => {
 	it('el nuevo índice único rechaza dos filas en el mismo slot', () => {
 		const db = legacyDb();
 		db.exec(`INSERT INTO recipes (name) VALUES ('A'), ('B')`);
-		runMigrations(db);
+		runMigrations(db, 18);
 
 		const ins = db.prepare(`INSERT INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, recipe_id) VALUES ('2026-W10', 1, 'comida', 0, 0, ?)`);
 		ins.run(1);
@@ -72,7 +72,7 @@ describe('migración 16: drop_members_and_rebuild_week_plans', () => {
 	it('borrar una receta borra sus filas de plan (ya no quedan fantasmas)', () => {
 		const db = legacyDb();
 		db.exec(`INSERT INTO recipes (name) VALUES ('A'), ('B')`);
-		runMigrations(db);
+		runMigrations(db, 18);
 
 		db.exec(`
 			INSERT INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, recipe_id) VALUES
@@ -86,8 +86,8 @@ describe('migración 16: drop_members_and_rebuild_week_plans', () => {
 
 	it('recrea los índices y es idempotente al ejecutarse de nuevo', () => {
 		const db = legacyDb();
-		runMigrations(db);
-		runMigrations(db);
+		runMigrations(db, 18);
+		runMigrations(db, 18);
 
 		const idx = (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'week_plans'`).all() as { name: string }[]).map(i => i.name);
 		expect(idx).toEqual(expect.arrayContaining(['idx_week_plans_unique', 'idx_week_plans_recipe_id', 'idx_week_plans_weekday_meal']));
@@ -138,7 +138,7 @@ describe('migración 17: split_week_day_config', () => {
 	it('copia la capacidad: sticky sin límite, no sticky limitada a su semana', () => {
 		const db = legacyDbWithConfig();
 		seed(db);
-		runMigrations(db);
+		runMigrations(db, 18);
 
 		const rows = db.prepare(`
 			SELECT weekday, meal_type, effective_from, effective_to, recipe_count, accompaniment_per_recipe, accompaniment_per_slot
@@ -155,7 +155,7 @@ describe('migración 17: split_week_day_config', () => {
 	it('normaliza los tres formatos de required_tag a filas por slot', () => {
 		const db = legacyDbWithConfig();
 		seed(db);
-		runMigrations(db);
+		runMigrations(db, 18);
 
 		const tags = db.prepare(`
 			SELECT c.effective_from AS week, t.slot_index AS slot, t.tag
@@ -175,7 +175,7 @@ describe('migración 17: split_week_day_config', () => {
 	it('mueve disabled/comentario/nota a week_meal_state solo cuando hay algo que guardar', () => {
 		const db = legacyDbWithConfig();
 		seed(db);
-		runMigrations(db);
+		runMigrations(db, 18);
 
 		expect(db.prepare('SELECT * FROM week_meal_state').all()).toEqual([
 			{ week_key: '2026-W15', weekday: 2, meal_type: 'cena', disabled: 1, disabled_comment: 'fuera', note: 'n' }
@@ -185,17 +185,36 @@ describe('migración 17: split_week_day_config', () => {
 	it('elimina week_day_config y no falla al ejecutarse de nuevo', () => {
 		const db = legacyDbWithConfig();
 		seed(db);
-		runMigrations(db);
-		runMigrations(db);
+		runMigrations(db, 18);
+		runMigrations(db, 18);
 		expect(db.prepare(`SELECT 1 FROM sqlite_master WHERE name = 'week_day_config'`).get()).toBeUndefined();
 	});
 
 	it('borrar una vigencia borra sus tags exigidos (ON DELETE CASCADE)', () => {
 		const db = legacyDbWithConfig();
 		seed(db);
-		runMigrations(db);
+		runMigrations(db, 18);
 		db.prepare(`DELETE FROM meal_config WHERE effective_from = '2026-W20'`).run();
 		const left = db.prepare(`SELECT COUNT(*) AS n FROM meal_config_required_tags WHERE tag = 'pasta'`).get() as { n: number };
 		expect(left.n).toBe(0);
+	});
+});
+
+describe('migración 19: independent_meal_slots', () => {
+	it('encadena con la 17: la configuración por semanas acaba en huecos y desaparece meal_config', () => {
+		const db = legacyDbWithConfig();
+		db.prepare(`
+			INSERT INTO week_day_config (week_key, weekday, meal_type, recipe_count, accompaniment_per_recipe, accompaniment_per_slot, required_tag, sticky)
+			VALUES ('2026-W20', 1, 'comida', 2, 0, 0, '["pasta","carne"]', 1)
+		`).run();
+		runMigrations(db);
+		runMigrations(db);
+		const slots = db.prepare(`
+			SELECT kind, tags FROM meal_slots
+			WHERE weekday = 1 AND meal_type = 'comida' AND effective_from <= '2026-W30' AND (effective_to IS NULL OR effective_to >= '2026-W30')
+			ORDER BY position
+		`).all();
+		expect(slots).toEqual([{ kind: 'main', tags: 'pasta' }, { kind: 'main', tags: 'carne' }]);
+		expect(db.prepare(`SELECT 1 FROM sqlite_master WHERE name IN ('meal_config', 'meal_config_required_tags')`).get()).toBeUndefined();
 	});
 });

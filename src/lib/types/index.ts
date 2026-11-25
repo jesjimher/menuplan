@@ -34,24 +34,42 @@ export interface WeekPlan {
 	week_key: string;
 	weekday: number;
 	meal_type: MealType;
-	slot_index: number;
+	slot_id: number;
 	is_accompaniment: number;
 	is_leftover: number;
 	recipe_id: number;
+	/** Programación de la que viene la receta (al consolidar un día pasado), o null. */
+	schedule_id: number | null;
 }
 
-// Capacidad de una comida (día+tipo) a partir de `effective_from`. `effective_to` NULL = sin
-// límite; igual a `effective_from` = override de una sola semana (edición de una semana pasada).
-// Si varias vigencias cubren una semana, gana la de `effective_from` más reciente.
-export interface MealConfigRow {
+export type MealSlotKind = 'main' | 'acc';
+
+// Versión de un hueco (meal_slots): `slot_id` es la identidad del hueco, común a todas sus
+// versiones; cada fila cubre [effective_from, effective_to] (NULL = sin final).
+export interface MealSlotRow {
 	id: number;
+	slot_id: number;
 	weekday: number;
 	meal_type: MealType;
+	kind: MealSlotKind;
+	parent_slot_id: number | null;
 	effective_from: string;
 	effective_to: string | null;
-	recipe_count: number;
-	accompaniment_per_recipe: number;
-	accompaniment_per_slot: number;
+	position: number;
+	tags: string;
+}
+
+// Hueco tal y como rige en una semana concreta.
+export interface MealSlot {
+	/** slot_id (identidad del hueco). Negativo = hueco virtual de una programación «add». */
+	id: number;
+	kind: MealSlotKind;
+	/** Plato del que cuelga un acompañamiento; null = acompañamiento de toda la comida. */
+	parent_id: number | null;
+	position: number;
+	tags: string[];
+	/** Hueco que solo existe esta semana porque lo añade una programación (on_conflict='add'). */
+	virtual?: boolean;
 }
 
 // Estado puntual de una comida en una semana concreta (sin herencia).
@@ -98,20 +116,20 @@ export interface ScheduleWithRecipe extends Schedule {
 export interface SlotData {
 	weekday: number;
 	meal_type: MealType;
-	slot_index: number;
+	slot_id: number;
 	is_accompaniment: number;
 	is_leftover: 0 | 1;
 	recipe: Recipe | null;
 	schedule: ScheduleWithRecipe | null;
 	/** Para quién es esta receta; vacío = para todos. */
 	people: number[];
+	/** Programación de la que salió una receta ya consolidada (día pasado), o null. */
+	origin_schedule_id?: number | null;
 }
 
 export interface MealConfig {
-	recipe_count: number;
-	accompaniment_per_recipe: number;
-	accompaniment_per_slot: number;
-	required_tags: string[][];
+	/** Huecos vigentes esa semana: platos y acompañamientos, ordenados por posición. */
+	slots: MealSlot[];
 	disabled: boolean;
 	disabled_comment: string | null;
 	note: string | null;

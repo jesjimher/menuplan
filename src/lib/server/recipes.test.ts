@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { importPlantoeatRecipes, exportPlantoeatRecipes, getAllRecipes, createRecipe, getAllTags, searchRecipes, getRecipesPlannedNearDate } from './recipes.js';
-import { resetDb, seedRecipe } from './test-helpers.js';
+import { resetDb, seedRecipe, slotFor } from './test-helpers.js';
 import { assignRecipe } from './weekplan.js';
 import { upsertSchedule } from './schedules.js';
 import { getWeekKey, weekKeyToIndex, indexToWeekKey, getWeekDates } from '$lib/utils/dates.js';
@@ -95,7 +95,7 @@ describe('getRecipesPlannedNearDate', () => {
 
 	it('cubre la separación completa de una semana (lunes -> domingo, 6 días)', () => {
 		const recipe = seedRecipe('Cocido', 'legumbres');
-		assignRecipe(WEEK, 1, 'comida', 0, 0, recipe.id); // lunes
+		assignRecipe(WEEK, slotFor(WEEK, 1, 'comida', 0, 0), recipe.id); // lunes
 		const dates = getWeekDates(WEEK);
 		const result = getRecipesPlannedNearDate(dates[6]); // domingo
 		expect(result.map(r => r.id)).toContain(recipe.id);
@@ -104,8 +104,8 @@ describe('getRecipesPlannedNearDate', () => {
 	it('no incluye acompañamientos ni recetas ya marcadas como restos', () => {
 		const acc = seedRecipe('Pan', 'acompañamiento');
 		const leftover = seedRecipe('Sobras', 'legumbres');
-		assignRecipe(WEEK, 1, 'comida', 0, 1, acc.id);
-		assignRecipe(WEEK, 1, 'comida', 1, 0, leftover.id, 1);
+		assignRecipe(WEEK, slotFor(WEEK, 1, 'comida', 0, 1), acc.id);
+		assignRecipe(WEEK, slotFor(WEEK, 1, 'comida', 1, 0), leftover.id, 1);
 		const dates = getWeekDates(WEEK);
 		const result = getRecipesPlannedNearDate(dates[2]);
 		expect(result.map(r => r.id)).not.toContain(acc.id);

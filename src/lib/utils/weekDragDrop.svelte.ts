@@ -1,5 +1,6 @@
 // Estado y handlers de drag & drop de la página de semana (runes en módulo .svelte.ts).
-export type SlotCoord = { weekday: number; mealType: string; slotIndex: number; isAcc: number };
+// slotId: slot_id del hueco (negativo = hueco virtual de una programación «add»)
+export type SlotCoord = { weekday: number; mealType: string; slotId: number; isAcc: number };
 
 export class WeekDragDrop {
 	dragSource = $state<SlotCoord | null>(null);

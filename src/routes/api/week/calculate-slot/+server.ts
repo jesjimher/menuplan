@@ -1,31 +1,29 @@
-import { json } from '@sveltejs/kit';
+import { json, error } from '@sveltejs/kit';
 import { getWeekData } from '$lib/server/weekplan.js';
 import { calculatePlan } from '$lib/server/planner.js';
+import { resolveSlotId, getSlotVersion } from '$lib/server/mealSlots.js';
+import { parseTags } from '$lib/utils/parseTags.js';
 import { parseBody } from '$lib/utils/parseBody.js';
 import { calculateSlotBodySchema } from '$lib/schemas/index.js';
 
 export async function POST({ request }) {
 	const body = await parseBody(request, calculateSlotBodySchema);
-	const { weekKey, weekday, meal_type, slot_index, is_accompaniment } = body;
+	const { weekKey } = body;
+
+	const slotId = resolveSlotId(weekKey, body.slot_id);
+	const version = getSlotVersion(slotId, weekKey);
+	if (!version) throw error(400, 'El hueco no existe esa semana');
 
 	const weekData = getWeekData(weekKey);
-	const mealCfg = weekData.configs[weekday]?.[meal_type];
+	const isAcc = version.kind === 'acc' ? 1 : 0;
+	calculatePlan(weekKey, [{
+		weekday: version.weekday,
+		meal_type: version.meal_type,
+		slot_id: slotId,
+		is_accompaniment: isAcc,
+		required_tags: isAcc ? [] : parseTags(version.tags)
+	}], weekData.slots);
 
-	const slot = {
-		weekday,
-		meal_type,
-		slot_index,
-		is_accompaniment,
-		required_tags: is_accompaniment === 0 ? (mealCfg?.required_tags[slot_index] ?? []) : []
-	};
-
-	calculatePlan(weekKey, [slot], weekData.slots);
-
-	const updated = getWeekData(weekKey);
-	const filledSlot = updated.slots.find(s =>
-		s.weekday === weekday && s.meal_type === meal_type &&
-		s.slot_index === slot_index && s.is_accompaniment === is_accompaniment
-	);
-
-	return json({ recipe: filledSlot?.recipe ?? null });
+	const filledSlot = getWeekData(weekKey).slots.find(s => s.slot_id === slotId);
+	return json({ recipe: filledSlot?.recipe ?? null, slot_id: slotId });
 }

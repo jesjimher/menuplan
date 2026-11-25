@@ -7,7 +7,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check": "svelte-check --threshold error"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.2.9",
@@ -17,6 +18,7 @@
     "@types/better-sqlite3": "^7.6.12",
     "playwright": "^1.60.0",
     "svelte": "^5.0.0",
+    "svelte-check": "^4.7.8",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.0.0",
     "vite": "^6.0.0",

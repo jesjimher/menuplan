@@ -21,7 +21,7 @@
 		weekKey,
 		weekday,
 		mealType,
-		slotIndex,
+		slotId,
 		isAccompaniment,
 		recipe,
 		schedule,
@@ -35,7 +35,7 @@
 		weekKey: string;
 		weekday: number;
 		mealType: string;
-		slotIndex: number;
+		slotId: number;
 		isAccompaniment: number;
 		recipe: Recipe;
 		schedule: ScheduleWithRecipe | null;

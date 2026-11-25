@@ -1,6 +1,9 @@
 import { json, error } from '@sveltejs/kit';
-import { removeRecipe, hasManualEntry } from '$lib/server/weekplan.js';
+import { removeRecipe, getPlanRow } from '$lib/server/weekplan.js';
 import { getScheduleForMeal, getActiveSchedulesForWeek, deleteSchedule } from '$lib/server/schedules.js';
+import { slotTarget } from '$lib/server/mealSlots.js';
+import { isDayConsolidated } from '$lib/server/consolidationMark.js';
+import { getDb } from '$lib/db/index.js';
 import { parseBody } from '$lib/utils/parseBody.js';
 import { removeBodySchema } from '$lib/schemas/index.js';
 import { withFrozenPast, shiftScheduleRotation, countSchedulesForMeal } from '$lib/server/scheduleFreeze.js';
@@ -8,19 +11,22 @@ import { getWeekKey, weekKeyToIndex, indexToWeekKey } from '$lib/utils/dates.js'
 
 export async function POST({ request }) {
 	const body = await parseBody(request, removeBodySchema);
-	const { weekKey, weekday, meal_type, slot_index, is_accompaniment, recipe_id, force } = body;
+	const { weekKey, slot_id, recipe_id, force } = body;
+	const target = slotTarget(slot_id);
+	if (!target) throw error(400, 'Hueco desconocido');
+	const { weekday, meal_type, is_accompaniment } = target;
 
 	if (force === 'move' || force === 'only_week') {
-		// 'only_week': la excepción ya fue añadida por el cliente; aquí solo limpiamos
-		// la entrada manual si existe.
-		removeRecipe(weekKey, weekday, meal_type, slot_index, is_accompaniment);
+		// 'only_week': la excepción ya fue añadida por el cliente (si hacía falta); aquí solo
+		// limpiamos la fila guardada si existe.
+		removeRecipe(weekKey, slot_id);
 		return json({ ok: true, had_schedule: false });
 	}
 
 	if (force === 'full_schedule') {
 		const sched = getScheduleForMeal(weekday, meal_type, is_accompaniment, recipe_id);
 		if (sched) withFrozenPast(() => deleteSchedule(sched.id));
-		removeRecipe(weekKey, weekday, meal_type, slot_index, is_accompaniment);
+		removeRecipe(weekKey, slot_id);
 		return json({ ok: true, had_schedule: false });
 	}
 
@@ -29,14 +35,13 @@ export async function POST({ request }) {
 			throw error(400, 'No se puede desplazar la rotación en una semana pasada');
 		}
 		shiftScheduleRotation(weekKey, weekday, meal_type, is_accompaniment);
-		removeRecipe(weekKey, weekday, meal_type, slot_index, is_accompaniment);
+		removeRecipe(weekKey, slot_id);
 		return json({ ok: true, had_schedule: false });
 	}
 
-	// Sin force: determinar si el slot es virtual (programación) o manual
-	const isManual = hasManualEntry(weekKey, weekday, meal_type, slot_index, is_accompaniment);
+	const row = slot_id >= 0 ? getPlanRow(weekKey, slot_id) : undefined;
 
-	if (!isManual) {
+	if (!row) {
 		// La receta visible viene de una programación activa → preguntar al usuario
 		const activeScheds = getActiveSchedulesForWeek(weekKey);
 		const sched = activeScheds.find(s =>
@@ -60,15 +65,21 @@ export async function POST({ request }) {
 		return json({ ok: true, had_schedule: false });
 	}
 
+	// Receta consolidada de una programación (día ya pasado): antes de quitarla, preguntar si
+	// se quiere retrasar la rotación para no perder la receta que tocaba
+	if (row.schedule_id !== null && isDayConsolidated(weekKey, weekday)
+		&& getDb().prepare('SELECT 1 FROM schedules WHERE id = ?').get(row.schedule_id)) {
+		return json({ ok: true, had_schedule: false, consolidated_schedule_id: row.schedule_id });
+	}
+
 	// La receta es manual: borrar la fila
-	removeRecipe(weekKey, weekday, meal_type, slot_index, is_accompaniment);
+	removeRecipe(weekKey, slot_id);
 
 	// Comprobar si hay programación activa debajo (que ahora reaparecerá)
-	const activeScheds = getActiveSchedulesForWeek(weekKey);
-	const schedUnderneath = activeScheds.find(s =>
+	const schedUnderneath = !isDayConsolidated(weekKey, weekday) && getActiveSchedulesForWeek(weekKey).some(s =>
 		s.weekday === weekday && s.meal_type === meal_type &&
 		s.is_accompaniment === is_accompaniment
 	);
 
-	return json({ ok: true, had_schedule: false, schedule_resumed: schedUnderneath ? true : false });
+	return json({ ok: true, had_schedule: false, schedule_resumed: schedUnderneath });
 }

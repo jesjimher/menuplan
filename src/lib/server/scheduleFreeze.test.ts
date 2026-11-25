@@ -1,18 +1,24 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getWeekData } from './weekplan.js';
 import { upsertSchedule, deleteSchedule, moveSchedule, addException } from './schedules.js';
-import { freezeSchedulesBefore, withFrozenPast, shiftScheduleRotation, countSchedulesForMeal } from './scheduleFreeze.js';
-import { resetDb, seedRecipe } from './test-helpers.js';
+import { consolidateSchedules, withFrozenPast, shiftScheduleRotation, delayScheduleRotation, countSchedulesForMeal } from './scheduleFreeze.js';
+import { removeRecipe, getPlanRow } from './weekplan.js';
+import { getConsolidatedThrough } from './consolidationMark.js';
+import { resetDb, seedRecipe, mainSlot } from './test-helpers.js';
 import { getDb } from '$lib/db/index.js';
-import { getWeekKey, weekKeyToIndex, indexToWeekKey } from '$lib/utils/dates.js';
+import { getWeekKey, weekKeyToIndex, indexToWeekKey, weekdayDateKey } from '$lib/utils/dates.js';
 
 const NOW = weekKeyToIndex(getWeekKey());
 const wk = (offset: number) => indexToWeekKey(NOW + offset);
 
-/** Nombres de las recetas del lunes-comida de una semana. */
+// Los tests usan el domingo: es el único día de la semana actual que nunca está consolidado
+// (consolidar llega hasta ayer), así que el resultado no depende del día en que se ejecuten.
+const DAY = 7;
+
+/** Nombres de las recetas del domingo-comida de una semana. */
 function mondayLunch(offset: number): string[] {
 	return getWeekData(wk(offset)).slots
-		.filter(s => s.weekday === 1 && s.meal_type === 'comida' && s.is_accompaniment === 0)
+		.filter(s => s.weekday === DAY && s.meal_type === 'comida' && s.is_accompaniment === 0)
 		.map(s => s.recipe?.name ?? '');
 }
 
@@ -24,7 +30,7 @@ function snapshot(from: number, to: number): string[][] {
 
 function schedule(name: string, every: number, anchorOffset: number): number {
 	const r = seedRecipe(name, 'comida');
-	return upsertSchedule(r.id, 1, 'comida', 0, every, wk(anchorOffset), 'skip', 5);
+	return upsertSchedule(r.id, DAY, 'comida', 0, every, wk(anchorOffset), 'skip', 5);
 }
 
 beforeEach(() => resetDb());
@@ -45,15 +51,15 @@ describe('withFrozenPast', () => {
 		expect(result.ok).toBe(true);
 		expect(snapshot(-4, -1)).toEqual(before);
 		expect(mondayLunch(0)).toEqual([]);
-		const tuesday = getWeekData(wk(0)).slots.filter(s => s.weekday === 2);
+		const tuesday = getWeekData(wk(1)).slots.filter(s => s.weekday === 2);
 		expect(tuesday.map(s => s.recipe?.name)).toEqual(['Arroz']);
 	});
 
 	it('cambiar la frecuencia no cambia el pasado', () => {
 		const r = seedRecipe('Arroz', 'comida');
-		upsertSchedule(r.id, 1, 'comida', 0, 1, wk(-6), 'skip', 5);
+		upsertSchedule(r.id, DAY, 'comida', 0, 1, wk(-6), 'skip', 5);
 		const before = snapshot(-6, -1);
-		withFrozenPast(() => upsertSchedule(r.id, 1, 'comida', 0, 3, wk(-6), 'skip', 5));
+		withFrozenPast(() => upsertSchedule(r.id, DAY, 'comida', 0, 3, wk(-6), 'skip', 5));
 		expect(snapshot(-6, -1)).toEqual(before);
 		// Futuro: cada 3 semanas desde el ancla original (-6 → 0, 3, 6...)
 		expect(snapshot(0, 3)).toEqual([['Arroz'], [], [], ['Arroz']]);
@@ -61,7 +67,7 @@ describe('withFrozenPast', () => {
 
 	it('crear una programación con ancla en el pasado no la muestra en el pasado', () => {
 		const r = seedRecipe('Arroz', 'comida');
-		withFrozenPast(() => upsertSchedule(r.id, 1, 'comida', 0, 2, wk(-5), 'skip', 5));
+		withFrozenPast(() => upsertSchedule(r.id, DAY, 'comida', 0, 2, wk(-5), 'skip', 5));
 		expect(snapshot(-5, -1).flat()).toEqual([]);
 		// Mantiene la fase: -5, -3, -1, 1, 3...
 		expect(snapshot(0, 3)).toEqual([[], ['Arroz'], [], ['Arroz']]);
@@ -69,10 +75,10 @@ describe('withFrozenPast', () => {
 
 	it('es idempotente', () => {
 		schedule('Arroz', 2, -6);
-		freezeSchedulesBefore();
+		consolidateSchedules();
 		const rows1 = getDb().prepare('SELECT COUNT(*) AS n FROM week_plans').get() as { n: number };
 		const anchors1 = getDb().prepare('SELECT anchor_week_key FROM schedules').all();
-		freezeSchedulesBefore();
+		consolidateSchedules();
 		const rows2 = getDb().prepare('SELECT COUNT(*) AS n FROM week_plans').get() as { n: number };
 		expect(rows2.n).toBe(rows1.n);
 		expect(getDb().prepare('SELECT anchor_week_key FROM schedules').all()).toEqual(anchors1);
@@ -92,7 +98,7 @@ describe('shiftScheduleRotation', () => {
 		rotation();
 		expect(snapshot(0, 3)).toEqual([['Arroz'], ['Macarrones'], ['Lentejas'], ['Arroz']]);
 		const past = snapshot(-3, -1);
-		shiftScheduleRotation(wk(0), 1, 'comida', 0);
+		shiftScheduleRotation(wk(0), DAY, 'comida', 0);
 		expect(snapshot(0, 3)).toEqual([['Macarrones'], ['Lentejas'], ['Arroz'], ['Macarrones']]);
 		expect(snapshot(-3, -1)).toEqual(past);
 	});
@@ -100,7 +106,7 @@ describe('shiftScheduleRotation', () => {
 	it('las excepciones futuras siguen a su aparición', () => {
 		const { l } = rotation();
 		addException(l, wk(5)); // lentejas: 2, 5, 8 → se excluye la de la semana 5
-		shiftScheduleRotation(wk(0), 1, 'comida', 0);
+		shiftScheduleRotation(wk(0), DAY, 'comida', 0);
 		// Tras adelantar, lentejas cae en 1, 4, 7: la excluida ahora es la 4
 		expect(snapshot(0, 7)).toEqual([['Macarrones'], ['Lentejas'], ['Arroz'], ['Macarrones'], [], ['Arroz'], ['Macarrones'], ['Lentejas']]);
 	});
@@ -108,7 +114,7 @@ describe('shiftScheduleRotation', () => {
 	it('desplazar en una semana futura no altera las semanas intermedias', () => {
 		rotation();
 		const before = snapshot(-3, 1);
-		shiftScheduleRotation(wk(2), 1, 'comida', 0);
+		shiftScheduleRotation(wk(2), DAY, 'comida', 0);
 		expect(snapshot(-3, 1)).toEqual(before);
 		// Semana 2 era lentejas → ahora arroz (lo que tocaba en la 3), luego macarrones, luego lentejas
 		expect(snapshot(2, 5)).toEqual([['Arroz'], ['Macarrones'], ['Lentejas'], ['Arroz']]);
@@ -116,12 +122,55 @@ describe('shiftScheduleRotation', () => {
 
 	it('rechaza semanas pasadas', () => {
 		rotation();
-		expect(() => shiftScheduleRotation(wk(-1), 1, 'comida', 0)).toThrow();
+		expect(() => shiftScheduleRotation(wk(-1), DAY, 'comida', 0)).toThrow();
 	});
 
 	it('cuenta las programaciones del hueco', () => {
 		rotation();
-		expect(countSchedulesForMeal(1, 'comida', 0)).toBe(3);
+		expect(countSchedulesForMeal(DAY, 'comida', 0)).toBe(3);
 		expect(countSchedulesForMeal(2, 'comida', 0)).toBe(0);
+	});
+});
+
+describe('consolidación diaria', () => {
+	it('guarda los días pasados con la programación de origen y avanza la marca', () => {
+		const id = schedule('Arroz', 1, -2);
+		consolidateSchedules();
+		const row = getPlanRow(wk(-1), mainSlot(wk(-1), DAY, 'comida'));
+		expect(row?.schedule_id).toBe(id);
+		expect(getConsolidatedThrough()).not.toBeNull();
+		// La semana actual (domingo, aún no ha llegado) sigue resolviéndose al vuelo
+		expect(getPlanRow(wk(0), mainSlot(wk(0), DAY, 'comida'))).toBeUndefined();
+		expect(mondayLunch(0)).toEqual(['Arroz']);
+	});
+
+	it('un día consolidado que se vacía a mano no vuelve a rellenarse', () => {
+		schedule('Arroz', 1, -2);
+		consolidateSchedules();
+		removeRecipe(wk(-1), mainSlot(wk(-1), DAY, 'comida'));
+		consolidateSchedules();
+		expect(mondayLunch(-1)).toEqual([]);
+	});
+
+	it('consolida por días dentro de la semana', () => {
+		const lunes = seedRecipe('Lentejas', 'comida');
+		const jueves = seedRecipe('Paella', 'comida');
+		upsertSchedule(lunes.id, 1, 'comida', 0, 1, wk(0), 'skip', 5);
+		upsertSchedule(jueves.id, 4, 'comida', 0, 1, wk(0), 'skip', 5);
+		consolidateSchedules(weekdayDateKey(wk(0), 3)); // hasta el miércoles
+		expect(getPlanRow(wk(0), mainSlot(wk(0), 1, 'comida'))?.recipe_id).toBe(lunes.id);
+		expect(getPlanRow(wk(0), mainSlot(wk(0), 4, 'comida'))).toBeUndefined();
+		// El lunes ya no depende de la programación: borrarla no lo cambia
+		getDb().prepare('DELETE FROM schedules').run();
+		const names = getWeekData(wk(0)).slots.filter(s => s.weekday === 1).map(s => s.recipe?.name);
+		expect(names).toEqual(['Lentejas']);
+	});
+
+	it('retrasar la rotación pasa la receta que tocaba a la semana siguiente', () => {
+		schedule('Arroz', 3, 0);
+		schedule('Macarrones', 3, 1);
+		schedule('Lentejas', 3, 2);
+		delayScheduleRotation(wk(0), DAY, 'comida', 0);
+		expect(snapshot(0, 4)).toEqual([[], ['Arroz'], ['Macarrones'], ['Lentejas'], ['Arroz']]);
 	});
 });

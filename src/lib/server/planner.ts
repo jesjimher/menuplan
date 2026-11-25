@@ -13,10 +13,10 @@ import { countTagsPerPerson, countBuckets, addTagCounts, ruleTargets, type TagCo
 const MIDWEEK_DAY_OFFSET = 4;
 const MIN_DAYS_RELAXATION_FACTOR = 0.5;
 
-interface SlotToFill {
+export interface SlotToFill {
 	weekday: number;
 	meal_type: MealType;
-	slot_index: number;
+	slot_id: number;
 	is_accompaniment: number;
 	required_tags?: string[];
 }
@@ -94,7 +94,7 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 			const pool = helping.length > 0 ? helping : candidates;
 			const chosen = pool[Math.floor(Math.random() * pool.length)];
 
-			assignRecipe(weekKey, slot.weekday, slot.meal_type, slot.slot_index, slot.is_accompaniment, chosen.id);
+			assignRecipe(weekKey, slot.slot_id, chosen.id);
 
 			if (!slot.is_accompaniment) addTagCounts(tagCounts, parseTags(chosen.tags), allBuckets);
 		}
@@ -106,7 +106,6 @@ export function getDiscardedRecipes(
 	_weekday: number,
 	mealType: string,
 	isAcc: number,
-	_slotIndex: number,
 	currentSlots: SlotData[],
 	slotRequiredTags: string[] = []
 ): { recipe: Recipe; reason: string }[] {

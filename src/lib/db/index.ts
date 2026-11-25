@@ -29,14 +29,14 @@ CREATE TABLE IF NOT EXISTS week_plans (
     week_key         TEXT    NOT NULL,
     weekday          INTEGER NOT NULL,
     meal_type        TEXT    NOT NULL,
-    slot_index       INTEGER NOT NULL DEFAULT 0,
+    slot_id          INTEGER NOT NULL,
     is_accompaniment INTEGER NOT NULL DEFAULT 0,
     is_leftover      INTEGER NOT NULL DEFAULT 0,
-    recipe_id        INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE
+    recipe_id        INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+    schedule_id      INTEGER DEFAULT NULL
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_week_plans_unique
-    ON week_plans(week_key, weekday, meal_type, is_accompaniment, slot_index);
+-- El índice único (week_key, slot_id) lo crea la migración 19: en una BD antigua esta
+-- sentencia se ejecuta antes de que exista la columna slot_id.
 
 CREATE INDEX IF NOT EXISTS idx_week_plans_recipe_id
     ON week_plans(recipe_id);
@@ -44,24 +44,23 @@ CREATE INDEX IF NOT EXISTS idx_week_plans_recipe_id
 CREATE INDEX IF NOT EXISTS idx_week_plans_weekday_meal
     ON week_plans(weekday, meal_type, is_accompaniment);
 
-CREATE TABLE IF NOT EXISTS meal_config (
-    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
-    weekday                  INTEGER NOT NULL,
-    meal_type                TEXT    NOT NULL,
-    effective_from           TEXT    NOT NULL,
-    effective_to             TEXT    DEFAULT NULL,
-    recipe_count             INTEGER NOT NULL DEFAULT 1,
-    accompaniment_per_recipe INTEGER NOT NULL DEFAULT 1,
-    accompaniment_per_slot   INTEGER NOT NULL DEFAULT 0,
-    UNIQUE(weekday, meal_type, effective_from)
+-- Huecos de cada comida. Cada fila es una versión; slot_id es la identidad del hueco y se
+-- repite en todas sus versiones. Una versión rige de effective_from a effective_to (NULL = sin final).
+CREATE TABLE IF NOT EXISTS meal_slots (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    slot_id        INTEGER NOT NULL,
+    weekday        INTEGER NOT NULL,
+    meal_type      TEXT    NOT NULL,
+    kind           TEXT    NOT NULL CHECK(kind IN ('main','acc')),
+    parent_slot_id INTEGER DEFAULT NULL,
+    effective_from TEXT    NOT NULL,
+    effective_to   TEXT    DEFAULT NULL,
+    position       INTEGER NOT NULL DEFAULT 0,
+    tags           TEXT    NOT NULL DEFAULT ''
 );
 
-CREATE TABLE IF NOT EXISTS meal_config_required_tags (
-    config_id  INTEGER NOT NULL REFERENCES meal_config(id) ON DELETE CASCADE,
-    slot_index INTEGER NOT NULL,
-    tag        TEXT    NOT NULL,
-    UNIQUE(config_id, slot_index, tag)
-);
+CREATE INDEX IF NOT EXISTS idx_meal_slots_meal ON meal_slots(weekday, meal_type);
+CREATE INDEX IF NOT EXISTS idx_meal_slots_slot ON meal_slots(slot_id);
 
 CREATE TABLE IF NOT EXISTS week_meal_state (
     week_key         TEXT    NOT NULL,

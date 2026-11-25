@@ -1,64 +1,160 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getWeekData, assignRecipe, removeRecipe, copyPreviousWeek, updateDayConfig, updateSlotRequiredTag } from './weekplan.js';
+import { getWeekData, assignRecipe, removeRecipe, copyPreviousWeek, updateDayConfig } from './weekplan.js';
+import { addSlot, removeSlot, setSlotTags } from './mealSlots.js';
 import { upsertSchedule } from './schedules.js';
-import { resetDb, seedRecipe, seedRule } from './test-helpers.js';
+import { resetDb, seedRecipe, seedRule, mainSlot, accSlot, slotsOf } from './test-helpers.js';
 import { getDb } from '$lib/db/index.js';
 import { getWeekKey, weekKeyToIndex, indexToWeekKey } from '$lib/utils/dates.js';
 
-// Semanas futuras relativas a la actual (las vigencias de meal_config solo se propagan
-// al futuro cuando se editan en semanas presentes o futuras).
+// Semanas futuras relativas a la actual (los cambios de huecos solo se propagan hacia
+// delante cuando se hacen en la semana actual o futuras).
 const NOW = weekKeyToIndex(getWeekKey());
-const WEEK = indexToWeekKey(NOW + 6);
-const PREV = indexToWeekKey(NOW + 5);
-const NEXT = indexToWeekKey(NOW + 7);
+const wk = (offset: number) => indexToWeekKey(NOW + offset);
+const WEEK = wk(6);
+const PREV = wk(5);
+const NEXT = wk(7);
+
+const mains = (week: string, d = 1, meal = 'comida') => getWeekData(week).configs[d][meal as 'comida'].slots.filter(s => s.kind === 'main');
+const tagsOf = (week: string, slotId: number) => getWeekData(week).configs[1].comida.slots.find(s => s.id === slotId)?.tags;
+const versions = (slotId: number) => (getDb().prepare('SELECT COUNT(*) AS n FROM meal_slots WHERE slot_id = ?').get(slotId) as { n: number }).n;
 
 beforeEach(() => resetDb());
 
 describe('assignRecipe + getWeekData', () => {
-	it('asigna una receta y la devuelve en el slot', () => {
+	it('asigna una receta y la devuelve en el hueco', () => {
 		const r = seedRecipe('Lentejas', 'comida,legumbres');
-		assignRecipe(WEEK, 1, 'comida', 0, 0, r.id);
+		const slot = mainSlot(WEEK, 1, 'comida');
+		assignRecipe(WEEK, slot, r.id);
 		const data = getWeekData(WEEK);
 		expect(data.slots).toHaveLength(1);
-		expect(data.slots[0]).toMatchObject({ weekday: 1, meal_type: 'comida', recipe: expect.objectContaining({ id: r.id }) });
+		expect(data.slots[0]).toMatchObject({ weekday: 1, meal_type: 'comida', slot_id: slot, recipe: expect.objectContaining({ id: r.id }) });
 	});
 
-	it('hace upsert sobre el mismo slot (índice de expresión)', () => {
+	it('hace upsert sobre el mismo hueco', () => {
 		const r1 = seedRecipe('Lentejas', 'comida');
 		const r2 = seedRecipe('Garbanzos', 'comida');
-		assignRecipe(WEEK, 1, 'comida', 0, 0, r1.id);
-		assignRecipe(WEEK, 1, 'comida', 0, 0, r2.id);
+		const slot = mainSlot(WEEK, 1, 'comida');
+		assignRecipe(WEEK, slot, r1.id);
+		assignRecipe(WEEK, slot, r2.id);
 		const rows = getDb().prepare('SELECT COUNT(*) AS n FROM week_plans WHERE week_key = ?').get(WEEK) as { n: number };
 		expect(rows.n).toBe(1);
 		expect(getWeekData(WEEK).slots[0].recipe?.id).toBe(r2.id);
+	});
+
+	it('rechaza un hueco que no existe esa semana', () => {
+		const r = seedRecipe('Lentejas', 'comida');
+		const slot = addSlot(WEEK, 1, 'comida', 'main');
+		expect(() => assignRecipe(PREV, slot, r.id)).toThrow();
 	});
 
 	it('detecta violaciones de reglas en la semana', () => {
 		const r1 = seedRecipe('Pasta carbonara', 'comida,pasta');
 		const r2 = seedRecipe('Macarrones', 'comida,pasta');
 		seedRule('pasta', 'no_more_than', 1);
-		assignRecipe(WEEK, 1, 'comida', 0, 0, r1.id);
-		assignRecipe(WEEK, 2, 'comida', 0, 0, r2.id);
+		assignRecipe(WEEK, mainSlot(WEEK, 1, 'comida'), r1.id);
+		assignRecipe(WEEK, mainSlot(WEEK, 2, 'comida'), r2.id);
 		const { violations } = getWeekData(WEEK);
 		expect(violations.length).toBeGreaterThan(0);
 		expect(violations[0].rule.tag).toBe('pasta');
 	});
 });
 
-describe('configuración por día (meal_config / week_meal_state)', () => {
-	it('aplica la configuración exacta de la semana', () => {
-		updateDayConfig(WEEK, 1, 'comida', { recipe_count: 2 });
-		expect(getWeekData(WEEK).configs[1].comida.recipe_count).toBe(2);
+describe('huecos con vigencia (meal_slots)', () => {
+	it('añadir un hueco rige desde esa semana en adelante', () => {
+		addSlot(WEEK, 1, 'comida', 'main');
+		expect(mains(PREV)).toHaveLength(1);
+		expect(mains(WEEK)).toHaveLength(2);
+		expect(mains(wk(40))).toHaveLength(2);
 	});
 
-	it('hereda la configuración de semanas anteriores', () => {
-		updateDayConfig(PREV, 2, 'cena', { recipe_count: 3 });
-		// Semana posterior: hereda
-		expect(getWeekData(WEEK).configs[2].cena.recipe_count).toBe(3);
-		// Semana anterior a la config: usa el valor por defecto global
-		expect(getWeekData(indexToWeekKey(NOW + 4)).configs[2].cena.recipe_count).toBe(1);
+	it('quitar un hueco concreto deja los demás intactos, con sus tags', () => {
+		const trabajo = mainSlot(WEEK, 1, 'comida', 0);
+		const rapido = mainSlot(WEEK, 1, 'comida', 1);
+		setSlotTags(WEEK, trabajo, ['trabajo']);
+		setSlotTags(WEEK, rapido, ['rápido']);
+		removeSlot(WEEK, trabajo);
+		const left = mains(WEEK);
+		expect(left.map(s => s.id)).toEqual([rapido]);
+		expect(left[0].tags).toEqual(['rápido']);
+		// Antes de la semana del cambio el hueco sigue existiendo
+		expect(mains(PREV).map(s => s.id)).toContain(trabajo);
 	});
 
+	it('quitar un hueco borra sus recetas desde esa semana, no las anteriores', () => {
+		const r = seedRecipe('Lentejas', 'comida');
+		const slot = mainSlot(PREV, 1, 'comida');
+		assignRecipe(PREV, slot, r.id);
+		assignRecipe(WEEK, slot, r.id);
+		removeSlot(WEEK, slot);
+		expect(getWeekData(PREV).slots).toHaveLength(1);
+		expect(getWeekData(WEEK).slots).toHaveLength(0);
+	});
+
+	it('cambiar tags en una semana no afecta a las anteriores y se mantiene después', () => {
+		const slot = mainSlot(WEEK, 1, 'comida');
+		setSlotTags(PREV, slot, ['trabajo']);
+		setSlotTags(WEEK, slot, ['rápido']);
+		expect(tagsOf(wk(4), slot)).toEqual([]);
+		expect(tagsOf(PREV, slot)).toEqual(['trabajo']);
+		expect(tagsOf(WEEK, slot)).toEqual(['rápido']);
+		expect(tagsOf(wk(30), slot)).toEqual(['rápido']);
+		// Las recetas siguen en el mismo hueco: el id no cambia entre versiones
+		expect(mains(WEEK)[0].id).toBe(slot);
+	});
+
+	it('un cambio rige hasta el siguiente cambio que ya existía', () => {
+		const slot = mainSlot(WEEK, 1, 'comida');
+		setSlotTags(NEXT, slot, ['carne']);
+		setSlotTags(WEEK, slot, ['pasta']);
+		expect(tagsOf(WEEK, slot)).toEqual(['pasta']);
+		expect(tagsOf(NEXT, slot)).toEqual(['carne']);
+	});
+
+	it('volver a los tags anteriores fusiona las versiones', () => {
+		const slot = mainSlot(WEEK, 1, 'comida');
+		expect(versions(slot)).toBe(1);
+		setSlotTags(WEEK, slot, ['pasta']);
+		expect(versions(slot)).toBe(2);
+		setSlotTags(WEEK, slot, []);
+		expect(versions(slot)).toBe(1);
+	});
+
+	it('editar una semana pasada solo la afecta a ella', () => {
+		const past = wk(-3);
+		const slot = mainSlot(past, 1, 'comida');
+		setSlotTags(past, slot, ['pasta']);
+		expect(tagsOf(wk(-4), slot)).toEqual([]);
+		expect(tagsOf(past, slot)).toEqual(['pasta']);
+		expect(tagsOf(wk(-2), slot)).toEqual([]);
+		expect(tagsOf(WEEK, slot)).toEqual([]);
+
+		removeSlot(wk(-2), slot);
+		expect(mains(wk(-2))).toHaveLength(0);
+		expect(mains(wk(-1))).toHaveLength(1);
+
+		addSlot(wk(-5), 1, 'comida', 'main');
+		expect(mains(wk(-5))).toHaveLength(2);
+		expect(mains(wk(-4))).toHaveLength(1);
+	});
+
+	it('los acompañamientos de un plato desaparecen con él', () => {
+		const plato = mainSlot(WEEK, 1, 'comida');
+		const acc = addSlot(WEEK, 1, 'comida', 'acc', plato);
+		const general = accSlot(WEEK, 1, 'comida');
+		const cfg = getWeekData(WEEK).configs[1].comida;
+		expect(cfg.slots.find(s => s.id === acc)?.parent_id).toBe(plato);
+		removeSlot(WEEK, plato);
+		const left = getWeekData(WEEK).configs[1].comida.slots.map(s => s.id);
+		expect(left).toEqual([general]);
+	});
+
+	it('un acompañamiento no puede colgar de un plato que no existe esa semana', () => {
+		const plato = addSlot(WEEK, 1, 'comida', 'main');
+		expect(() => addSlot(PREV, 1, 'comida', 'acc', plato)).toThrow();
+	});
+});
+
+describe('estado por semana (week_meal_state)', () => {
 	it('disabled y note solo aplican a la semana exacta', () => {
 		updateDayConfig(WEEK, 1, 'comida', { disabled: true, disabled_comment: 'fuera', note: 'nota' });
 		const cfg = getWeekData(WEEK).configs[1].comida;
@@ -70,55 +166,11 @@ describe('configuración por día (meal_config / week_meal_state)', () => {
 		expect(cfgNext.note).toBeNull();
 	});
 
-	const count = (table: string) => (getDb().prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
-
-	it('una edición posterior sustituye a la anterior desde su semana', () => {
-		updateDayConfig(indexToWeekKey(NOW + 1), 1, 'comida', { recipe_count: 2 });
-		updateDayConfig(indexToWeekKey(NOW + 4), 1, 'comida', { recipe_count: 3 });
-		const rc = (off: number) => getWeekData(indexToWeekKey(NOW + off)).configs[1].comida.recipe_count;
-		expect(rc(0)).toBe(1);
-		expect(rc(2)).toBe(2);
-		expect(rc(4)).toBe(3);
-		expect(rc(5)).toBe(3);
-	});
-
-	it('editar una semana pasada solo la afecta a ella', () => {
-		const past = indexToWeekKey(NOW - 3);
-		updateDayConfig(past, 1, 'comida', { recipe_count: 4 });
-		const rc = (off: number) => getWeekData(indexToWeekKey(NOW + off)).configs[1].comida.recipe_count;
-		expect(rc(-3)).toBe(4);
-		expect(rc(-4)).toBe(1);
-		expect(rc(-2)).toBe(1);
-		expect(rc(0)).toBe(1);
-	});
-
-	it('un override de una semana pasada convive con una vigencia anterior sin límite', () => {
-		// Estado que solo existe por el paso del tiempo (o por migración): una vigencia sin límite
-		// y, después, un override de una sola semana ya pasada encima de ella.
-		const ins = getDb().prepare(`
-			INSERT INTO meal_config (weekday, meal_type, effective_from, effective_to, recipe_count)
-			VALUES (1, 'comida', ?, ?, ?)
-		`);
-		ins.run(indexToWeekKey(NOW - 10), null, 2);
-		ins.run(indexToWeekKey(NOW - 5), indexToWeekKey(NOW - 5), 5);
-		const rc = (off: number) => getWeekData(indexToWeekKey(NOW + off)).configs[1].comida.recipe_count;
-		expect(rc(-6)).toBe(2);
-		expect(rc(-5)).toBe(5); // gana el override (from más reciente)
-		expect(rc(-4)).toBe(2); // el override no se propaga
-		expect(rc(3)).toBe(2);
-	});
-
-	it('disabled y note no crean ni fijan una vigencia de capacidad', () => {
-		updateDayConfig(WEEK, 1, 'comida', { disabled: true, note: 'nota' });
-		expect(count('meal_config')).toBe(0);
-		expect(count('week_meal_state')).toBe(1);
-	});
-
 	it('la fila de estado desaparece al volver a los valores por defecto', () => {
 		updateDayConfig(WEEK, 1, 'comida', { disabled: true, disabled_comment: 'fuera', note: 'x' });
 		updateDayConfig(WEEK, 1, 'comida', { disabled: false, disabled_comment: null, note: null });
-		expect(count('week_meal_state')).toBe(0);
-		expect(getWeekData(WEEK).configs[1].comida.disabled).toBe(false);
+		const n = getDb().prepare('SELECT COUNT(*) AS n FROM week_meal_state').get() as { n: number };
+		expect(n.n).toBe(0);
 	});
 
 	it('un cambio parcial de estado conserva el resto de campos', () => {
@@ -131,133 +183,129 @@ describe('configuración por día (meal_config / week_meal_state)', () => {
 	});
 });
 
-describe('tags exigidos por slot (meal_config_required_tags)', () => {
-	const tagsOf = (week: string) => getWeekData(week).configs[1].comida.required_tags;
-
-	it('guarda varios tags por slot y se heredan a semanas posteriores', () => {
-		updateSlotRequiredTag(WEEK, 1, 'comida', 0, ['pasta', 'rapido']);
-		updateSlotRequiredTag(WEEK, 1, 'comida', 1, ['carne']);
-		expect(tagsOf(WEEK)).toEqual([['pasta', 'rapido'], ['carne']]);
-		expect(tagsOf(NEXT)).toEqual([['pasta', 'rapido'], ['carne']]);
-		expect(tagsOf(PREV)).toEqual([]);
-	});
-
-	it('vaciar un slot deja el hueco y conserva los demás', () => {
-		updateSlotRequiredTag(WEEK, 1, 'comida', 0, ['pasta']);
-		updateSlotRequiredTag(WEEK, 1, 'comida', 1, ['carne']);
-		updateSlotRequiredTag(WEEK, 1, 'comida', 0, []);
-		expect(tagsOf(WEEK)).toEqual([[], ['carne']]);
-	});
-
-	it('una edición en otra semana hereda los tags y la capacidad vigentes', () => {
-		updateDayConfig(PREV, 1, 'comida', { recipe_count: 3 });
-		updateSlotRequiredTag(PREV, 1, 'comida', 0, ['pasta']);
-		updateSlotRequiredTag(WEEK, 1, 'comida', 1, ['carne']);
-		const cfg = getWeekData(WEEK).configs[1].comida;
-		expect(cfg.recipe_count).toBe(3);
-		expect(cfg.required_tags).toEqual([['pasta'], ['carne']]);
-		// La semana anterior no se ve afectada por lo que se añade después
-		expect(tagsOf(PREV)).toEqual([['pasta']]);
-	});
-});
-
 describe('copyPreviousWeek', () => {
-	it('copia los slots de la semana anterior', () => {
+	it('copia las recetas al mismo hueco', () => {
 		const r = seedRecipe('Lentejas', 'comida');
-		assignRecipe(PREV, 3, 'comida', 0, 0, r.id);
+		const slot = mainSlot(PREV, 3, 'comida');
+		assignRecipe(PREV, slot, r.id);
 		copyPreviousWeek(WEEK, PREV);
 		const slots = getWeekData(WEEK).slots;
 		expect(slots).toHaveLength(1);
-		expect(slots[0]).toMatchObject({ weekday: 3, recipe: expect.objectContaining({ id: r.id }) });
+		expect(slots[0]).toMatchObject({ weekday: 3, slot_id: slot, recipe: expect.objectContaining({ id: r.id }) });
 	});
 
 	it('reemplaza el contenido previo de la semana destino', () => {
 		const viejo = seedRecipe('Viejo', 'comida');
 		const nuevo = seedRecipe('Nuevo', 'comida');
-		assignRecipe(WEEK, 1, 'comida', 0, 0, viejo.id);
-		assignRecipe(PREV, 2, 'comida', 0, 0, nuevo.id);
+		assignRecipe(WEEK, mainSlot(WEEK, 1, 'comida'), viejo.id);
+		assignRecipe(PREV, mainSlot(PREV, 2, 'comida'), nuevo.id);
 		copyPreviousWeek(WEEK, PREV);
 		const slots = getWeekData(WEEK).slots;
 		expect(slots).toHaveLength(1);
 		expect(slots[0].recipe?.id).toBe(nuevo.id);
 	});
+
+	it('si el hueco ya no existe usa otro libre del mismo tipo, y si no hay lo descarta', () => {
+		const a = seedRecipe('A', 'comida');
+		const b = seedRecipe('B', 'comida');
+		const s0 = mainSlot(PREV, 1, 'comida', 0);
+		const s1 = mainSlot(PREV, 1, 'comida', 1);
+		assignRecipe(PREV, s0, a.id);
+		assignRecipe(PREV, s1, b.id);
+		removeSlot(WEEK, s0);
+		copyPreviousWeek(WEEK, PREV);
+		expect(getWeekData(WEEK).slots.map(s => s.recipe?.name)).toEqual(['B']);
+
+		const nuevo = addSlot(WEEK, 1, 'comida', 'main');
+		copyPreviousWeek(WEEK, PREV);
+		const slots = getWeekData(WEEK).slots;
+		expect(slots.find(s => s.slot_id === s1)?.recipe?.name).toBe('B');
+		expect(slots.find(s => s.slot_id === nuevo)?.recipe?.name).toBe('A');
+	});
 });
 
-describe('asignación manual sobre una receta programada', () => {
+describe('programaciones sobre huecos', () => {
 	it('on_conflict=skip: la asignación manual gana y la programación se reubica en otro hueco libre', () => {
 		const programada = seedRecipe('Programada', 'comida');
 		const manual = seedRecipe('Manual', 'comida');
-		updateDayConfig(WEEK, 1, 'comida', { recipe_count: 2 });
+		const s0 = mainSlot(WEEK, 1, 'comida', 0);
+		mainSlot(WEEK, 1, 'comida', 1);
 		upsertSchedule(programada.id, 1, 'comida', 0, 1, WEEK, 'skip', 5);
+		expect(getWeekData(WEEK).slots[0]).toMatchObject({ slot_id: s0, recipe: expect.objectContaining({ id: programada.id }) });
 
-		// Antes de tocar nada, la programación ocupa el hueco libre (slot_index 0)
-		expect(getWeekData(WEEK).slots[0].recipe?.id).toBe(programada.id);
-
-		assignRecipe(WEEK, 1, 'comida', 0, 0, manual.id);
-
-		// La manual se queda en el índice 0; como aún queda un segundo hueco libre
-		// (recipe_count=2), la programación se reubica ahí en vez de desaparecer.
-		const slots = getWeekData(WEEK).slots;
-		expect(slots.map(s => s.recipe?.id)).toEqual([manual.id, programada.id]);
+		assignRecipe(WEEK, s0, manual.id);
+		expect(getWeekData(WEEK).slots.map(s => s.recipe?.id)).toEqual([manual.id, programada.id]);
 	});
 
-	it('on_conflict=overwrite: la manual ya no queda enmascarada por la programación', () => {
+	it('prefiere un hueco cuyos tags cumple la receta', () => {
+		const programada = seedRecipe('Tupper', 'comida,trabajo');
+		const s0 = mainSlot(WEEK, 1, 'comida', 0);
+		const s1 = mainSlot(WEEK, 1, 'comida', 1);
+		const s2 = mainSlot(WEEK, 1, 'comida', 2);
+		setSlotTags(WEEK, s0, ['rápido']);
+		setSlotTags(WEEK, s2, ['trabajo']);
+		upsertSchedule(programada.id, 1, 'comida', 0, 1, WEEK, 'skip', 5);
+		expect(getWeekData(WEEK).slots[0].slot_id).toBe(s2);
+
+		// Ocupado el hueco que encaja, va a uno sin tags antes que a uno cuyos tags no cumple
+		assignRecipe(WEEK, s2, seedRecipe('Otra', 'comida').id);
+		expect(getWeekData(WEEK).slots.find(s => s.schedule)?.slot_id).toBe(s1);
+	});
+
+	it('on_conflict=overwrite: nunca sustituye una receta puesta a mano', () => {
 		const programada = seedRecipe('Programada', 'comida');
 		const manual = seedRecipe('Manual', 'comida');
+		const slot = mainSlot(WEEK, 1, 'comida');
 		upsertSchedule(programada.id, 1, 'comida', 0, 1, WEEK, 'overwrite', 5);
-
 		expect(getWeekData(WEEK).slots[0].recipe?.id).toBe(programada.id);
-
-		assignRecipe(WEEK, 1, 'comida', 0, 0, manual.id);
-
-		// Antes: on_conflict='overwrite' sustituía el slot 0 sin mirar si era manual.
+		assignRecipe(WEEK, slot, manual.id);
 		expect(getWeekData(WEEK).slots[0].recipe?.id).toBe(manual.id);
-	});
-
-	it('al quitar la receta manual, la programación retoma el control del hueco sin ningún paso extra', () => {
-		const programada = seedRecipe('Programada', 'comida');
-		const manual = seedRecipe('Manual', 'comida');
-		upsertSchedule(programada.id, 1, 'comida', 0, 1, WEEK, 'overwrite', 5);
-		assignRecipe(WEEK, 1, 'comida', 0, 0, manual.id);
-		expect(getWeekData(WEEK).slots[0].recipe?.id).toBe(manual.id);
-
-		removeRecipe(WEEK, 1, 'comida', 0, 0);
-
+		// Al quitar la manual, la programación retoma el hueco
+		removeRecipe(WEEK, slot);
 		expect(getWeekData(WEEK).slots[0].recipe?.id).toBe(programada.id);
 	});
 
-	it('cambiar de una receta manual a otra sigue bloqueando la programación', () => {
-		const programada = seedRecipe('Programada', 'comida');
-		const manualA = seedRecipe('Manual A', 'comida');
-		const manualB = seedRecipe('Manual B', 'comida');
-		upsertSchedule(programada.id, 1, 'comida', 0, 1, WEEK, 'overwrite', 5);
-
-		assignRecipe(WEEK, 1, 'comida', 0, 0, manualA.id);
-		assignRecipe(WEEK, 1, 'comida', 0, 0, manualB.id);
-
-		expect(getWeekData(WEEK).slots[0].recipe?.id).toBe(manualB.id);
-	});
-
-	it('overwrite sigue pudiendo desplazar a otra programación (no solo a huecos manuales)', () => {
-		const unaId = seedRecipe('Programación A', 'comida');
-		const otraId = seedRecipe('Programación B', 'comida');
-		upsertSchedule(unaId.id, 1, 'comida', 0, 1, WEEK, 'overwrite', 1);
-		upsertSchedule(otraId.id, 1, 'comida', 0, 1, WEEK, 'overwrite', 10);
-
-		// Sin manual de por medio, 'overwrite' sigue resolviendo el conflicto entre
-		// programaciones dejando una sola en el único hueco (no lo bloquea el fix).
+	it('overwrite sigue pudiendo desplazar a otra programación', () => {
+		const a = seedRecipe('Programación A', 'comida');
+		const b = seedRecipe('Programación B', 'comida');
+		upsertSchedule(a.id, 1, 'comida', 0, 1, WEEK, 'overwrite', 1);
+		upsertSchedule(b.id, 1, 'comida', 0, 1, WEEK, 'overwrite', 10);
 		const slots = getWeekData(WEEK).slots;
 		expect(slots).toHaveLength(1);
-		expect([unaId.id, otraId.id]).toContain(slots[0].recipe?.id);
+		expect([a.id, b.id]).toContain(slots[0].recipe?.id);
 	});
 
-	it('acompañamiento programado con accompaniment_per_slot=0 aparece en el índice 0', () => {
-		const acomp = seedRecipe('Ensalada', 'acompañamiento');
-		updateDayConfig(WEEK, 1, 'comida', { accompaniment_per_recipe: 1, accompaniment_per_slot: 0 });
-		upsertSchedule(acomp.id, 1, 'comida', 1, 1, WEEK, 'skip', 5);
+	it('on_conflict=add: crea un hueco virtual solo esa semana, que se materializa al asignarle algo', () => {
+		const fija = seedRecipe('Fija', 'comida');
+		const extra = seedRecipe('Extra', 'comida');
+		assignRecipe(WEEK, mainSlot(WEEK, 1, 'comida'), fija.id);
+		const schedId = upsertSchedule(extra.id, 1, 'comida', 0, 1, WEEK, 'add', 5);
+		const cfg = getWeekData(WEEK).configs[1].comida;
+		expect(cfg.slots.map(s => s.id)).toContain(-schedId);
+		expect(getWeekData(WEEK).slots.find(s => s.slot_id === -schedId)?.recipe?.id).toBe(extra.id);
 
+		const real = assignRecipe(WEEK, -schedId, extra.id, 0, []);
+		expect(real).toBeGreaterThan(0);
+		expect(mains(WEEK).map(s => s.id)).toContain(real);
+		expect(mains(NEXT).map(s => s.id)).not.toContain(real);
+	});
+
+	it('un acompañamiento programado prefiere los de toda la comida', () => {
+		const ensalada = seedRecipe('Ensalada', 'acompañamiento');
+		const plato = mainSlot(WEEK, 1, 'comida');
+		addSlot(WEEK, 1, 'comida', 'acc', plato);
+		const general = accSlot(WEEK, 1, 'comida');
+		upsertSchedule(ensalada.id, 1, 'comida', 1, 1, WEEK, 'skip', 5);
 		const accSlots = getWeekData(WEEK).slots.filter(s => s.is_accompaniment === 1);
 		expect(accSlots).toHaveLength(1);
-		expect(accSlots[0]).toMatchObject({ slot_index: 0, recipe: expect.objectContaining({ id: acomp.id }) });
+		expect(accSlots[0].slot_id).toBe(general);
+	});
+
+	it('sin huecos libres de ese tipo, skip no coloca la programación', () => {
+		const r = seedRecipe('Programada', 'comida');
+		removeSlot(WEEK, mainSlot(WEEK, 1, 'comida'));
+		upsertSchedule(r.id, 1, 'comida', 0, 1, WEEK, 'skip', 5);
+		expect(getWeekData(WEEK).slots).toHaveLength(0);
+		expect(slotsOf(WEEK, 1, 'comida')).toHaveLength(0);
 	});
 });

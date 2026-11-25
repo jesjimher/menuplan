@@ -7,7 +7,7 @@
 	let {
 		weekday,
 		mealType,
-		slotIdx,
+		slotId,
 		isAcc = 0,
 		slot,
 		slotKeyStr,
@@ -40,6 +40,7 @@
 		onTouchEnd,
 		onTouchMove,
 		onDeleteSlot,
+		onAddAccompaniment,
 		schedule,
 		slotSchedules = [],
 		onSchedule,
@@ -52,7 +53,8 @@
 	}: {
 		weekday: number;
 		mealType: string;
-		slotIdx: number;
+		/** slot_id del hueco (negativo = hueco virtual de una programación). */
+		slotId: number;
 		isAcc?: number;
 		slot: SlotData | undefined;
 		slotKeyStr: string;
@@ -81,7 +83,10 @@
 		onTouchStart: () => void;
 		onTouchEnd: () => void;
 		onTouchMove: () => void;
+		/** Quitar el hueco (no solo su receta). */
 		onDeleteSlot?: () => void;
+		/** Añadir un acompañamiento que cuelgue de este plato. */
+		onAddAccompaniment?: () => void;
 		schedule?: ScheduleWithRecipe | null;
 		slotSchedules?: ScheduleWithRecipe[];
 		onSchedule?: () => void;
@@ -106,15 +111,16 @@
 		return { destroy() { ro.disconnect(); } };
 	}
 
+	let mainCount = $derived(cfg.slots.filter(s => s.kind === 'main').length);
 	let imgH = $derived(
 		isAcc ? '' :
-		cfg.recipe_count === 1 ? 'min-h-[70px]' :
-		cfg.recipe_count === 2 ? 'min-h-[52px]' : 'min-h-[40px]'
+		mainCount <= 1 ? 'min-h-[70px]' :
+		mainCount === 2 ? 'min-h-[52px]' : 'min-h-[40px]'
 	);
 	let emptyH = $derived(
 		isAcc ? '' :
-		cfg.recipe_count === 1 ? 'min-h-[3rem]' :
-		cfg.recipe_count === 2 ? 'min-h-[2rem]' : 'min-h-[1.5rem]'
+		mainCount <= 1 ? 'min-h-[3rem]' :
+		mainCount === 2 ? 'min-h-[2rem]' : 'min-h-[1.5rem]'
 	);
 
 	let scheduleTooltip = $derived.by(() => {
@@ -140,6 +146,7 @@
 	const menuButtons = $derived.by(() => {
 		const items: { type: string }[] = [];
 		if (editingTagKey !== slotTagEditKey) items.push({ type: 'tag' });
+		if (onAddAccompaniment) items.push({ type: 'acc' });
 		items.push({ type: 'random' });
 		if (slot?.recipe && onSchedule) items.push({ type: 'schedule' });
 		if (canSetPeople) items.push({ type: 'people' });
@@ -195,8 +202,8 @@
 					{/if}
 				</span>
 			</button>
-			{#if slot?.recipe}
-				<div class="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/acc:opacity-100 transition-opacity flex gap-1">
+			{#if slot?.recipe || onDeleteSlot}
+				<div class="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/acc:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity flex gap-1">
 					{#if canSetPeople}
 						<button
 							on:click|stopPropagation={onOpenPeople}
@@ -206,12 +213,24 @@
 							title="Para quién"
 						>{@render usersIcon('w-3 h-3')}</button>
 					{/if}
-					<button
-						on:click|stopPropagation={onRemove}
-						class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors text-xs"
-						style="background: rgba(255,255,255,0.9); color: var(--error);"
-						aria-label="Quitar acompañamiento"
-					>&times;</button>
+					{#if slot?.recipe}
+						<button
+							on:click|stopPropagation={onRemove}
+							class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors text-xs"
+							style="background: rgba(255,255,255,0.9); color: var(--error);"
+							aria-label="Quitar receta"
+							title="Quitar receta"
+						>&times;</button>
+					{/if}
+					{#if onDeleteSlot}
+						<button
+							on:click|stopPropagation={onDeleteSlot}
+							class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors"
+							style="background: var(--error); color: white;"
+							aria-label="Eliminar acompañamiento"
+							title="Eliminar este acompañamiento"
+						><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -349,6 +368,13 @@
 										aria-label="Añadir tag requerido"
 									><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 shrink-0"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg><span>Añadir tag</span></button>
 
+								{:else if btn.type === 'acc'}
+									<button
+										on:click|stopPropagation={() => { onAddAccompaniment?.(); closeMenu(); }}
+										class="vert-btn slot-action-btn"
+										aria-label="Añadir acompañamiento a este plato"
+									><span class="shrink-0 text-sm font-bold">+</span><span>Acompañamiento</span></button>
+
 								{:else if btn.type === 'random'}
 									<button
 										on:click|stopPropagation={() => { onRandom(); closeMenu(); }}
@@ -409,6 +435,16 @@
 									style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
 									aria-label="Añadir tag requerido"
 								><span class="btn-label">Añadir tag</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg></button>
+
+							{:else if btn.type === 'acc'}
+								<button
+									on:click|stopPropagation={() => { onAddAccompaniment?.(); closeMenu(); }}
+									on:mouseenter={() => clearTimeout(closeTimer)}
+									class="circ-btn slot-action-btn"
+									class:circ-open={menuOpen}
+									style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
+									aria-label="Añadir acompañamiento a este plato"
+								><span class="btn-label">Acompañamiento</span><span class="font-bold">+</span></button>
 
 							{:else if btn.type === 'random'}
 								<button

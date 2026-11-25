@@ -8,7 +8,6 @@
 	import PeopleAvatars from '$lib/components/people/PeopleAvatars.svelte';
 	import type { MealConfig, SlotData, ScheduleWithRecipe, Person } from '$lib/types/index.js';
 	import type { WeekDragDrop } from '$lib/utils/weekDragDrop.svelte.js';
-	import { recipeAccompanimentIndexes, mealAccompanimentIndexes } from '$lib/utils/mealCapacity.js';
 
 	let {
 		weekday, mealType, col, isToday, weekKey,
@@ -16,7 +15,7 @@
 		dnd, slotSchedules,
 		getSlot, slotKey, makeSlotCallbacks,
 		people, slotPeopleInfo, isSlotHidden,
-		onIncrementMealCount, onDecrementMealCount, onUpdateConfig,
+		onAddMealSlot, onRemoveMealSlot,
 		onSetDisabledComment, onSetMealNote, onOpenPicker, onRemoveSlot
 	}: {
 		weekday: number;
@@ -32,24 +31,29 @@
 		isMoveMode: boolean;
 		dnd: WeekDragDrop;
 		slotSchedules: ScheduleWithRecipe[];
-		getSlot: (weekday: number, mealType: string, slotIndex: number, isAcc: number) => SlotData | undefined;
-		slotKey: (weekday: number, mealType: string, slotIndex: number, isAcc: number) => string;
-		makeSlotCallbacks: (weekday: number, mealType: string, slotIdx: number, isAcc: number) => Record<string, unknown>;
+		getSlot: (weekday: number, mealType: string, slotId: number, isAcc: number) => SlotData | undefined;
+		slotKey: (weekday: number, mealType: string, slotId: number, isAcc: number) => string;
+		makeSlotCallbacks: (weekday: number, mealType: string, slotId: number, isAcc: number) => Record<string, unknown>;
 		people: Person[];
 		/** Para quién es la receta del hueco (y si lo hereda del plato principal). */
-		slotPeopleInfo: (weekday: number, mealType: string, slotIdx: number, isAcc: number) => { ids: number[]; inherited: boolean };
+		slotPeopleInfo: (weekday: number, mealType: string, slotId: number, isAcc: number) => { ids: number[]; inherited: boolean };
 		/** En la vista por persona, oculta las recetas que no son para ella. */
-		isSlotHidden: (weekday: number, mealType: string, slotIdx: number, isAcc: number) => boolean;
-		onIncrementMealCount: () => void;
-		onDecrementMealCount: () => void;
-		onUpdateConfig: (field: string, value: number) => void;
+		isSlotHidden: (weekday: number, mealType: string, slotId: number, isAcc: number) => boolean;
+		/** Añade un hueco: plato, acompañamiento de un plato (parentId) o de toda la comida (null). */
+		onAddMealSlot: (kind: 'main' | 'acc', parentId: number | null) => void;
+		/** Quita un hueco concreto (no solo su receta). */
+		onRemoveMealSlot: (slotId: number) => void;
 		onSetDisabledComment: (comment: string) => void;
 		onSetMealNote: (note: string) => void;
-		onOpenPicker: (slotIdx: number, isAcc: number) => void;
-		onRemoveSlot: (slotIdx: number, isAcc: number) => void;
+		onOpenPicker: (slotId: number, isAcc: number) => void;
+		/** Quita la receta de un hueco. */
+		onRemoveSlot: (slotId: number, isAcc: number) => void;
 	} = $props();
 
 	let isComida = $derived(mealType === 'comida');
+	let mainSlots = $derived(cfg.slots.filter(s => s.kind === 'main'));
+	let mealAccSlots = $derived(cfg.slots.filter(s => s.kind === 'acc' && s.parent_id === null));
+	const childAccs = (mainId: number) => cfg.slots.filter(s => s.kind === 'acc' && s.parent_id === mainId);
 	let row = $derived(isComida ? 2 : 3);
 </script>
 
@@ -87,72 +91,73 @@
 		</div>
 		<!-- Botones añadir cuando no hay slots -->
 		<SlotAddButtons class="px-2 pb-2"
-			onAddPlato={onIncrementMealCount}
-			onAddAcomp={() => onUpdateConfig('accompaniment_per_slot', cfg.accompaniment_per_slot + 1)}
+			onAddPlato={() => onAddMealSlot('main', null)}
+			onAddAcomp={() => onAddMealSlot('acc', null)}
 		/>
 	{:else}
 
 		<!-- Slots -->
 		<div class="px-2 pb-3 pt-2 flex-1 flex flex-col gap-2">
-			{#each Array(cfg.recipe_count) as _, slotIdx}
-				{@const slot = getSlot(weekday, mealType, slotIdx, 0)}
-				{@const key = slotKey(weekday, mealType, slotIdx, 0)}
-				{@const slotTags = cfg.required_tags[slotIdx] ?? []}
-				{@const slotTagEditKey = `tag-${weekday}-${mealType}-${slotIdx}`}
-				{@const callbacks = makeSlotCallbacks(weekday, mealType, slotIdx, 0)}
-				{@const pInfo = slotPeopleInfo(weekday, mealType, slotIdx, 0)}
+			{#each mainSlots as ms (ms.id)}
+				{@const slotId = ms.id}
+				{@const slot = getSlot(weekday, mealType, slotId, 0)}
+				{@const key = slotKey(weekday, mealType, slotId, 0)}
+				{@const slotTagEditKey = `tag-${slotId}`}
+				{@const callbacks = makeSlotCallbacks(weekday, mealType, slotId, 0)}
+				{@const pInfo = slotPeopleInfo(weekday, mealType, slotId, 0)}
 
-				{#if !isSlotHidden(weekday, mealType, slotIdx, 0)}
+				{#if !isSlotHidden(weekday, mealType, slotId, 0)}
 				<RecipeSlot
-					{weekday} {mealType} {slotIdx}
+					{weekday} {mealType} {slotId}
 					{slot} slotKeyStr={key} {cfg} {allTags}
 					isBusy={busySlots.has(key)}
-					isDragSource={!!dnd.dragSource && key === slotKey(dnd.dragSource.weekday, dnd.dragSource.mealType, dnd.dragSource.slotIndex, dnd.dragSource.isAcc)}
+					isDragSource={!!dnd.dragSource && key === slotKey(dnd.dragSource.weekday, dnd.dragSource.mealType, dnd.dragSource.slotId, dnd.dragSource.isAcc)}
 					isDragOver={dnd.dragOver === key}
 					{isMoveMode}
 					{isTouchDevice}
-					{editingTagKey} {slotTags} {slotTagEditKey}
+					{editingTagKey} slotTags={ms.tags} {slotTagEditKey}
 					schedule={slot?.schedule ?? null}
 					{slotSchedules}
 					{...callbacks}
 					{people}
 					slotPeople={pInfo.ids}
-					onDeleteSlot={onDecrementMealCount}
+					onDeleteSlot={ms.virtual ? undefined : () => onRemoveMealSlot(slotId)}
+					onAddAccompaniment={ms.virtual ? undefined : () => onAddMealSlot('acc', slotId)}
 				/>
 				{/if}
 
-				<!-- Acompañamientos por receta -->
-				{#if cfg.accompaniment_per_recipe > 0}
-					{#each recipeAccompanimentIndexes(cfg, slotIdx) as accSlotIdx}
-						{@const accSlot = getSlot(weekday, mealType, accSlotIdx, 1)}
-						{@const accKey = slotKey(weekday, mealType, accSlotIdx, 1)}
-						{@const accCallbacks = makeSlotCallbacks(weekday, mealType, accSlotIdx, 1)}
-						{@const accInfo = slotPeopleInfo(weekday, mealType, accSlotIdx, 1)}
+				<!-- Acompañamientos de este plato -->
+				{#each childAccs(slotId) as acc (acc.id)}
+					{@const accSlot = getSlot(weekday, mealType, acc.id, 1)}
+					{@const accKey = slotKey(weekday, mealType, acc.id, 1)}
+					{@const accCallbacks = makeSlotCallbacks(weekday, mealType, acc.id, 1)}
+					{@const accInfo = slotPeopleInfo(weekday, mealType, acc.id, 1)}
 
-						{#if !isSlotHidden(weekday, mealType, accSlotIdx, 1)}
-						<RecipeSlot
-							{weekday} {mealType} slotIdx={accSlotIdx} isAcc={1}
-							slot={accSlot} slotKeyStr={accKey} {cfg} {allTags}
-							isDragSource={!!dnd.dragSource && accKey === slotKey(dnd.dragSource.weekday, dnd.dragSource.mealType, dnd.dragSource.slotIndex, dnd.dragSource.isAcc)}
-							isDragOver={dnd.dragOver === accKey}
-							{isMoveMode}
-							{isTouchDevice}
-							{editingTagKey}
-							{...accCallbacks}
-							{people}
-							slotPeople={accInfo.ids}
-							peopleInherited={accInfo.inherited}
-						/>
-						{/if}
-					{/each}
-				{/if}
+					{#if !isSlotHidden(weekday, mealType, acc.id, 1)}
+					<RecipeSlot
+						{weekday} {mealType} slotId={acc.id} isAcc={1}
+						slot={accSlot} slotKeyStr={accKey} {cfg} {allTags}
+						isDragSource={!!dnd.dragSource && accKey === slotKey(dnd.dragSource.weekday, dnd.dragSource.mealType, dnd.dragSource.slotId, dnd.dragSource.isAcc)}
+						isDragOver={dnd.dragOver === accKey}
+						{isMoveMode}
+						{isTouchDevice}
+						{editingTagKey}
+						{...accCallbacks}
+						{people}
+						slotPeople={accInfo.ids}
+						peopleInherited={accInfo.inherited}
+						onDeleteSlot={() => onRemoveMealSlot(acc.id)}
+					/>
+					{/if}
+				{/each}
 			{/each}
 
 			<!-- Acompañamientos por franja -->
-			{#if cfg.accompaniment_per_slot > 0}
+			{#if mealAccSlots.length > 0}
 				<div class="pt-1.5 space-y-1.5 shrink-0"
 					style="border-top: 1px solid var(--surface-container-highest);">
-					{#each mealAccompanimentIndexes(cfg) as aIdx}
+					{#each mealAccSlots as ma (ma.id)}
+						{@const aIdx = ma.id}
 						{@const accSlot = getSlot(weekday, mealType, aIdx, 1)}
 						{@const accPeople = accSlot?.people ?? []}
 						{@const accCallbacks = makeSlotCallbacks(weekday, mealType, aIdx, 1)}
@@ -193,13 +198,15 @@
 										title="Quitar receta"
 									>&times;</button>
 								{/if}
+								{#if !ma.virtual}
 								<button
-									on:click|stopPropagation={() => onUpdateConfig('accompaniment_per_slot', Math.max(0, cfg.accompaniment_per_slot - 1))}
+									on:click|stopPropagation={() => onRemoveMealSlot(aIdx)}
 									class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors"
 									style="background: var(--error); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.35);"
 									aria-label="Eliminar acompañamiento"
 									title="Eliminar acompañamiento"
 								><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+								{/if}
 							</div>
 						</div>
 						{/if}
@@ -209,8 +216,8 @@
 
 			<!-- Botones añadir justo después del último slot -->
 			<SlotAddButtons class="pt-2"
-				onAddPlato={onIncrementMealCount}
-				onAddAcomp={() => onUpdateConfig('accompaniment_per_slot', cfg.accompaniment_per_slot + 1)}
+				onAddPlato={() => onAddMealSlot('main', null)}
+				onAddAcomp={() => onAddMealSlot('acc', null)}
 			/>
 		</div>
 		<!-- Nota de franja -->

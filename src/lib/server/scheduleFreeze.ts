@@ -1,11 +1,12 @@
-// Las programaciones se resuelven al vuelo para cualquier semana, también las pasadas.
-// Para que editar una programación no reescriba el histórico, antes de cada cambio se
-// "congela" el pasado: lo que las programaciones colocaban en semanas anteriores al corte
-// se guarda como filas normales en week_plans, y las anclas se adelantan a su primera
-// aparición >= corte para que ninguna programación vuelva a activarse en el pasado.
+// Las programaciones se resuelven al vuelo, salvo en los días ya consolidados: cada día que
+// pasa, lo que las programaciones ponían ese día se guarda como filas normales de week_plans
+// (con schedule_id apuntando a su programación) y se adelanta la marca «consolidado hasta»
+// (consolidationMark.ts). A partir de ahí ese día no depende de las programaciones: editarlas,
+// borrarlas o cambiar los huecos no lo altera, y vaciarlo a mano lo deja vacío.
 import { getDb } from '$lib/db/index.js';
-import { getWeekKey, weekKeyToIndex, indexToWeekKey } from '$lib/utils/dates.js';
+import { getWeekKey, weekKeyToIndex, indexToWeekKey, localDateKey, dateKeyToWeekKey, weekdayDateKey } from '$lib/utils/dates.js';
 import { getWeekData, assignRecipe } from './weekplan.js';
+import { getConsolidatedThrough, setConsolidatedThrough } from './consolidationMark.js';
 
 interface ScheduleAnchorRow {
 	id: number;
@@ -24,23 +25,46 @@ function firstOccurrenceFrom(anchorIdx: number, n: number, cutoffIdx: number): n
 	return anchorIdx + Math.ceil((cutoffIdx - anchorIdx) / n) * n;
 }
 
-/** Guarda como filas de week_plans lo que las programaciones ponían en semanas < cutoff. */
-function materializePast(cutoffWeekKey: string, ids?: number[], fromWeekKey?: string): void {
-	const schedules = loadSchedules(ids);
-	if (schedules.length === 0) return;
-	const cutoffIdx = weekKeyToIndex(cutoffWeekKey);
-	let startIdx = Math.min(...schedules.map(s => weekKeyToIndex(s.anchor_week_key)));
-	if (fromWeekKey) startIdx = Math.max(startIdx, weekKeyToIndex(fromWeekKey));
-	const idSet = new Set(schedules.map(s => s.id));
-
-	for (let idx = startIdx; idx < cutoffIdx; idx++) {
+/**
+ * Guarda como filas de week_plans lo que las programaciones (todas o `ids`) ponían en las
+ * semanas [fromIdx, toIdx], solo en los días con fecha en (afterDay, throughDay].
+ */
+function materialize(fromIdx: number, toIdx: number, afterDay: string | null, throughDay: string | null, ids?: number[]): void {
+	const idSet = ids ? new Set(ids) : null;
+	const db = getDb();
+	for (let idx = fromIdx; idx <= toIdx; idx++) {
 		const wk = indexToWeekKey(idx);
+		const saved = new Set((db.prepare('SELECT slot_id FROM week_plans WHERE week_key = ?').all(wk) as { slot_id: number }[]).map(r => r.slot_id));
 		for (const slot of getWeekData(wk).slots) {
-			if (slot.schedule && idSet.has(slot.schedule.id) && slot.recipe) {
-				assignRecipe(wk, slot.weekday, slot.meal_type, slot.slot_index, slot.is_accompaniment, slot.recipe.id, slot.is_leftover, slot.people);
+			if (!slot.schedule || !slot.recipe || (idSet && !idSet.has(slot.schedule.id))) continue;
+			const day = weekdayDateKey(wk, slot.weekday);
+			if ((afterDay !== null && day <= afterDay) || (throughDay !== null && day > throughDay)) continue;
+			if (saved.has(slot.slot_id)) {
+				// Receta puesta a mano que coincide con la programada: queda anotado de dónde sale
+				db.prepare('UPDATE week_plans SET schedule_id = ? WHERE week_key = ? AND slot_id = ? AND schedule_id IS NULL')
+					.run(slot.schedule.id, wk, slot.slot_id);
+			} else {
+				assignRecipe(wk, slot.slot_id, slot.recipe.id, slot.is_leftover, slot.people, slot.schedule.id);
 			}
 		}
 	}
+}
+
+/**
+ * Consolida los días hasta `throughDay` (por defecto, ayer). Idempotente y barato si la marca
+ * ya está al día: es lo que se ejecuta en cada petición.
+ */
+export function consolidateSchedules(throughDay: string = localDateKey(-1)): void {
+	const mark = getConsolidatedThrough();
+	if (mark !== null && mark >= throughDay) return;
+	getDb().transaction(() => {
+		const anchors = loadSchedules().map(s => weekKeyToIndex(s.anchor_week_key));
+		if (anchors.length > 0) {
+			const fromIdx = mark !== null ? weekKeyToIndex(dateKeyToWeekKey(mark)) : Math.min(...anchors);
+			materialize(fromIdx, weekKeyToIndex(dateKeyToWeekKey(throughDay)), mark, throughDay);
+		}
+		setConsolidatedThrough(throughDay);
+	})();
 }
 
 /** Adelanta las anclas < cutoff a su primera aparición >= cutoff (no cambia el futuro). */
@@ -66,27 +90,16 @@ function deleteExceptionsBefore(cutoffWeekKey: string, ids?: number[]): void {
 }
 
 /**
- * Congela las semanas anteriores a `cutoffWeekKey`: materializa lo que mostraban las
- * programaciones, normaliza anclas y borra excepciones ya irrelevantes. Idempotente.
- */
-export function freezeSchedulesBefore(cutoffWeekKey: string = getWeekKey()): void {
-	getDb().transaction(() => {
-		materializePast(cutoffWeekKey);
-		normalizeAnchors(cutoffWeekKey);
-		deleteExceptionsBefore(cutoffWeekKey);
-	})();
-}
-
-/**
- * Ejecuta una mutación de programaciones sin alterar las semanas pasadas: congela antes,
- * y después vuelve a normalizar anclas por si la mutación puso alguna en el pasado.
+ * Ejecuta una mutación de programaciones sin alterar el pasado: consolida hasta ayer antes, y
+ * después normaliza anclas y limpia excepciones de semanas pasadas (ya no influyen en nada).
  */
 export function withFrozenPast<T>(fn: () => T): T {
 	const cutoff = getWeekKey();
 	return getDb().transaction(() => {
-		freezeSchedulesBefore(cutoff);
+		consolidateSchedules();
 		const result = fn();
 		normalizeAnchors(cutoff);
+		deleteExceptionsBefore(cutoff);
 		return result;
 	})();
 }
@@ -98,10 +111,33 @@ export function countSchedulesForMeal(weekday: number, mealType: string, isAccom
 	return row.n;
 }
 
+function mealScheduleIds(weekday: number, mealType: string, isAccompaniment: number): number[] {
+	return (getDb().prepare(
+		'SELECT id FROM schedules WHERE weekday = ? AND meal_type = ? AND is_accompaniment = ?'
+	).all(weekday, mealType, isAccompaniment) as { id: number }[]).map(r => r.id);
+}
+
+/** Desplaza `delta` semanas las excepciones >= fromWeekKey (en el orden que evita chocar con el UNIQUE). */
+function shiftExceptions(ids: number[], fromWeekKey: string, delta: 1 | -1, minWeekIdx: number): void {
+	const db = getDb();
+	const exceptions = db.prepare(
+		`SELECT schedule_id, week_key FROM schedule_exceptions
+		 WHERE schedule_id IN (${ids.map(() => '?').join(',')}) AND week_key >= ?
+		 ORDER BY week_key ${delta < 0 ? 'ASC' : 'DESC'}`
+	).all(...ids, fromWeekKey) as { schedule_id: number; week_key: string }[];
+	const delEx = db.prepare('DELETE FROM schedule_exceptions WHERE schedule_id = ? AND week_key = ?');
+	const insEx = db.prepare('INSERT OR IGNORE INTO schedule_exceptions (schedule_id, week_key) VALUES (?, ?)');
+	for (const ex of exceptions) {
+		delEx.run(ex.schedule_id, ex.week_key);
+		const newIdx = weekKeyToIndex(ex.week_key) + delta;
+		if (newIdx >= minWeekIdx) insEx.run(ex.schedule_id, indexToWeekKey(newIdx));
+	}
+}
+
 /**
- * Quita la receta programada de `weekKey` y adelanta una semana toda la rotación de esa
- * comida: lo de la semana siguiente pasa a esta, etc., y la quitada vuelve al final del ciclo.
- * Solo para la semana actual o futuras.
+ * «Pasar a la siguiente»: quita la receta programada de `weekKey` y adelanta una semana toda la
+ * rotación de esa comida: lo de la semana siguiente pasa a esta, etc., y la quitada vuelve al
+ * final del ciclo. Solo para la semana actual o futuras.
  */
 export function shiftScheduleRotation(weekKey: string, weekday: number, mealType: string, isAccompaniment: number): void {
 	const current = getWeekKey();
@@ -110,15 +146,14 @@ export function shiftScheduleRotation(weekKey: string, weekday: number, mealType
 
 	const db = getDb();
 	db.transaction(() => {
-		freezeSchedulesBefore(current);
+		consolidateSchedules();
 
-		const ids = (db.prepare(
-			'SELECT id FROM schedules WHERE weekday = ? AND meal_type = ? AND is_accompaniment = ?'
-		).all(weekday, mealType, isAccompaniment) as { id: number }[]).map(r => r.id);
+		const ids = mealScheduleIds(weekday, mealType, isAccompaniment);
 		if (ids.length === 0) return;
 
-		// Las semanas entre la actual y la editada tampoco deben cambiar
-		materializePast(weekKey, ids, current);
+		// Las semanas entre la actual y la editada tampoco deben cambiar (sus días ya consolidados
+		// no dependen de las programaciones)
+		materialize(weekKeyToIndex(current), weekIdx - 1, getConsolidatedThrough(), null, ids);
 		normalizeAnchors(weekKey, ids);
 		deleteExceptionsBefore(weekKey, ids);
 
@@ -129,19 +164,28 @@ export function shiftScheduleRotation(weekKey: string, weekday: number, mealType
 			updateAnchor.run(indexToWeekKey(shifted), s.id);
 		}
 
-		// Las excepciones siguen a la aparición a la que apuntaban (una semana antes);
-		// se recorren en orden ascendente para no chocar con UNIQUE(schedule_id, week_key).
-		const exceptions = db.prepare(
-			`SELECT schedule_id, week_key FROM schedule_exceptions
-			 WHERE schedule_id IN (${ids.map(() => '?').join(',')}) AND week_key >= ?
-			 ORDER BY week_key ASC`
-		).all(...ids, weekKey) as { schedule_id: number; week_key: string }[];
-		const delEx = db.prepare('DELETE FROM schedule_exceptions WHERE schedule_id = ? AND week_key = ?');
-		const insEx = db.prepare('INSERT OR IGNORE INTO schedule_exceptions (schedule_id, week_key) VALUES (?, ?)');
-		for (const ex of exceptions) {
-			delEx.run(ex.schedule_id, ex.week_key);
-			const newIdx = weekKeyToIndex(ex.week_key) - 1;
-			if (newIdx >= weekIdx) insEx.run(ex.schedule_id, indexToWeekKey(newIdx));
+		// Las excepciones siguen a la aparición a la que apuntaban (una semana antes)
+		shiftExceptions(ids, weekKey, -1, weekIdx);
+	})();
+}
+
+/**
+ * Para un día ya consolidado en el que no se comió lo programado: retrasa una semana toda la
+ * rotación de esa comida a partir de `weekKey`, de modo que la receta que tocaba pasa a la semana
+ * siguiente y las demás se corren detrás. Los días consolidados no cambian.
+ */
+export function delayScheduleRotation(weekKey: string, weekday: number, mealType: string, isAccompaniment: number): void {
+	const db = getDb();
+	db.transaction(() => {
+		consolidateSchedules();
+		const ids = mealScheduleIds(weekday, mealType, isAccompaniment);
+		if (ids.length === 0) return;
+		const weekIdx = weekKeyToIndex(weekKey);
+		const updateAnchor = db.prepare('UPDATE schedules SET anchor_week_key = ? WHERE id = ?');
+		for (const s of loadSchedules(ids)) {
+			const first = firstOccurrenceFrom(weekKeyToIndex(s.anchor_week_key), s.every_n_weeks, weekIdx);
+			updateAnchor.run(indexToWeekKey(first + 1), s.id);
 		}
+		shiftExceptions(ids, weekKey, 1, weekIdx);
 	})();
 }

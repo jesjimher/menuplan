@@ -1,70 +1,38 @@
 import { getDb } from '$lib/db/index.js';
-import type { WeekPlan, MealConfigRow, WeekMealState, MealConfig, Options, SlotData, DayConfig, WeekData, ScheduleWithRecipe, MealType } from '$lib/types/index.js';
+import type { WeekPlan, WeekMealState, MealConfig, MealSlot, SlotData, DayConfig, WeekData, ScheduleWithRecipe, MealType } from '$lib/types/index.js';
 import { getAllRules } from './rules.js';
 import { checkRules } from '$lib/utils/ruleChecker.js';
-import { getOptions } from './options.js';
 import { getActivePeople, loadPeopleLinks, setPeopleLinks } from './people.js';
 import { getActiveSchedulesForWeek } from './schedules.js';
-import { getWeekKey, weekKeyToIndex } from '$lib/utils/dates.js';
-import { maxSlots } from '$lib/utils/mealCapacity.js';
-import type Database from 'better-sqlite3';
+import { getSlotRowsForWeek, getSlotVersion, resolveSlotId } from './mealSlots.js';
+import { getConsolidatedThrough, isDayConsolidated } from './consolidationMark.js';
+import { parseTags } from '$lib/utils/parseTags.js';
 
 interface WeekPlanRow {
 	id: number; week_key: string; weekday: number; meal_type: MealType;
-	slot_index: number; is_accompaniment: number; is_leftover: number;
-	recipe_id: number;
+	slot_id: number; is_accompaniment: number; is_leftover: number;
+	recipe_id: number; schedule_id: number | null;
 	r_id: number | null; name: string | null; description: string | null;
 	tags: string | null; min_days: number | null; image_type: string | null; created_at: string | null;
 }
 
-type MealCapacity = Pick<MealConfigRow, 'recipe_count' | 'accompaniment_per_recipe' | 'accompaniment_per_slot'>;
-
-function defaultCapacity(options: Options, mealType: string): MealCapacity {
-	return {
-		recipe_count: mealType === 'comida' ? options.meals_per_day : options.dinners_per_day,
-		accompaniment_per_recipe: options.side_dishes_per_recipe,
-		accompaniment_per_slot: options.side_dishes_per_slot
-	};
-}
-
-// Vigencia de meal_config que cubre una semana: desde <= semana y (sin límite o hasta >= semana).
-// Si hay varias (un override de una semana pasada solapa con una vigencia anterior sin límite),
-// gana la de effective_from más reciente.
-const COVERS_WEEK = 'c.effective_from <= ? AND (c.effective_to IS NULL OR c.effective_to >= ?)';
-
-// Crea (o devuelve) la vigencia que empieza exactamente en `weekKey` para esa comida, heredando
-// capacidad y tags exigidos de la que rige hasta entonces (o de las opciones globales).
-// Desde la semana actual en adelante la vigencia no tiene límite (se propaga al futuro); editar
-// una semana pasada solo la afecta a ella.
-function ensureMealConfig(db: Database.Database, weekKey: string, weekday: number, mealType: string): number {
-	const exact = db.prepare(
-		'SELECT id FROM meal_config WHERE weekday = ? AND meal_type = ? AND effective_from = ?'
-	).get(weekday, mealType, weekKey) as { id: number } | undefined;
-	if (exact) return exact.id;
-
-	const inherited = db.prepare(`
-		SELECT c.* FROM meal_config c
-		WHERE c.weekday = ? AND c.meal_type = ? AND ${COVERS_WEEK}
-		ORDER BY c.effective_from DESC LIMIT 1
-	`).get(weekday, mealType, weekKey, weekKey) as MealConfigRow | undefined;
-	const capacity = inherited ?? defaultCapacity(getOptions(), mealType);
-
-	const isFutureOrNow = weekKeyToIndex(weekKey) >= weekKeyToIndex(getWeekKey());
-	const id = db.prepare(`
-		INSERT INTO meal_config (weekday, meal_type, effective_from, effective_to, recipe_count, accompaniment_per_recipe, accompaniment_per_slot)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`).run(
-		weekday, mealType, weekKey, isFutureOrNow ? null : weekKey,
-		capacity.recipe_count, capacity.accompaniment_per_recipe, capacity.accompaniment_per_slot
-	).lastInsertRowid as number;
-
-	if (inherited) {
-		db.prepare(`
-			INSERT INTO meal_config_required_tags (config_id, slot_index, tag)
-			SELECT ?, slot_index, tag FROM meal_config_required_tags WHERE config_id = ? ORDER BY rowid
-		`).run(id, inherited.id);
-	}
-	return id;
+/**
+ * Orden en que una programación prueba los huecos de su tipo: primero los que tienen tags y la
+ * receta los cumple, luego los que no tienen tags y por último los que la receta no cumple.
+ * Los acompañamientos prefieren los de toda la comida a los que cuelgan de un plato.
+ */
+function rankForSchedule(slots: MealSlot[], all: MealSlot[], recipeTags: string): MealSlot[] {
+	const tags = parseTags(recipeTags);
+	const mainPos = new Map(all.filter(s => s.kind === 'main').map(s => [s.id, s.position]));
+	const tagRank = (s: MealSlot) => s.tags.length === 0 ? 1 : s.tags.every(t => tags.includes(t)) ? 0 : 2;
+	const key = (s: MealSlot): number[] => s.kind === 'acc'
+		? [s.parent_id === null ? 0 : 1, tagRank(s), s.parent_id === null ? 0 : (mainPos.get(s.parent_id) ?? 0), s.position, s.id]
+		: [tagRank(s), s.position, s.id];
+	return [...slots].sort((a, b) => {
+		const ka = key(a), kb = key(b);
+		for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
+		return 0;
+	});
 }
 
 export function getWeekData(weekKey: string): WeekData {
@@ -75,51 +43,37 @@ export function getWeekData(weekKey: string): WeekData {
 		FROM week_plans wp
 		JOIN recipes r ON r.id = wp.recipe_id
 		WHERE wp.week_key = ?
-		ORDER BY wp.weekday, wp.meal_type, wp.is_accompaniment, wp.slot_index
 	`).all(weekKey) as WeekPlanRow[];
 
-	// Configuración por día/comida (necesaria antes de solapar programaciones, para
-	// conocer la capacidad real de cada comida tal y como se pinta en la rejilla)
-	const options = getOptions();
-	const configRows = db.prepare(`
-		SELECT c.* FROM meal_config c WHERE ${COVERS_WEEK} ORDER BY c.effective_from ASC
-	`).all(weekKey, weekKey) as MealConfigRow[];
-	const tagRows = db.prepare(`
-		SELECT t.config_id, t.slot_index, t.tag
-		FROM meal_config_required_tags t
-		JOIN meal_config c ON c.id = t.config_id
-		WHERE ${COVERS_WEEK}
-		ORDER BY t.rowid
-	`).all(weekKey, weekKey) as { config_id: number; slot_index: number; tag: string }[];
-	const stateRows = db.prepare(
-		'SELECT * FROM week_meal_state WHERE week_key = ?'
-	).all(weekKey) as WeekMealState[];
-
-	// Orden ASC + sobrescritura: la vigencia con effective_from más reciente gana
-	const configByMeal = new Map<string, MealConfigRow>();
-	for (const c of configRows) configByMeal.set(`${c.weekday}-${c.meal_type}`, c);
-	const tagsByConfig = new Map<number, string[][]>();
-	for (const t of tagRows) {
-		const slots = tagsByConfig.get(t.config_id) ?? [];
-		while (slots.length <= t.slot_index) slots.push([]);
-		slots[t.slot_index].push(t.tag);
-		tagsByConfig.set(t.config_id, slots);
-	}
+	const stateRows = db.prepare('SELECT * FROM week_meal_state WHERE week_key = ?').all(weekKey) as WeekMealState[];
 	const stateByMeal = new Map<string, WeekMealState>();
 	for (const st of stateRows) stateByMeal.set(`${st.weekday}-${st.meal_type}`, st);
+
+	// Huecos vigentes por comida
+	const slotRows = getSlotRowsForWeek(weekKey);
+	const vigentes = new Set(slotRows.map(r => r.slot_id));
+	const slotsByMeal = new Map<string, MealSlot[]>();
+	for (const r of slotRows) {
+		const key = `${r.weekday}-${r.meal_type}`;
+		const list = slotsByMeal.get(key) ?? [];
+		list.push({
+			id: r.slot_id,
+			kind: r.kind,
+			// Un acompañamiento cuyo plato no existe esa semana se muestra como de toda la comida
+			parent_id: r.parent_slot_id !== null && vigentes.has(r.parent_slot_id) ? r.parent_slot_id : null,
+			position: r.position,
+			tags: parseTags(r.tags)
+		});
+		slotsByMeal.set(key, list);
+	}
 
 	const configs: Record<number, DayConfig> = {};
 	for (let d = 1; d <= 7; d++) {
 		const build = (meal: MealType): MealConfig => {
 			const key = `${d}-${meal}`;
-			const cfg = configByMeal.get(key);
 			const state = stateByMeal.get(key);
-			const capacity = cfg ?? defaultCapacity(options, meal);
 			return {
-				recipe_count: capacity.recipe_count,
-				accompaniment_per_recipe: capacity.accompaniment_per_recipe,
-				accompaniment_per_slot: capacity.accompaniment_per_slot,
-				required_tags: cfg ? (tagsByConfig.get(cfg.id) ?? []) : [],
+				slots: slotsByMeal.get(key) ?? [],
 				disabled: !!state?.disabled,
 				disabled_comment: state?.disabled_comment ?? null,
 				note: state?.note ?? null
@@ -128,16 +82,14 @@ export function getWeekData(weekKey: string): WeekData {
 		configs[d] = { comida: build('comida'), cena: build('cena') };
 	}
 
-	// Programaciones activas para esta semana (ya ordenadas por priority DESC, id ASC)
-	const activeSchedules = getActiveSchedulesForWeek(weekKey);
-
-	// Construir slots manuales desde week_plans
+	// Recetas guardadas (manuales o consolidadas) por hueco
 	const peopleByPlan = loadPeopleLinks('week_plan_people', plans.map(p => p.id));
-	const manualSlots: SlotData[] = plans
-		.map(p => ({
+	const bySlot = new Map<number, SlotData>();
+	for (const p of plans) {
+		bySlot.set(p.slot_id, {
 			weekday: p.weekday,
 			meal_type: p.meal_type,
-			slot_index: p.slot_index,
+			slot_id: p.slot_id,
 			is_accompaniment: p.is_accompaniment,
 			is_leftover: (p.is_leftover ?? 0) as 0 | 1,
 			recipe: {
@@ -150,100 +102,68 @@ export function getWeekData(weekKey: string): WeekData {
 				created_at: p.created_at as string
 			},
 			schedule: null as ScheduleWithRecipe | null,
-			people: peopleByPlan.get(p.id) ?? []
-		}));
-
-	// Agrupar slots manuales por comida: "wd-mt-ia" → SlotData[]
-	const mealKey = (wd: number, mt: string, ia: number) => `${wd}-${mt}-${ia}`;
-	const mealSlots = new Map<string, SlotData[]>();
-	// Huecos genuinamente manuales (fila real en week_plans) por comida: una programación
-	// nunca puede sustituir lo que haya aquí, sea cual sea su on_conflict.
-	const manualOccupied = new Map<string, Set<number>>();
-	for (const slot of manualSlots) {
-		const key = mealKey(slot.weekday, slot.meal_type, slot.is_accompaniment);
-		const arr = mealSlots.get(key) ?? [];
-		arr.push(slot);
-		mealSlots.set(key, arr);
-		const occ = manualOccupied.get(key) ?? new Set<number>();
-		occ.add(slot.slot_index);
-		manualOccupied.set(key, occ);
+			people: peopleByPlan.get(p.id) ?? [],
+			origin_schedule_id: p.schedule_id ?? null
+		});
 	}
+	// Una programación nunca puede sustituir lo que haya en una fila real de week_plans
+	const manualIds = new Set(bySlot.keys());
 
-	// Slots virtuales añadidos por programaciones con on_conflict='add'
-	const virtualSlots: SlotData[] = [];
+	// Programaciones activas (ya ordenadas por priority DESC, id ASC). Los días consolidados
+	// no las resuelven: lo que tengan en week_plans es definitivo.
+	const mark = getConsolidatedThrough();
+	for (const sched of getActiveSchedulesForWeek(weekKey)) {
+		if (isDayConsolidated(weekKey, sched.weekday, mark)) continue;
+		const cfg = configs[sched.weekday][sched.meal_type as MealType];
+		const kind = sched.is_accompaniment ? 'acc' : 'main';
+		const inMeal = (s: SlotData) => s.weekday === sched.weekday && s.meal_type === sched.meal_type && s.is_accompaniment === sched.is_accompaniment;
 
-	// Aplicar programaciones a nivel de comida
-	for (const sched of activeSchedules) {
-		const key = mealKey(sched.weekday, sched.meal_type, sched.is_accompaniment);
-		const mealArr = mealSlots.get(key) ?? [];
-
-		// Si la receta ya está en un slot manual de esta comida, adjuntar referencia
-		const existingIdx = mealArr.findIndex(s => s.recipe?.id === sched.recipe_id);
-		if (existingIdx >= 0) {
-			if (!mealArr[existingIdx].schedule) {
-				mealArr[existingIdx] = { ...mealArr[existingIdx], schedule: sched };
-				mealSlots.set(key, mealArr);
-			}
+		// Si la receta ya está en esta comida, solo se marca como programada
+		const existing = [...bySlot.values()].find(s => inMeal(s) && s.recipe?.id === sched.recipe_id);
+		if (existing) {
+			if (!existing.schedule) bySlot.set(existing.slot_id, { ...existing, schedule: sched });
 			continue;
 		}
 
-		// Calcular capacidad máxima de la comida, igual que la ve la rejilla (MealCell):
-		// los acompañamientos comparten espacio de índices entre "por receta" y "por franja".
-		const cfg = configs[sched.weekday][sched.meal_type as MealType];
-		const capacity = maxSlots(cfg, sched.is_accompaniment === 1);
+		const placed = (slotId: number): SlotData => ({
+			weekday: sched.weekday,
+			meal_type: sched.meal_type,
+			slot_id: slotId,
+			is_accompaniment: sched.is_accompaniment,
+			is_leftover: 0,
+			recipe: sched.recipe,
+			schedule: sched,
+			people: sched.people,
+			origin_schedule_id: null
+		});
 
-		// Encontrar el primer slot_index libre (no ocupado por entrada manual)
-		const occupied = new Set(mealArr.map(s => s.slot_index));
-		let freeSlot = -1;
-		for (let i = 0; i < capacity; i++) {
-			if (!occupied.has(i)) { freeSlot = i; break; }
-		}
-
-		if (freeSlot >= 0) {
-			// Colocar la programación en el hueco libre
-			const newSlot: SlotData = {
-				weekday: sched.weekday,
-				meal_type: sched.meal_type,
-				slot_index: freeSlot,
-				is_accompaniment: sched.is_accompaniment,
-				is_leftover: 0,
-				recipe: sched.recipe,
-				schedule: sched,
-				people: sched.people
-			};
-			mealArr.push(newSlot);
-			mealSlots.set(key, mealArr);
+		const ranked = rankForSchedule(cfg.slots.filter(s => s.kind === kind && !s.virtual), cfg.slots, sched.recipe.tags);
+		const free = ranked.find(s => !bySlot.has(s.id));
+		if (free) {
+			bySlot.set(free.id, placed(free.id));
 		} else if (sched.on_conflict === 'overwrite') {
-			// Sobreescribir slot_index 0, salvo que sea una receta puesta a mano: una
-			// programación nunca desplaza una elección manual, solo a otra programación
-			// de menor prioridad que ya estuviera materializada ahí.
-			const idx0 = mealArr.findIndex(s => s.slot_index === 0);
-			const isManual = manualOccupied.get(key)?.has(0) ?? false;
-			if (idx0 >= 0 && !isManual) {
-				mealArr[idx0] = { ...mealArr[idx0], recipe: sched.recipe, is_leftover: 0, schedule: sched, people: sched.people };
-				mealSlots.set(key, mealArr);
-			}
+			// Solo desplaza a otra programación de menor prioridad, nunca una receta guardada
+			const target = ranked.find(s => !manualIds.has(s.id));
+			if (target) bySlot.set(target.id, placed(target.id));
 		} else if (sched.on_conflict === 'add') {
-			// Añadir slot virtual adicional más allá de los existentes
-			const allInMeal = [...mealArr, ...virtualSlots.filter(s => s.weekday === sched.weekday && s.meal_type === sched.meal_type && s.is_accompaniment === sched.is_accompaniment)];
-			const maxIdx = allInMeal.reduce((m, s) => Math.max(m, s.slot_index), -1);
-			virtualSlots.push({
-				weekday: sched.weekday,
-				meal_type: sched.meal_type,
-				slot_index: maxIdx + 1,
-				is_accompaniment: sched.is_accompaniment,
-				is_leftover: 0,
-				recipe: sched.recipe,
-				schedule: sched,
-				people: sched.people
-			});
+			// Hueco extra solo esta semana, detrás de los demás de su tipo
+			const id = -sched.id;
+			const maxPos = cfg.slots.filter(s => s.kind === kind && s.parent_id === null).reduce((m, s) => Math.max(m, s.position), -1);
+			cfg.slots = [...cfg.slots, { id, kind, parent_id: null, position: maxPos + 1, tags: [], virtual: true }];
+			bySlot.set(id, placed(id));
 		}
 		// on_conflict === 'skip': no hacer nada si la comida está llena
 	}
 
-	const allManual = [...mealSlots.values()].flat();
-	const slots: SlotData[] = [...allManual, ...virtualSlots]
-		.sort((a, b) => a.weekday - b.weekday || a.meal_type.localeCompare(b.meal_type) || a.is_accompaniment - b.is_accompaniment || a.slot_index - b.slot_index);
+	for (const d of Object.values(configs)) {
+		for (const cfg of [d.comida, d.cena]) cfg.slots.sort((a, b) => a.position - b.position || a.id - b.id);
+	}
+
+	const order = new Map<number, number>();
+	for (const d of Object.values(configs)) for (const cfg of [d.comida, d.cena]) cfg.slots.forEach((s, i) => order.set(s.id, i));
+	const slots: SlotData[] = [...bySlot.values()]
+		.sort((a, b) => a.weekday - b.weekday || a.meal_type.localeCompare(b.meal_type) || a.is_accompaniment - b.is_accompaniment
+			|| (order.get(a.slot_id) ?? 0) - (order.get(b.slot_id) ?? 0));
 
 	const rules = getAllRules();
 	const people = getActivePeople();
@@ -274,54 +194,54 @@ export function getScheduleResolutionsForWeeks(weekKeys: string[]): ScheduleSlot
 }
 
 /**
- * Pone una receta en un hueco. `people` sustituye para quién es (vacío = para todos);
- * omitido, el hueco conserva las personas que ya tuviera (el upsert mantiene el id de la fila).
+ * Pone una receta en un hueco y devuelve el slot_id real (un hueco virtual de una programación
+ * «add» se materializa como hueco de una sola semana). `people` sustituye para quién es (vacío =
+ * para todos); omitido, el hueco conserva las personas que ya tuviera. `scheduleId` anota de qué
+ * programación sale la receta (al consolidar); una asignación normal lo deja a null.
  */
-export function assignRecipe(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number, recipeId: number, isLeftover = 0, people?: number[]): void {
+export function assignRecipe(weekKey: string, slotId: number, recipeId: number, isLeftover = 0, people?: number[], scheduleId: number | null = null): number {
 	const db = getDb();
-	db.transaction(() => {
+	return db.transaction(() => {
+		const realId = resolveSlotId(weekKey, slotId);
+		const slot = getSlotVersion(realId, weekKey);
+		if (!slot) throw new Error(`El hueco ${realId} no existe en la semana ${weekKey}`);
 		const { id } = db.prepare(`
-			INSERT INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, is_leftover, recipe_id)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT(week_key, weekday, meal_type, is_accompaniment, slot_index)
-			DO UPDATE SET recipe_id = excluded.recipe_id, is_leftover = excluded.is_leftover
+			INSERT INTO week_plans (week_key, weekday, meal_type, slot_id, is_accompaniment, is_leftover, recipe_id, schedule_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(week_key, slot_id)
+			DO UPDATE SET recipe_id = excluded.recipe_id, is_leftover = excluded.is_leftover, schedule_id = excluded.schedule_id
 			RETURNING id
-		`).get(weekKey, weekday, mealType, slotIndex, isAccompaniment, isLeftover, recipeId) as { id: number };
+		`).get(weekKey, slot.weekday, slot.meal_type, realId, slot.kind === 'acc' ? 1 : 0, isLeftover, recipeId, scheduleId) as { id: number };
 		if (people) setPeopleLinks('week_plan_people', id, people);
+		return realId;
 	})();
+}
+
+export function getPlanRow(weekKey: string, slotId: number): WeekPlan | undefined {
+	return getDb().prepare('SELECT * FROM week_plans WHERE week_key = ? AND slot_id = ?').get(weekKey, slotId) as WeekPlan | undefined;
 }
 
 /**
  * Cambia para quién es la receta de un hueco. Si el hueco no tiene fila propia (la receta
  * viene de una programación), se materializa con esa receta para guardar las personas solo
- * en esta semana.
+ * en esta semana. Devuelve el slot_id real.
  */
-export function setSlotPeople(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number, recipeId: number, people: number[]): void {
+export function setSlotPeople(weekKey: string, slotId: number, recipeId: number, people: number[]): number {
 	const db = getDb();
-	const row = db.prepare(`
-		SELECT id FROM week_plans
-		WHERE week_key = ? AND weekday = ? AND meal_type = ? AND slot_index = ? AND is_accompaniment = ?
-	`).get(weekKey, weekday, mealType, slotIndex, isAccompaniment) as { id: number } | undefined;
+	const row = slotId >= 0 ? getPlanRow(weekKey, slotId) : undefined;
 	if (row) {
 		db.transaction(() => setPeopleLinks('week_plan_people', row.id, people))();
-	} else {
-		assignRecipe(weekKey, weekday, mealType, slotIndex, isAccompaniment, recipeId, 0, people);
+		return slotId;
 	}
+	return assignRecipe(weekKey, slotId, recipeId, 0, people);
 }
 
-export function removeRecipe(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number): void {
-	getDb().prepare(`
-		DELETE FROM week_plans
-		WHERE week_key = ? AND weekday = ? AND meal_type = ? AND slot_index = ? AND is_accompaniment = ?
-	`).run(weekKey, weekday, mealType, slotIndex, isAccompaniment);
+export function removeRecipe(weekKey: string, slotId: number): void {
+	getDb().prepare('DELETE FROM week_plans WHERE week_key = ? AND slot_id = ?').run(weekKey, slotId);
 }
 
-export function hasManualEntry(weekKey: string, weekday: number, mealType: string, slotIndex: number, isAccompaniment: number): boolean {
-	const row = getDb().prepare(`
-		SELECT 1 FROM week_plans
-		WHERE week_key = ? AND weekday = ? AND meal_type = ? AND slot_index = ? AND is_accompaniment = ?
-	`).get(weekKey, weekday, mealType, slotIndex, isAccompaniment);
-	return !!row;
+export function hasManualEntry(weekKey: string, slotId: number): boolean {
+	return !!getPlanRow(weekKey, slotId);
 }
 
 export function clearWeek(weekKey: string, scope: 'week' | 'future' = 'week'): void {
@@ -333,6 +253,10 @@ export function clearWeek(weekKey: string, scope: 'week' | 'future' = 'week'): v
 	}
 }
 
+/**
+ * Copia las recetas de la semana anterior. Cada una va a su mismo hueco si existe en las dos
+ * semanas; si no, al primer hueco libre del mismo tipo en esa comida; si no queda ninguno, se descarta.
+ */
 export function copyPreviousWeek(weekKey: string, previousWeekKey: string): void {
 	const db = getDb();
 
@@ -341,14 +265,32 @@ export function copyPreviousWeek(weekKey: string, previousWeekKey: string): void
 
 		const plans = db.prepare('SELECT * FROM week_plans WHERE week_key = ?').all(previousWeekKey) as WeekPlan[];
 		const peopleByPlan = loadPeopleLinks('week_plan_people', plans.map(p => p.id));
+		const target = getSlotRowsForWeek(weekKey);
+		const vigentes = new Set(target.map(s => s.slot_id));
+		const used = new Set<number>();
+		const destination = new Map<number, number>(); // plan.id → slot_id
+
+		// Primero los que mantienen su hueco, para que ningún sustituto se lo quite
+		for (const plan of plans) {
+			if (vigentes.has(plan.slot_id)) { destination.set(plan.id, plan.slot_id); used.add(plan.slot_id); }
+		}
+		for (const plan of plans) {
+			if (destination.has(plan.id)) continue;
+			const kind = plan.is_accompaniment ? 'acc' : 'main';
+			const free = target.find(s => s.weekday === plan.weekday && s.meal_type === plan.meal_type && s.kind === kind && !used.has(s.slot_id));
+			if (free) { destination.set(plan.id, free.slot_id); used.add(free.slot_id); }
+		}
+
 		const insertPlan = db.prepare(`
-			INSERT OR IGNORE INTO week_plans (week_key, weekday, meal_type, slot_index, is_accompaniment, is_leftover, recipe_id)
+			INSERT INTO week_plans (week_key, weekday, meal_type, slot_id, is_accompaniment, is_leftover, recipe_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`);
 		for (const plan of plans) {
-			const res = insertPlan.run(weekKey, plan.weekday, plan.meal_type, plan.slot_index, plan.is_accompaniment, plan.is_leftover ?? 0, plan.recipe_id);
+			const slotId = destination.get(plan.id);
+			if (slotId === undefined) continue;
+			const res = insertPlan.run(weekKey, plan.weekday, plan.meal_type, slotId, plan.is_accompaniment, plan.is_leftover ?? 0, plan.recipe_id);
 			const people = peopleByPlan.get(plan.id);
-			if (res.changes > 0 && people) setPeopleLinks('week_plan_people', res.lastInsertRowid as number, people);
+			if (people) setPeopleLinks('week_plan_people', res.lastInsertRowid as number, people);
 		}
 	})();
 }
@@ -359,59 +301,33 @@ export function getHistory(): string[] {
 	return rows.map(r => r.week_key);
 }
 
-export function updateSlotRequiredTag(weekKey: string, weekday: number, mealType: string, slotIndex: number, tags: string[]): void {
-	const db = getDb();
-	db.transaction(() => {
-		const configId = ensureMealConfig(db, weekKey, weekday, mealType);
-		db.prepare('DELETE FROM meal_config_required_tags WHERE config_id = ? AND slot_index = ?').run(configId, slotIndex);
-		const insert = db.prepare('INSERT OR IGNORE INTO meal_config_required_tags (config_id, slot_index, tag) VALUES (?, ?, ?)');
-		for (const tag of tags) if (tag) insert.run(configId, slotIndex, tag);
-	})();
-}
-
 export interface DayConfigPatch {
-	recipe_count?: number;
-	accompaniment_per_recipe?: number;
-	accompaniment_per_slot?: number;
 	disabled?: boolean;
 	disabled_comment?: string | null;
 	note?: string | null;
 }
 
+/** Estado puntual de una comida en una semana (sin herencia); la fila desaparece si vuelve a los valores por defecto. */
 export function updateDayConfig(weekKey: string, weekday: number, mealType: string, config: DayConfigPatch): void {
 	const db = getDb();
 	db.transaction(() => {
-		// Capacidad: vigencia que se propaga hacia el futuro (ver ensureMealConfig)
-		if (config.recipe_count !== undefined || config.accompaniment_per_recipe !== undefined || config.accompaniment_per_slot !== undefined) {
-			const configId = ensureMealConfig(db, weekKey, weekday, mealType);
+		if (!('disabled' in config || 'disabled_comment' in config || 'note' in config)) return;
+		const existing = db.prepare(
+			'SELECT * FROM week_meal_state WHERE week_key = ? AND weekday = ? AND meal_type = ?'
+		).get(weekKey, weekday, mealType) as WeekMealState | undefined;
+		const disabled = 'disabled' in config ? (config.disabled ? 1 : 0) : (existing?.disabled ?? 0);
+		const comment = 'disabled_comment' in config ? config.disabled_comment ?? null : existing?.disabled_comment ?? null;
+		const note = 'note' in config ? config.note ?? null : existing?.note ?? null;
+
+		if (!disabled && comment === null && note === null) {
+			db.prepare('DELETE FROM week_meal_state WHERE week_key = ? AND weekday = ? AND meal_type = ?').run(weekKey, weekday, mealType);
+		} else {
 			db.prepare(`
-				UPDATE meal_config SET
-					recipe_count = COALESCE(?, recipe_count),
-					accompaniment_per_recipe = COALESCE(?, accompaniment_per_recipe),
-					accompaniment_per_slot = COALESCE(?, accompaniment_per_slot)
-				WHERE id = ?
-			`).run(config.recipe_count ?? null, config.accompaniment_per_recipe ?? null, config.accompaniment_per_slot ?? null, configId);
-		}
-
-		// Estado puntual de esta semana (sin herencia); la fila se elimina si vuelve a los valores por defecto
-		if ('disabled' in config || 'disabled_comment' in config || 'note' in config) {
-			const existing = db.prepare(
-				'SELECT * FROM week_meal_state WHERE week_key = ? AND weekday = ? AND meal_type = ?'
-			).get(weekKey, weekday, mealType) as WeekMealState | undefined;
-			const disabled = 'disabled' in config ? (config.disabled ? 1 : 0) : (existing?.disabled ?? 0);
-			const comment = 'disabled_comment' in config ? config.disabled_comment ?? null : existing?.disabled_comment ?? null;
-			const note = 'note' in config ? config.note ?? null : existing?.note ?? null;
-
-			if (!disabled && comment === null && note === null) {
-				db.prepare('DELETE FROM week_meal_state WHERE week_key = ? AND weekday = ? AND meal_type = ?').run(weekKey, weekday, mealType);
-			} else {
-				db.prepare(`
-					INSERT INTO week_meal_state (week_key, weekday, meal_type, disabled, disabled_comment, note)
-					VALUES (?, ?, ?, ?, ?, ?)
-					ON CONFLICT(week_key, weekday, meal_type)
-					DO UPDATE SET disabled = excluded.disabled, disabled_comment = excluded.disabled_comment, note = excluded.note
-				`).run(weekKey, weekday, mealType, disabled, comment, note);
-			}
+				INSERT INTO week_meal_state (week_key, weekday, meal_type, disabled, disabled_comment, note)
+				VALUES (?, ?, ?, ?, ?, ?)
+				ON CONFLICT(week_key, weekday, meal_type)
+				DO UPDATE SET disabled = excluded.disabled, disabled_comment = excluded.disabled_comment, note = excluded.note
+			`).run(weekKey, weekday, mealType, disabled, comment, note);
 		}
 	})();
 }

@@ -10,7 +10,7 @@
 		weekKey,
 		weekday,
 		mealType,
-		slotIndex,
+		slotId,
 		isAcc = 0,
 		allTags = [],
 		people = [],
@@ -25,7 +25,7 @@
 		weekKey: string;
 		weekday: number;
 		mealType: string;
-		slotIndex: number;
+		slotId: number;
 		isAcc?: number;
 		allTags?: string[];
 		/** Personas activas; si hay, se elige para quién es la receta al seleccionarla. */
@@ -97,7 +97,7 @@
 				weekKey,
 				weekday: String(weekday),
 				mealType,
-				slotIndex: String(slotIndex),
+				slotId: String(slotId),
 				isAcc: String(isAcc),
 			});
 			const res = await fetch(`/api/recipes/picker?${params}`, { signal: ctrl.signal });

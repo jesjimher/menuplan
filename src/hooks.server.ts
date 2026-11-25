@@ -1,7 +1,13 @@
 import type { Handle, HandleServerError } from '@sveltejs/kit';
-import { json } from '@sveltejs/kit';
+import { consolidateSchedules } from '$lib/server/scheduleFreeze.js';
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// Guardar en week_plans lo programado para los días ya pasados (no hace nada si ya está al día)
+	try {
+		consolidateSchedules();
+	} catch (e) {
+		console.error(`[${new Date().toISOString()}] Error al consolidar programaciones:`, e);
+	}
 	return resolve(event);
 };
 

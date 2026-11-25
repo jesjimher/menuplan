@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { getWeekKey, weekKeyToIndex } from '../utils/dates.js';
+import { migrateToMealSlots } from './migrateMealSlots.js';
 
 interface Migration {
 	version: number;
@@ -354,10 +355,17 @@ const MIGRATIONS: Migration[] = [
 				);
 			`);
 		}
+	},
+	{
+		version: 19,
+		name: 'independent_meal_slots',
+		// Huecos independientes con vigencia (meal_slots) en lugar de contador + posiciones
+		up: (db) => migrateToMealSlots(db)
 	}
 ];
 
-export function runMigrations(db: Database.Database): void {
+/** `upTo` limita hasta qué versión se aplica (solo para tests de migraciones intermedias). */
+export function runMigrations(db: Database.Database, upTo = Infinity): void {
 	db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 		version    INTEGER PRIMARY KEY,
 		name       TEXT NOT NULL,
@@ -371,7 +379,7 @@ export function runMigrations(db: Database.Database): void {
 	const insert = db.prepare('INSERT INTO schema_migrations (version, name) VALUES (?, ?)');
 
 	for (const m of MIGRATIONS) {
-		if (applied.has(m.version)) continue;
+		if (applied.has(m.version) || m.version > upTo) continue;
 		db.transaction(() => {
 			m.up(db);
 			insert.run(m.version, m.name);
