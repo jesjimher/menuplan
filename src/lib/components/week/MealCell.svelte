@@ -121,7 +121,10 @@
 					{...callbacks}
 					{people}
 					slotPeople={pInfo.ids}
-					onDeleteSlot={ms.virtual ? undefined : () => onRemoveMealSlot(slotId)}
+					onDeleteSlot={ms.virtual
+						// Hueco que solo existe porque lo añade una programación: quitarlo es quitar la receta programada
+						? () => onRemoveSlot(slotId, 0)
+						: () => onRemoveMealSlot(slotId)}
 					onAddAccompaniment={ms.virtual ? undefined : () => onAddMealSlot('acc', slotId)}
 				/>
 				{/if}
@@ -198,9 +201,9 @@
 										title="Quitar receta"
 									>&times;</button>
 								{/if}
-								{#if !ma.virtual}
+								{#if !ma.virtual || accSlot?.recipe}
 								<button
-									on:click|stopPropagation={() => onRemoveMealSlot(aIdx)}
+									on:click|stopPropagation={() => ma.virtual ? onRemoveSlot(aIdx, 1) : onRemoveMealSlot(aIdx)}
 									class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors"
 									style="background: var(--error); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.35);"
 									aria-label="Eliminar acompañamiento"
