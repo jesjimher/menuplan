@@ -103,6 +103,21 @@ describe('getRecipesPlannedNearDate', () => {
 		expect(result.map(r => r.id)).toContain(recipe.id);
 	});
 
+	it('en la cena incluye la comida del mismo día, y en la comida no', () => {
+		const recipe = seedRecipe('Paella', 'arroz');
+		assignRecipe(WEEK, slotFor(WEEK, 3, 'comida', 0, 0), recipe.id); // miércoles
+		const dates = getWeekDates(WEEK);
+		expect(getRecipesPlannedNearDate(dates[2], 7, 'cena').map(r => r.id)).toContain(recipe.id);
+		expect(getRecipesPlannedNearDate(dates[2], 7, 'comida').map(r => r.id)).not.toContain(recipe.id);
+	});
+
+	it('también el lunes por la noche, aunque la semana anterior no tenga nada', () => {
+		const recipe = seedRecipe('Lasaña', 'pasta');
+		assignRecipe(WEEK, slotFor(WEEK, 1, 'comida', 0, 0), recipe.id); // lunes
+		const dates = getWeekDates(WEEK);
+		expect(getRecipesPlannedNearDate(dates[0], 7, 'cena').map(r => r.id)).toContain(recipe.id);
+	});
+
 	it('no incluye acompañamientos ni recetas ya marcadas como restos', () => {
 		const acc = seedRecipe('Pan', 'acompañamiento');
 		const leftover = seedRecipe('Sobras', 'legumbres');

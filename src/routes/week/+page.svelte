@@ -529,6 +529,8 @@
 		const targetDate = dates[target.weekday - 1];
 		if (!sourceDate || !targetDate) return false;
 		const diffDays = Math.round((targetDate.getTime() - sourceDate.getTime()) / MS_PER_DAY);
+		// La cena puede ser restos de la comida del mismo día.
+		if (diffDays === 0) return source.mealType === 'comida' && target.mealType === 'cena';
 		return diffDays > 0 && diffDays <= 6;
 	}
 
@@ -1143,11 +1145,24 @@
 		</div>
 	{/if}
 
+	{#if dnd.dragSource}
+		<!-- Aviso durante el arrastre: sin Ctrl el plato solo se mueve -->
+		<div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full shadow-lg pointer-events-none text-sm font-bold whitespace-nowrap"
+			style="background: {dnd.dragModifier ? 'var(--primary)' : 'var(--text)'}; color: {dnd.dragModifier ? 'white' : 'var(--surface)'};">
+			{#if dnd.dragModifier}
+				Suelta para elegir: mover, copiar o restos
+			{:else}
+				Mantén <kbd class="px-1.5 py-0.5 rounded" style="background: rgba(127,127,127,0.35);">Ctrl</kbd> al soltar para copiar o marcar como restos
+			{/if}
+		</div>
+	{/if}
+
 	{#if moveSource}
 		<div class="fixed bottom-0 left-0 right-0 z-50 px-4 py-3 flex items-center justify-between shadow-lg"
 			style="background: var(--primary); color: white;">
 			<span class="text-sm font-bold">
 				Toca el destino de «{getSlot(moveSource.weekday, moveSource.mealType, moveSource.slotId, moveSource.isAcc)?.recipe?.name}»
+				<span class="block text-xs font-normal opacity-90">Podrás elegir mover, copiar o marcar como restos</span>
 			</span>
 			<button
 				on:click={() => moveSource = null}

@@ -28,6 +28,9 @@ export class WeekDragDrop {
 		// suppress the native no-drop cursor when dragging over non-slot areas without Ctrl.
 		const onDocDragOver = (e: DragEvent) => {
 			if (!this.dragSource) return;
+			// Mantiene al día el aviso de la página aunque el cursor no esté sobre un hueco
+			// (durante un arrastre nativo el navegador no siempre emite keydown/keyup).
+			this.dragModifier = this.ctrlHeld || e.ctrlKey || e.metaKey;
 			if (this.ctrlHeld) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; }
 		};
 		// Prevent the browser from navigating when the user drops on an empty area.

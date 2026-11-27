@@ -150,8 +150,11 @@ export function getOldestPlannedRecipes(mealType: string, limit = DEFAULT_RECENT
 	`).all(mealType, isAcc ? 1 : 0, slotRecipeTag(mealType, isAcc), limit) as (Recipe & { last_week: string | null })[];
 }
 
-export function getRecipesPlannedNearDate(targetDate: Date, daysBack = 7): Recipe[] {
+/** Recetas de los `daysBack` días anteriores a `targetDate`. Si el destino es una cena,
+ *  también la comida de ese mismo día (cenar las sobras del mediodía). */
+export function getRecipesPlannedNearDate(targetDate: Date, daysBack = 7, targetMealType: string = 'comida'): Recipe[] {
 	const startDate = new Date(targetDate.getTime() - daysBack * MS_PER_DAY);
+	const includeSameDayLunch = targetMealType === 'cena';
 
 	const weekKeys = new Set<string>();
 	const cur = new Date(startDate);
@@ -159,6 +162,7 @@ export function getRecipesPlannedNearDate(targetDate: Date, daysBack = 7): Recip
 		weekKeys.add(getWeekKey(cur));
 		cur.setUTCDate(cur.getUTCDate() + 1);
 	}
+	if (includeSameDayLunch) weekKeys.add(getWeekKey(targetDate));
 	if (weekKeys.size === 0) return [];
 
 	const targetTime = targetDate.getTime();
@@ -174,8 +178,10 @@ export function getRecipesPlannedNearDate(targetDate: Date, daysBack = 7): Recip
 			if (!slot.recipe || slot.is_accompaniment !== 0 || slot.is_leftover !== 0) continue;
 			const rowDate = dates[slot.weekday - 1];
 			if (!rowDate) continue;
-			const rowTime = rowDate.getTime();
-			if (rowTime >= startTime && rowTime < targetTime) {
+			// La comida va medio día antes que la cena, para ordenar por cercanía.
+			const rowTime = rowDate.getTime() + (slot.meal_type === 'cena' ? MS_PER_DAY / 2 : 0);
+			const sameDayLunch = includeSameDayLunch && rowDate.getTime() === targetTime && slot.meal_type === 'comida';
+			if ((rowTime >= startTime && rowDate.getTime() < targetTime) || sameDayLunch) {
 				const existing = seen.get(slot.recipe.id);
 				if (!existing || rowTime > existing.date) {
 					seen.set(slot.recipe.id, { recipe: slot.recipe, date: rowTime });
