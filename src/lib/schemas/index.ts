@@ -68,8 +68,6 @@ export const addSlotBodySchema = z.object({
 	weekday: weekdaySchema,
 	meal_type: mealTypeSchema,
 	kind: z.enum(['main', 'acc']),
-	// Plato del que cuelga un acompañamiento; omitido/null = de toda la comida
-	parent_id: z.number().int().positive().nullable().optional(),
 	tags: z.array(z.string()).optional(),
 });
 

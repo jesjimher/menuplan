@@ -21,7 +21,6 @@ export interface SlotIdentity {
 	weekday: number;
 	meal_type: MealType;
 	kind: MealSlotKind;
-	parent_slot_id: number | null;
 }
 
 /** Versiones vigentes en una semana (todas las comidas). */
@@ -40,15 +39,8 @@ export function getSlotVersion(slotId: number, weekKey: string): MealSlotRow | u
 
 /** Día, comida y tipo de un hueco (no cambian entre versiones). */
 export function getSlotIdentity(slotId: number): SlotIdentity | undefined {
-	return getDb().prepare('SELECT weekday, meal_type, kind, parent_slot_id FROM meal_slots WHERE slot_id = ? LIMIT 1')
+	return getDb().prepare('SELECT weekday, meal_type, kind FROM meal_slots WHERE slot_id = ? LIMIT 1')
 		.get(slotId) as SlotIdentity | undefined;
-}
-
-/** Última semana en la que existe un hueco (null = sin final). */
-function lifetimeEnd(slotId: number): string | null {
-	const rows = getDb().prepare('SELECT effective_to FROM meal_slots WHERE slot_id = ?').all(slotId) as { effective_to: string | null }[];
-	if (rows.some(r => r.effective_to === null)) return null;
-	return rows.reduce((max, r) => (r.effective_to! > max ? r.effective_to! : max), '');
 }
 
 function normalizeTags(tags: string[]): string {
@@ -56,35 +48,23 @@ function normalizeTags(tags: string[]): string {
 }
 
 /**
- * Crea un hueco en una comida desde `weekKey`. Va detrás de sus hermanos (mismo tipo y mismo
- * plato padre). Un acompañamiento «por receta» no puede durar más que su plato.
- * Devuelve el slot_id del hueco nuevo.
+ * Crea un hueco en una comida desde `weekKey`, detrás de los de su tipo. Devuelve su slot_id.
  */
 export function addSlot(
 	weekKey: string, weekday: number, mealType: string, kind: MealSlotKind,
-	parentSlotId: number | null = null, tags: string[] = [], singleWeek = false
+	tags: string[] = [], singleWeek = false
 ): number {
 	const db = getDb();
 	return db.transaction(() => {
-		let to: string | null = singleWeek || isPast(weekKey) ? weekKey : null;
-		if (parentSlotId !== null) {
-			const parent = getSlotVersion(parentSlotId, weekKey);
-			if (!parent || parent.kind !== 'main' || parent.weekday !== weekday || parent.meal_type !== mealType) {
-				throw new Error('El plato del que cuelga el acompañamiento no existe esa semana');
-			}
-			if (kind !== 'acc') throw new Error('Solo un acompañamiento puede colgar de un plato');
-			const parentEnd = lifetimeEnd(parentSlotId);
-			if (to === null) to = parentEnd;
-			else if (parentEnd !== null && parentEnd < to) to = parentEnd;
-		}
+		const to: string | null = singleWeek || isPast(weekKey) ? weekKey : null;
 		const { maxPos } = db.prepare(`
 			SELECT MAX(position) AS maxPos FROM meal_slots
-			WHERE weekday = ? AND meal_type = ? AND kind = ? AND parent_slot_id IS ? AND ${COVERS}
-		`).get(weekday, mealType, kind, parentSlotId, weekKey, weekKey) as { maxPos: number | null };
+			WHERE weekday = ? AND meal_type = ? AND kind = ? AND ${COVERS}
+		`).get(weekday, mealType, kind, weekKey, weekKey) as { maxPos: number | null };
 		const id = db.prepare(`
-			INSERT INTO meal_slots (slot_id, weekday, meal_type, kind, parent_slot_id, effective_from, effective_to, position, tags)
-			VALUES (0, ?, ?, ?, ?, ?, ?, ?, ?)
-		`).run(weekday, mealType, kind, parentSlotId, weekKey, to, (maxPos ?? -1) + 1, normalizeTags(tags)).lastInsertRowid as number;
+			INSERT INTO meal_slots (slot_id, weekday, meal_type, kind, effective_from, effective_to, position, tags)
+			VALUES (0, ?, ?, ?, ?, ?, ?, ?)
+		`).run(weekday, mealType, kind, weekKey, to, (maxPos ?? -1) + 1, normalizeTags(tags)).lastInsertRowid as number;
 		db.prepare('UPDATE meal_slots SET slot_id = ? WHERE id = ?').run(id, id);
 		return id;
 	})();
@@ -92,9 +72,9 @@ export function addSlot(
 
 function copyVersion(v: MealSlotRow, from: string, to: string | null): number {
 	return getDb().prepare(`
-		INSERT INTO meal_slots (slot_id, weekday, meal_type, kind, parent_slot_id, effective_from, effective_to, position, tags)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`).run(v.slot_id, v.weekday, v.meal_type, v.kind, v.parent_slot_id, from, to, v.position, v.tags).lastInsertRowid as number;
+		INSERT INTO meal_slots (slot_id, weekday, meal_type, kind, effective_from, effective_to, position, tags)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`).run(v.slot_id, v.weekday, v.meal_type, v.kind, from, to, v.position, v.tags).lastInsertRowid as number;
 }
 
 /**
@@ -141,30 +121,23 @@ export function setSlotTags(weekKey: string, slotId: number, tags: string[]): vo
 	})();
 }
 
-function removeOne(weekKey: string, slotId: number): void {
-	const db = getDb();
-	if (isPast(weekKey)) {
-		const id = isolateFrom(slotId, weekKey);
-		if (id === null) return;
-		db.prepare('DELETE FROM meal_slots WHERE id = ?').run(id);
-		db.prepare('DELETE FROM week_plans WHERE slot_id = ? AND week_key = ?').run(slotId, weekKey);
-		return;
-	}
-	db.prepare('DELETE FROM meal_slots WHERE slot_id = ? AND effective_from >= ?').run(slotId, weekKey);
-	db.prepare(`UPDATE meal_slots SET effective_to = ? WHERE slot_id = ? AND ${COVERS}`).run(prevWeek(weekKey), slotId, weekKey, weekKey);
-	db.prepare('DELETE FROM week_plans WHERE slot_id = ? AND week_key >= ?').run(slotId, weekKey);
-}
-
 /**
- * Quita un hueco desde `weekKey` (solo esa semana si es pasada), junto con los acompañamientos
- * que cuelgan de él y las recetas que tuvieran en las semanas en que dejan de existir.
+ * Quita un hueco desde `weekKey` (solo esa semana si es pasada), junto con las recetas que
+ * tuviera en las semanas en que deja de existir.
  */
 export function removeSlot(weekKey: string, slotId: number): void {
 	const db = getDb();
 	db.transaction(() => {
-		const children = (db.prepare('SELECT DISTINCT slot_id FROM meal_slots WHERE parent_slot_id = ?').all(slotId) as { slot_id: number }[])
-			.map(r => r.slot_id);
-		for (const id of [...children, slotId]) removeOne(weekKey, id);
+		if (isPast(weekKey)) {
+			const id = isolateFrom(slotId, weekKey);
+			if (id === null) return;
+			db.prepare('DELETE FROM meal_slots WHERE id = ?').run(id);
+			db.prepare('DELETE FROM week_plans WHERE slot_id = ? AND week_key = ?').run(slotId, weekKey);
+			return;
+		}
+		db.prepare('DELETE FROM meal_slots WHERE slot_id = ? AND effective_from >= ?').run(slotId, weekKey);
+		db.prepare(`UPDATE meal_slots SET effective_to = ? WHERE slot_id = ? AND ${COVERS}`).run(prevWeek(weekKey), slotId, weekKey, weekKey);
+		db.prepare('DELETE FROM week_plans WHERE slot_id = ? AND week_key >= ?').run(slotId, weekKey);
 	})();
 }
 
@@ -177,7 +150,7 @@ export function resolveSlotId(weekKey: string, slotId: number): number {
 	const sched = getDb().prepare('SELECT weekday, meal_type, is_accompaniment FROM schedules WHERE id = ?')
 		.get(-slotId) as { weekday: number; meal_type: string; is_accompaniment: number } | undefined;
 	if (!sched) throw new Error('Hueco virtual de una programación que ya no existe');
-	return addSlot(weekKey, sched.weekday, sched.meal_type, sched.is_accompaniment ? 'acc' : 'main', null, [], true);
+	return addSlot(weekKey, sched.weekday, sched.meal_type, sched.is_accompaniment ? 'acc' : 'main', [], true);
 }
 
 /** Día, comida y tipo de un hueco real o virtual. */

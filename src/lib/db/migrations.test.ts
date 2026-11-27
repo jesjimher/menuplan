@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { runMigrations } from './migrations.js';
+import { runMigrations, migrateIndependentAccompaniments } from './migrations.js';
+import { getDb } from './index.js';
 
 // Estado de una BD anterior a la migración 16: con members y week_plans.member_id.
 function legacyDb(): Database.Database {
@@ -216,5 +217,54 @@ describe('migración 19: independent_meal_slots', () => {
 		`).all();
 		expect(slots).toEqual([{ kind: 'main', tags: 'pasta' }, { kind: 'main', tags: 'carne' }]);
 		expect(db.prepare(`SELECT 1 FROM sqlite_master WHERE name IN ('meal_config', 'meal_config_required_tags')`).get()).toBeUndefined();
+	});
+});
+
+describe('migración 20: independent_accompaniments', () => {
+	// Estado tras la 19, con dos platos y acompañamientos de plato y de comida
+	function db19(): Database.Database {
+		const db = new Database(':memory:');
+		db.exec(`
+			CREATE TABLE meal_slots (
+				id INTEGER PRIMARY KEY AUTOINCREMENT, slot_id INTEGER NOT NULL, weekday INTEGER NOT NULL, meal_type TEXT NOT NULL,
+				kind TEXT NOT NULL, parent_slot_id INTEGER DEFAULT NULL, effective_from TEXT NOT NULL, effective_to TEXT DEFAULT NULL,
+				position INTEGER NOT NULL DEFAULT 0, tags TEXT NOT NULL DEFAULT ''
+			);
+			CREATE TABLE week_plans (id INTEGER PRIMARY KEY, week_key TEXT NOT NULL, slot_id INTEGER NOT NULL, is_accompaniment INTEGER NOT NULL);
+			CREATE TABLE week_plan_people (week_plan_id INTEGER NOT NULL, person_id INTEGER NOT NULL, PRIMARY KEY (week_plan_id, person_id));
+			-- Platos 1 y 2; 10 (de toda la comida), 11 (del plato 2), 12 (del plato 1, con dos versiones)
+			INSERT INTO meal_slots (id, slot_id, weekday, meal_type, kind, parent_slot_id, effective_from, effective_to, position) VALUES
+				(1, 1, 1, 'comida', 'main', NULL, '2026-W01', NULL, 0),
+				(2, 2, 1, 'comida', 'main', NULL, '2026-W01', NULL, 1),
+				(10, 10, 1, 'comida', 'acc', NULL, '2026-W01', NULL, 0),
+				(11, 11, 1, 'comida', 'acc', 2, '2026-W01', NULL, 0),
+				(12, 12, 1, 'comida', 'acc', 1, '2026-W01', '2026-W09', 0),
+				(13, 12, 1, 'comida', 'acc', 1, '2026-W10', NULL, 0);
+			INSERT INTO week_plans VALUES
+				(100, '2026-W10', 1, 0), (101, '2026-W10', 12, 1),
+				(102, '2026-W10', 2, 0), (103, '2026-W10', 11, 1),
+				(104, '2026-W10', 10, 1);
+			-- Plato 1 para la persona 7; plato 2 para todos; el acompañamiento 11 ya tenía la persona 8
+			INSERT INTO week_plan_people VALUES (100, 7), (103, 8);
+		`);
+		return db;
+	}
+
+	it('hereda las personas del plato, renumera los acompañamientos y borra la columna', () => {
+		const db = db19();
+		migrateIndependentAccompaniments(db);
+		const people = db.prepare('SELECT week_plan_id, person_id FROM week_plan_people ORDER BY 1, 2').all();
+		expect(people).toEqual([{ week_plan_id: 100, person_id: 7 }, { week_plan_id: 101, person_id: 7 }, { week_plan_id: 103, person_id: 8 }]);
+		const order = db.prepare(`SELECT DISTINCT slot_id, position FROM meal_slots WHERE kind = 'acc' ORDER BY position`).all();
+		expect(order).toEqual([{ slot_id: 12, position: 0 }, { slot_id: 11, position: 1 }, { slot_id: 10, position: 2 }]);
+		const cols = (db.prepare('PRAGMA table_info(meal_slots)').all() as { name: string }[]).map(c => c.name);
+		expect(cols).not.toContain('parent_slot_id');
+		migrateIndependentAccompaniments(db);
+	});
+
+	it('una BD nueva pasa por todas las migraciones sin la columna', () => {
+		const db = getDb();
+		const cols = (db.prepare('PRAGMA table_info(meal_slots)').all() as { name: string }[]).map(c => c.name);
+		expect(cols).not.toContain('parent_slot_id');
 	});
 });

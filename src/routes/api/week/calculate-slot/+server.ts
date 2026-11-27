@@ -21,7 +21,7 @@ export async function POST({ request }) {
 		meal_type: version.meal_type,
 		slot_id: slotId,
 		is_accompaniment: isAcc,
-		required_tags: isAcc ? [] : parseTags(version.tags)
+		required_tags: parseTags(version.tags)
 	}], weekData.slots);
 
 	const filledSlot = getWeekData(weekKey).slots.find(s => s.slot_id === slotId);

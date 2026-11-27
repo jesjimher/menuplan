@@ -27,8 +27,8 @@ export function resetDb(): void {
 		DELETE FROM options WHERE key = 'schedules_consolidated_through';
 	`);
 	const ins = db.prepare(`
-		INSERT INTO meal_slots (slot_id, weekday, meal_type, kind, parent_slot_id, effective_from, effective_to, position, tags)
-		VALUES (0, ?, ?, 'main', NULL, ?, NULL, 0, '')
+		INSERT INTO meal_slots (slot_id, weekday, meal_type, kind, effective_from, effective_to, position, tags)
+		VALUES (0, ?, ?, 'main', ?, NULL, 0, '')
 	`);
 	for (let d = 1; d <= 7; d++) {
 		for (const meal of ['comida', 'cena']) {
@@ -63,10 +63,10 @@ export function seedRule(tag: string, direction: Rule['direction'], times: numbe
 	return createRule({ tag, direction, times, people });
 }
 
-/** slot_id del acompañamiento de toda la comida número `index` (crea los que falten desde esa semana). */
+/** slot_id del acompañamiento número `index` (crea los que falten desde esa semana). */
 export function accSlot(weekKey: string, weekday: number, mealType: string, index = 0): number {
 	const meal = () => getSlotRowsForWeek(weekKey)
-		.filter(s => s.weekday === weekday && s.meal_type === mealType && s.kind === 'acc' && s.parent_slot_id === null)
+		.filter(s => s.weekday === weekday && s.meal_type === mealType && s.kind === 'acc')
 		.map(s => s.slot_id);
 	let ids = meal();
 	while (ids.length <= index) {

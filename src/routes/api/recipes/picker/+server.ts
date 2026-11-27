@@ -17,14 +17,12 @@ export const GET: RequestHandler = async ({ url }) => {
 
 	const weekData = getWeekData(weekKey);
 	const currentSlots = weekData?.slots ?? [];
-	const slotRequiredTags: string[] = isAcc
-		? []
-		: (weekData?.configs[weekday]?.[mealType as 'comida' | 'cena']?.slots.find(s => s.id === slotId)?.tags ?? []);
+	const slotRequiredTags: string[] = weekData?.configs[weekday]?.[mealType as 'comida' | 'cena']?.slots.find(s => s.id === slotId)?.tags ?? [];
 
-	const topForDay = getTopRecipesForSlot(weekday, mealType, 20);
-	const topOverall = getTopRecipesOverall(mealType, 20);
-	const recentForDay = getRecentRecipesForSlot(weekday, mealType, 20);
-	const oldestPlanned = getOldestPlannedRecipes(mealType, 20);
+	const topForDay = getTopRecipesForSlot(weekday, mealType, 20, isAcc);
+	const topOverall = getTopRecipesOverall(mealType, 20, isAcc);
+	const recentForDay = getRecentRecipesForSlot(weekday, mealType, 20, isAcc);
+	const oldestPlanned = getOldestPlannedRecipes(mealType, 20, isAcc);
 	const discarded = getDiscardedRecipes(weekKey, weekday, mealType, isAcc, currentSlots, slotRequiredTags);
 
 	const leftovers = isAcc ? [] : getRecipesPlannedNearDate(getWeekDates(weekKey)[weekday - 1], 7);

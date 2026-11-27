@@ -1,22 +1,21 @@
 <script lang="ts">
-	// Celda de una franja (día + comida/cena): cabecera móvil, slots con sus
+	// Celda de una franja (día + comida/cena): cabecera móvil, platos, luego
 	// acompañamientos, estado deshabilitado y nota. La lógica de mutación vive
 	// en la página; aquí solo se reciben callbacks.
 	import RecipeSlot from './RecipeSlot.svelte';
 	import EditableNote from './EditableNote.svelte';
 	import SlotAddButtons from './SlotAddButtons.svelte';
-	import PeopleAvatars from '$lib/components/people/PeopleAvatars.svelte';
 	import type { MealConfig, SlotData, ScheduleWithRecipe, Person } from '$lib/types/index.js';
 	import type { WeekDragDrop } from '$lib/utils/weekDragDrop.svelte.js';
 
 	let {
 		weekday, mealType, col, isToday, weekKey,
 		cfg, allTags, editingTagKey, busySlots, isTouchDevice, isMoveMode,
-		dnd, slotSchedules,
+		dnd, slotSchedules, accSlotSchedules,
 		getSlot, slotKey, makeSlotCallbacks,
-		people, slotPeopleInfo, isSlotHidden,
+		people, slotPeopleIds, isSlotHidden,
 		onAddMealSlot, onRemoveMealSlot,
-		onSetDisabledComment, onSetMealNote, onOpenPicker, onRemoveSlot
+		onSetDisabledComment, onSetMealNote, onRemoveSlot
 	}: {
 		weekday: number;
 		mealType: 'comida' | 'cena';
@@ -31,29 +30,28 @@
 		isMoveMode: boolean;
 		dnd: WeekDragDrop;
 		slotSchedules: ScheduleWithRecipe[];
+		accSlotSchedules: ScheduleWithRecipe[];
 		getSlot: (weekday: number, mealType: string, slotId: number, isAcc: number) => SlotData | undefined;
 		slotKey: (weekday: number, mealType: string, slotId: number, isAcc: number) => string;
 		makeSlotCallbacks: (weekday: number, mealType: string, slotId: number, isAcc: number) => Record<string, unknown>;
 		people: Person[];
-		/** Para quién es la receta del hueco (y si lo hereda del plato principal). */
-		slotPeopleInfo: (weekday: number, mealType: string, slotId: number, isAcc: number) => { ids: number[]; inherited: boolean };
+		/** Para quién es la receta del hueco (vacío = para todos). */
+		slotPeopleIds: (weekday: number, mealType: string, slotId: number, isAcc: number) => number[];
 		/** En la vista por persona, oculta las recetas que no son para ella. */
 		isSlotHidden: (weekday: number, mealType: string, slotId: number, isAcc: number) => boolean;
-		/** Añade un hueco: plato, acompañamiento de un plato (parentId) o de toda la comida (null). */
-		onAddMealSlot: (kind: 'main' | 'acc', parentId: number | null) => void;
+		/** Añade un hueco (plato o acompañamiento). */
+		onAddMealSlot: (kind: 'main' | 'acc') => void;
 		/** Quita un hueco concreto (no solo su receta). */
 		onRemoveMealSlot: (slotId: number) => void;
 		onSetDisabledComment: (comment: string) => void;
 		onSetMealNote: (note: string) => void;
-		onOpenPicker: (slotId: number, isAcc: number) => void;
 		/** Quita la receta de un hueco. */
 		onRemoveSlot: (slotId: number, isAcc: number) => void;
 	} = $props();
 
 	let isComida = $derived(mealType === 'comida');
 	let mainSlots = $derived(cfg.slots.filter(s => s.kind === 'main'));
-	let mealAccSlots = $derived(cfg.slots.filter(s => s.kind === 'acc' && s.parent_id === null));
-	const childAccs = (mainId: number) => cfg.slots.filter(s => s.kind === 'acc' && s.parent_id === mainId);
+	let accSlots = $derived(cfg.slots.filter(s => s.kind === 'acc'));
 	let row = $derived(isComida ? 2 : 3);
 </script>
 
@@ -91,136 +89,47 @@
 		</div>
 		<!-- Botones añadir cuando no hay slots -->
 		<SlotAddButtons class="px-2 pb-2"
-			onAddPlato={() => onAddMealSlot('main', null)}
-			onAddAcomp={() => onAddMealSlot('acc', null)}
+			onAddPlato={() => onAddMealSlot('main')}
+			onAddAcomp={() => onAddMealSlot('acc')}
 		/>
 	{:else}
 
-		<!-- Slots -->
+		<!-- Slots: primero los platos y luego los acompañamientos -->
 		<div class="px-2 pb-3 pt-2 flex-1 flex flex-col gap-2">
-			{#each mainSlots as ms (ms.id)}
+			{#each [...mainSlots, ...accSlots] as ms (ms.id)}
 				{@const slotId = ms.id}
-				{@const slot = getSlot(weekday, mealType, slotId, 0)}
-				{@const key = slotKey(weekday, mealType, slotId, 0)}
-				{@const slotTagEditKey = `tag-${slotId}`}
-				{@const callbacks = makeSlotCallbacks(weekday, mealType, slotId, 0)}
-				{@const pInfo = slotPeopleInfo(weekday, mealType, slotId, 0)}
+				{@const isAcc = ms.kind === 'acc' ? 1 : 0}
+				{@const slot = getSlot(weekday, mealType, slotId, isAcc)}
+				{@const key = slotKey(weekday, mealType, slotId, isAcc)}
+				{@const callbacks = makeSlotCallbacks(weekday, mealType, slotId, isAcc)}
 
-				{#if !isSlotHidden(weekday, mealType, slotId, 0)}
+				{#if !isSlotHidden(weekday, mealType, slotId, isAcc)}
 				<RecipeSlot
-					{weekday} {mealType} {slotId}
+					{weekday} {mealType} {slotId} {isAcc}
 					{slot} slotKeyStr={key} {cfg} {allTags}
 					isBusy={busySlots.has(key)}
 					isDragSource={!!dnd.dragSource && key === slotKey(dnd.dragSource.weekday, dnd.dragSource.mealType, dnd.dragSource.slotId, dnd.dragSource.isAcc)}
 					isDragOver={dnd.dragOver === key}
 					{isMoveMode}
 					{isTouchDevice}
-					{editingTagKey} slotTags={ms.tags} {slotTagEditKey}
+					{editingTagKey} slotTags={ms.tags} slotTagEditKey={`tag-${slotId}`}
 					schedule={slot?.schedule ?? null}
-					{slotSchedules}
+					slotSchedules={isAcc ? accSlotSchedules : slotSchedules}
 					{...callbacks}
 					{people}
-					slotPeople={pInfo.ids}
+					slotPeople={slotPeopleIds(weekday, mealType, slotId, isAcc)}
 					onDeleteSlot={ms.virtual
 						// Hueco que solo existe porque lo añade una programación: quitarlo es quitar la receta programada
-						? () => onRemoveSlot(slotId, 0)
+						? () => onRemoveSlot(slotId, isAcc)
 						: () => onRemoveMealSlot(slotId)}
-					onAddAccompaniment={ms.virtual ? undefined : () => onAddMealSlot('acc', slotId)}
 				/>
 				{/if}
-
-				<!-- Acompañamientos de este plato -->
-				{#each childAccs(slotId) as acc (acc.id)}
-					{@const accSlot = getSlot(weekday, mealType, acc.id, 1)}
-					{@const accKey = slotKey(weekday, mealType, acc.id, 1)}
-					{@const accCallbacks = makeSlotCallbacks(weekday, mealType, acc.id, 1)}
-					{@const accInfo = slotPeopleInfo(weekday, mealType, acc.id, 1)}
-
-					{#if !isSlotHidden(weekday, mealType, acc.id, 1)}
-					<RecipeSlot
-						{weekday} {mealType} slotId={acc.id} isAcc={1}
-						slot={accSlot} slotKeyStr={accKey} {cfg} {allTags}
-						isDragSource={!!dnd.dragSource && accKey === slotKey(dnd.dragSource.weekday, dnd.dragSource.mealType, dnd.dragSource.slotId, dnd.dragSource.isAcc)}
-						isDragOver={dnd.dragOver === accKey}
-						{isMoveMode}
-						{isTouchDevice}
-						{editingTagKey}
-						{...accCallbacks}
-						{people}
-						slotPeople={accInfo.ids}
-						peopleInherited={accInfo.inherited}
-						onDeleteSlot={() => onRemoveMealSlot(acc.id)}
-					/>
-					{/if}
-				{/each}
 			{/each}
-
-			<!-- Acompañamientos por franja -->
-			{#if mealAccSlots.length > 0}
-				<div class="pt-1.5 space-y-1.5 shrink-0"
-					style="border-top: 1px solid var(--surface-container-highest);">
-					{#each mealAccSlots as ma (ma.id)}
-						{@const aIdx = ma.id}
-						{@const accSlot = getSlot(weekday, mealType, aIdx, 1)}
-						{@const accPeople = accSlot?.people ?? []}
-						{@const accCallbacks = makeSlotCallbacks(weekday, mealType, aIdx, 1)}
-						{#if !isSlotHidden(weekday, mealType, aIdx, 1)}
-						<div class="relative group/accslot">
-							<button
-								on:click|stopPropagation={() => onOpenPicker(aIdx, 1)}
-								class="w-full text-left text-[10px] transition-colors px-2 py-1.5 pr-12 rounded-lg"
-								style="{accSlot?.recipe
-									? `background: var(--secondary-container); color: var(--secondary);`
-									: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
-							>
-								<span class="flex items-center gap-1.5">
-									<span class="flex-1 {accSlot?.recipe ? 'font-semibold' : 'italic'}">
-										{accSlot?.recipe?.name ?? 'Elegir acompañamiento'}
-									</span>
-									{#if accSlot?.recipe && people.length > 0}
-										<span class="shrink-0 inline-flex"><PeopleAvatars {people} ids={accPeople} size={14} max={3} /></span>
-									{/if}
-								</span>
-							</button>
-							<div class="absolute top-1/2 right-1.5 -translate-y-1/2 flex gap-1 opacity-0 group-hover/accslot:opacity-100 transition-opacity">
-								{#if accSlot?.recipe && people.length > 0}
-									<button
-										on:click|stopPropagation={accCallbacks.onOpenPeople as () => void}
-										class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm"
-										style="background: rgba(255,255,255,0.92); color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(0,0,0,0.22);"
-										aria-label="Para quién"
-										title="Para quién"
-									><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></button>
-								{/if}
-								{#if accSlot?.recipe}
-									<button
-										on:click|stopPropagation={() => onRemoveSlot(aIdx, 1)}
-										class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm text-xs font-bold"
-										style="background: rgba(255,255,255,0.92); color: var(--error); box-shadow: 0 2px 5px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(0,0,0,0.22);"
-										aria-label="Quitar receta"
-										title="Quitar receta"
-									>&times;</button>
-								{/if}
-								{#if !ma.virtual || accSlot?.recipe}
-								<button
-									on:click|stopPropagation={() => ma.virtual ? onRemoveSlot(aIdx, 1) : onRemoveMealSlot(aIdx)}
-									class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors"
-									style="background: var(--error); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.35);"
-									aria-label="Eliminar acompañamiento"
-									title="Eliminar acompañamiento"
-								><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
-								{/if}
-							</div>
-						</div>
-						{/if}
-					{/each}
-				</div>
-			{/if}
 
 			<!-- Botones añadir justo después del último slot -->
 			<SlotAddButtons class="pt-2"
-				onAddPlato={() => onAddMealSlot('main', null)}
-				onAddAcomp={() => onAddMealSlot('acc', null)}
+				onAddPlato={() => onAddMealSlot('main')}
+				onAddAcomp={() => onAddMealSlot('acc')}
 			/>
 		</div>
 		<!-- Nota de franja -->

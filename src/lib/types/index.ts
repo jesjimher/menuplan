@@ -52,7 +52,6 @@ export interface MealSlotRow {
 	weekday: number;
 	meal_type: MealType;
 	kind: MealSlotKind;
-	parent_slot_id: number | null;
 	effective_from: string;
 	effective_to: string | null;
 	position: number;
@@ -64,8 +63,6 @@ export interface MealSlot {
 	/** slot_id (identidad del hueco). Negativo = hueco virtual de una programación «add». */
 	id: number;
 	kind: MealSlotKind;
-	/** Plato del que cuelga un acompañamiento; null = acompañamiento de toda la comida. */
-	parent_id: number | null;
 	position: number;
 	tags: string[];
 	/** Hueco que solo existe esta semana porque lo añade una programación (on_conflict='add'). */

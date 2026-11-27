@@ -86,33 +86,40 @@ export function getAllTags(): string[] {
 	return Array.from(tagSet).sort();
 }
 
-export function getTopRecipesForSlot(weekday: number, mealType: string, limit = DEFAULT_TOP_FOR_SLOT_LIMIT): Recipe[] {
+/** Tag que debe tener una receta para un hueco: el de la comida o, en acompañamientos, «acompañamiento». */
+export const slotRecipeTag = (mealType: string, isAcc: number) => isAcc ? 'acompañamiento' : mealType;
+
+// Listas del selector de recetas. `isAcc` elige entre platos (is_accompaniment = 0) y acompañamientos
+// (is_accompaniment = 1, y además con tag «acompañamiento» aunque antes se colara otra receta).
+export function getTopRecipesForSlot(weekday: number, mealType: string, limit = DEFAULT_TOP_FOR_SLOT_LIMIT, isAcc = 0): Recipe[] {
 	const db = getDb();
 	return db.prepare(`
 		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at, COUNT(*) as freq
 		FROM week_plans wp
 		JOIN recipes r ON r.id = wp.recipe_id
-		WHERE wp.weekday = ? AND wp.meal_type = ? AND wp.is_accompaniment = 0
+		WHERE wp.weekday = ? AND wp.meal_type = ? AND wp.is_accompaniment = ?
+			AND (? = 0 OR (',' || REPLACE(LOWER(r.tags), ', ', ',') || ',' LIKE '%,' || LOWER(?) || ',%'))
 		GROUP BY r.id
 		ORDER BY freq DESC
 		LIMIT ?
-	`).all(weekday, mealType, limit) as Recipe[];
+	`).all(weekday, mealType, isAcc ? 1 : 0, isAcc ? 1 : 0, slotRecipeTag(mealType, isAcc), limit) as Recipe[];
 }
 
-export function getTopRecipesOverall(mealType: string, limit = DEFAULT_TOP_OVERALL_LIMIT): (Recipe & { freq: number })[] {
+export function getTopRecipesOverall(mealType: string, limit = DEFAULT_TOP_OVERALL_LIMIT, isAcc = 0): (Recipe & { freq: number })[] {
 	const db = getDb();
 	return db.prepare(`
 		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at, COUNT(*) as freq
 		FROM week_plans wp
 		JOIN recipes r ON r.id = wp.recipe_id
-		WHERE wp.meal_type = ? AND wp.is_accompaniment = 0
+		WHERE wp.meal_type = ? AND wp.is_accompaniment = ?
+			AND (? = 0 OR (',' || REPLACE(LOWER(r.tags), ', ', ',') || ',' LIKE '%,' || LOWER(?) || ',%'))
 		GROUP BY r.id
 		ORDER BY freq DESC
 		LIMIT ?
-	`).all(mealType, limit) as (Recipe & { freq: number })[];
+	`).all(mealType, isAcc ? 1 : 0, isAcc ? 1 : 0, slotRecipeTag(mealType, isAcc), limit) as (Recipe & { freq: number })[];
 }
 
-export function getRecentRecipesForSlot(weekday: number, mealType: string, limit = DEFAULT_RECENT_LIMIT): (Recipe & { last_week: string | null })[] {
+export function getRecentRecipesForSlot(weekday: number, mealType: string, limit = DEFAULT_RECENT_LIMIT, isAcc = 0): (Recipe & { last_week: string | null })[] {
 	const db = getDb();
 	return db.prepare(`
 		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at,
@@ -121,26 +128,26 @@ export function getRecentRecipesForSlot(weekday: number, mealType: string, limit
 		LEFT JOIN week_plans wp ON wp.recipe_id = r.id
 		                       AND wp.weekday = ?
 		                       AND wp.meal_type = ?
-		                       AND wp.is_accompaniment = 0
+		                       AND wp.is_accompaniment = ?
 		WHERE (',' || REPLACE(LOWER(r.tags), ', ', ',') || ',' LIKE '%,' || LOWER(?) || ',%')
 		GROUP BY r.id
 		HAVING last_week IS NOT NULL
 		ORDER BY last_week DESC
 		LIMIT ?
-	`).all(weekday, mealType, mealType, limit) as (Recipe & { last_week: string | null })[];
+	`).all(weekday, mealType, isAcc ? 1 : 0, slotRecipeTag(mealType, isAcc), limit) as (Recipe & { last_week: string | null })[];
 }
 
-export function getOldestPlannedRecipes(mealType: string, limit = DEFAULT_RECENT_LIMIT): (Recipe & { last_week: string | null })[] {
+export function getOldestPlannedRecipes(mealType: string, limit = DEFAULT_RECENT_LIMIT, isAcc = 0): (Recipe & { last_week: string | null })[] {
 	const db = getDb();
 	return db.prepare(`
 		SELECT r.id, r.name, r.description, r.tags, r.min_days, r.image_type, r.created_at, MAX(wp.week_key) as last_week
 		FROM recipes r
-		LEFT JOIN week_plans wp ON wp.recipe_id = r.id AND wp.meal_type = ? AND wp.is_accompaniment = 0
+		LEFT JOIN week_plans wp ON wp.recipe_id = r.id AND wp.meal_type = ? AND wp.is_accompaniment = ?
 		WHERE (',' || REPLACE(LOWER(r.tags), ', ', ',') || ',' LIKE '%,' || LOWER(?) || ',%')
 		GROUP BY r.id
 		ORDER BY last_week ASC NULLS FIRST
 		LIMIT ?
-	`).all(mealType, mealType, limit) as (Recipe & { last_week: string | null })[];
+	`).all(mealType, isAcc ? 1 : 0, slotRecipeTag(mealType, isAcc), limit) as (Recipe & { last_week: string | null })[];
 }
 
 export function getRecipesPlannedNearDate(targetDate: Date, daysBack = 7): Recipe[] {

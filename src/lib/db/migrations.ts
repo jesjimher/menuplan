@@ -361,8 +361,63 @@ const MIGRATIONS: Migration[] = [
 		name: 'independent_meal_slots',
 		// Huecos independientes con vigencia (meal_slots) en lugar de contador + posiciones
 		up: (db) => migrateToMealSlots(db)
+	},
+	{
+		version: 20,
+		name: 'independent_accompaniments',
+		// Los acompañamientos dejan de colgar de un plato: todos son de la comida
+		up: (db) => migrateIndependentAccompaniments(db)
 	}
 ];
+
+/**
+ * Migración 20: borra `meal_slots.parent_slot_id`. Antes, borrarla:
+ *   - guarda en week_plan_people las personas que un acompañamiento sin personas heredaba (solo
+ *     en pantalla) del plato del que colgaba, para que siga siendo para las mismas;
+ *   - renumera `position` de los acompañamientos de cada comida en una sola serie: primero los
+ *     que colgaban de un plato (por el orden de su plato) y luego los de toda la comida.
+ */
+export function migrateIndependentAccompaniments(db: Database.Database): void {
+	if (!tableExists(db, 'meal_slots') || !columnExists(db, 'meal_slots', 'parent_slot_id')) return;
+
+	if (tableExists(db, 'week_plan_people') && tableExists(db, 'week_plans')) {
+		db.exec(`
+			INSERT OR IGNORE INTO week_plan_people (week_plan_id, person_id)
+			SELECT a.id, pp.person_id
+			FROM week_plans a
+			JOIN meal_slots v ON v.slot_id = a.slot_id
+				AND v.effective_from <= a.week_key AND (v.effective_to IS NULL OR v.effective_to >= a.week_key)
+			JOIN week_plans m ON m.week_key = a.week_key AND m.slot_id = v.parent_slot_id
+			JOIN week_plan_people pp ON pp.week_plan_id = m.id
+			WHERE a.is_accompaniment = 1 AND v.parent_slot_id IS NOT NULL
+				AND NOT EXISTS (SELECT 1 FROM week_plan_people x WHERE x.week_plan_id = a.id)
+		`);
+	}
+
+	const accs = db.prepare(`
+		SELECT s.slot_id, s.weekday, s.meal_type, MIN(s.position) AS pos, MIN(s.parent_slot_id) AS parent,
+			(SELECT MIN(p.position) FROM meal_slots p WHERE p.slot_id = MIN(s.parent_slot_id)) AS parent_pos
+		FROM meal_slots s WHERE s.kind = 'acc'
+		GROUP BY s.slot_id
+	`).all() as { slot_id: number; weekday: number; meal_type: string; pos: number; parent: number | null; parent_pos: number | null }[];
+	const byMeal = new Map<string, typeof accs>();
+	for (const a of accs) {
+		const key = `${a.weekday}-${a.meal_type}`;
+		byMeal.set(key, [...(byMeal.get(key) ?? []), a]);
+	}
+	const setPos = db.prepare('UPDATE meal_slots SET position = ? WHERE slot_id = ?');
+	for (const list of byMeal.values()) {
+		const key = (a: (typeof accs)[number]) => [a.parent === null ? 1 : 0, a.parent_pos ?? 0, a.pos, a.slot_id];
+		list.sort((a, b) => {
+			const ka = key(a), kb = key(b);
+			for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
+			return 0;
+		});
+		list.forEach((a, i) => setPos.run(i, a.slot_id));
+	}
+
+	db.exec('ALTER TABLE meal_slots DROP COLUMN parent_slot_id');
+}
 
 /** `upTo` limita hasta qué versión se aplica (solo para tests de migraciones intermedias). */
 export function runMigrations(db: Database.Database, upTo = Infinity): void {

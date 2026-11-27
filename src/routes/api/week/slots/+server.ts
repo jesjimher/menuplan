@@ -7,7 +7,7 @@ import { addSlotBodySchema } from '$lib/schemas/index.js';
 export async function POST({ request }) {
 	const body = await parseBody(request, addSlotBodySchema);
 	try {
-		const slot_id = addSlot(body.weekKey, body.weekday, body.meal_type, body.kind, body.parent_id ?? null, body.tags ?? []);
+		const slot_id = addSlot(body.weekKey, body.weekday, body.meal_type, body.kind, body.tags ?? []);
 		return json({ ok: true, slot_id });
 	} catch (e) {
 		throw error(400, (e as Error).message);

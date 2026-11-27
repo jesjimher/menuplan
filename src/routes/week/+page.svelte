@@ -662,14 +662,14 @@
 	}
 
 	/** Añade un hueco (rige desde esta semana). Si la comida estaba desactivada, la reactiva. */
-	async function addMealSlot(weekday: number, mealType: string, kind: 'main' | 'acc', parentId: number | null) {
+	async function addMealSlot(weekday: number, mealType: string, kind: 'main' | 'acc') {
 		const cfg = getDayConfig(weekday, mealType as 'comida' | 'cena');
 		if (cfg.disabled) {
 			if (!(await postConfig({ weekday, meal_type: mealType, disabled: false, disabled_comment: null }))) return;
 			// Reactivar una comida que aún tiene platos no añade otro
 			if (kind === 'main' && cfg.slots.some(s => s.kind === 'main')) { await invalidateAll(); return; }
 		}
-		await postSlots('', { weekday, meal_type: mealType, kind, parent_id: parentId });
+		await postSlots('', { weekday, meal_type: mealType, kind });
 		await invalidateAll();
 	}
 
@@ -745,24 +745,14 @@
 
 	// --- Personas por hueco ---
 
-	/** Plato del que cuelga un acompañamiento (null si es de toda la comida). */
-	function parentMainId(weekday: number, mealType: string, accId: number): number | null {
-		return getDayConfig(weekday, mealType as 'comida' | 'cena').slots.find(s => s.id === accId)?.parent_id ?? null;
-	}
-
-	/** Para quién es la receta: la suya o, si es un acompañamiento sin personas, las de su plato. */
-	function slotPeopleInfo(weekday: number, mealType: string, slotId: number, isAcc: number): { ids: number[]; inherited: boolean } {
-		const own = getSlot(weekday, mealType, slotId, isAcc)?.people ?? [];
-		if (own.length > 0 || !isAcc) return { ids: own, inherited: false };
-		const parent = parentMainId(weekday, mealType, slotId);
-		if (parent === null) return { ids: [], inherited: false };
-		const parentSlot = getSlot(weekday, mealType, parent, 0);
-		return { ids: parentSlot?.recipe ? parentSlot.people : [], inherited: true };
+	/** Para quién es la receta del hueco (vacío = para todos). */
+	function slotPeopleIds(weekday: number, mealType: string, slotId: number, isAcc: number): number[] {
+		return getSlot(weekday, mealType, slotId, isAcc)?.people ?? [];
 	}
 
 	function isSlotHidden(weekday: number, mealType: string, slotId: number, isAcc: number): boolean {
 		if (viewPerson === null || !getSlot(weekday, mealType, slotId, isAcc)?.recipe) return false;
-		const { ids } = slotPeopleInfo(weekday, mealType, slotId, isAcc);
+		const ids = slotPeopleIds(weekday, mealType, slotId, isAcc);
 		return ids.length > 0 && !ids.includes(viewPerson);
 	}
 
@@ -788,11 +778,6 @@
 		}
 	}
 
-	/** Texto de «sin selección» en el selector de personas del hueco. */
-	function allPeopleLabel(weekday: number, mealType: string, slotId: number, isAcc: number): string {
-		return isAcc && parentMainId(weekday, mealType, slotId) !== null ? 'Como el plato' : 'Todos';
-	}
-
 	// Helpers for creating slot callbacks
 	function makeSlotCallbacks(weekday: number, mealType: string, slotId: number, isAcc: number) {
 		const key = slotKey(weekday, mealType, slotId, isAcc);
@@ -807,6 +792,11 @@
 			...dnd.handlersFor(coord, key, () => !!getSlot(weekday, mealType, slotId, isAcc)?.recipe),
 			onMoveClick: () => {
 				if (moveSource) {
+					if (moveSource.isAcc !== coord.isAcc) {
+						moveSource = null;
+						showError('Un plato no se puede mover a un acompañamiento ni al revés');
+						return;
+					}
 					moveCopySource = moveSource;
 					moveCopyTarget = coord;
 					moveCopyModalOpen = true;
@@ -1012,17 +1002,17 @@
 								isMoveMode={!!moveSource}
 								{dnd}
 								slotSchedules={schedulesPerMeal[`${weekday}-${meal}-0`] ?? []}
+								accSlotSchedules={schedulesPerMeal[`${weekday}-${meal}-1`] ?? []}
 								{getSlot}
 								{slotKey}
 								{makeSlotCallbacks}
 								{people}
-								{slotPeopleInfo}
+								{slotPeopleIds}
 								{isSlotHidden}
-								onAddMealSlot={(kind, parentId) => addMealSlot(weekday, meal, kind, parentId)}
+								onAddMealSlot={(kind) => addMealSlot(weekday, meal, kind)}
 								onRemoveMealSlot={(slotId) => removeMealSlot(weekday, meal, slotId)}
 								onSetDisabledComment={(t) => setDisabledComment(weekday, meal, t)}
 								onSetMealNote={(t) => setMealNote(weekday, meal, t)}
-								onOpenPicker={(slotId, isAcc) => openRecipePicker(weekday, meal, slotId, isAcc)}
 								onRemoveSlot={(slotId, isAcc) => removeSlot(weekday, meal, slotId, isAcc)}
 							/>
 						{/each}
@@ -1050,7 +1040,6 @@
 			{people}
 			initialPeople={getSlot(pickerSlot.weekday, pickerSlot.mealType, pickerSlot.slotId, pickerSlot.isAcc)?.people
 				?? (viewPerson !== null ? [viewPerson] : [])}
-			allPeopleLabel={allPeopleLabel(pickerSlot.weekday, pickerSlot.mealType, pickerSlot.slotId, pickerSlot.isAcc)}
 			onPeopleChange={getSlot(pickerSlot.weekday, pickerSlot.mealType, pickerSlot.slotId, pickerSlot.isAcc)?.recipe
 				? (ids) => setSlotPeople(pickerSlot!.weekday, pickerSlot!.mealType, pickerSlot!.slotId, pickerSlot!.isAcc, ids)
 				: undefined}
@@ -1071,7 +1060,6 @@
 				recipeName={psSlot.recipe.name}
 				{people}
 				value={psSlot.people}
-				allLabel={allPeopleLabel(ps.weekday, ps.mealType, ps.slotId, ps.isAcc)}
 				hint={psSlot.schedule ? 'Receta programada: el cambio solo afecta a esta semana. Para todas, edita la programación.' : undefined}
 				onchange={(ids) => setSlotPeople(ps.weekday, ps.mealType, ps.slotId, ps.isAcc, ids)}
 				onClose={() => peopleSlot = null}
@@ -1192,6 +1180,8 @@
 		.week-grid {
 			display: flex;
 			flex-wrap: nowrap;
+			/* Cada día con su altura: si no, se estira al día más alto y el plato se come el hueco */
+			align-items: flex-start;
 			gap: 0;
 			transform: translateX(var(--day-offset-px, 0px));
 			transition: transform 0.28s ease;

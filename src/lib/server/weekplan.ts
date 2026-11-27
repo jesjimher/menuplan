@@ -19,20 +19,11 @@ interface WeekPlanRow {
 /**
  * Orden en que una programación prueba los huecos de su tipo: primero los que tienen tags y la
  * receta los cumple, luego los que no tienen tags y por último los que la receta no cumple.
- * Los acompañamientos prefieren los de toda la comida a los que cuelgan de un plato.
  */
-function rankForSchedule(slots: MealSlot[], all: MealSlot[], recipeTags: string): MealSlot[] {
+function rankForSchedule(slots: MealSlot[], recipeTags: string): MealSlot[] {
 	const tags = parseTags(recipeTags);
-	const mainPos = new Map(all.filter(s => s.kind === 'main').map(s => [s.id, s.position]));
 	const tagRank = (s: MealSlot) => s.tags.length === 0 ? 1 : s.tags.every(t => tags.includes(t)) ? 0 : 2;
-	const key = (s: MealSlot): number[] => s.kind === 'acc'
-		? [s.parent_id === null ? 0 : 1, tagRank(s), s.parent_id === null ? 0 : (mainPos.get(s.parent_id) ?? 0), s.position, s.id]
-		: [tagRank(s), s.position, s.id];
-	return [...slots].sort((a, b) => {
-		const ka = key(a), kb = key(b);
-		for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
-		return 0;
-	});
+	return [...slots].sort((a, b) => tagRank(a) - tagRank(b) || a.position - b.position || a.id - b.id);
 }
 
 export function getWeekData(weekKey: string): WeekData {
@@ -51,7 +42,6 @@ export function getWeekData(weekKey: string): WeekData {
 
 	// Huecos vigentes por comida
 	const slotRows = getSlotRowsForWeek(weekKey);
-	const vigentes = new Set(slotRows.map(r => r.slot_id));
 	const slotsByMeal = new Map<string, MealSlot[]>();
 	for (const r of slotRows) {
 		const key = `${r.weekday}-${r.meal_type}`;
@@ -59,8 +49,6 @@ export function getWeekData(weekKey: string): WeekData {
 		list.push({
 			id: r.slot_id,
 			kind: r.kind,
-			// Un acompañamiento cuyo plato no existe esa semana se muestra como de toda la comida
-			parent_id: r.parent_slot_id !== null && vigentes.has(r.parent_slot_id) ? r.parent_slot_id : null,
 			position: r.position,
 			tags: parseTags(r.tags)
 		});
@@ -137,7 +125,7 @@ export function getWeekData(weekKey: string): WeekData {
 			origin_schedule_id: null
 		});
 
-		const ranked = rankForSchedule(cfg.slots.filter(s => s.kind === kind && !s.virtual), cfg.slots, sched.recipe.tags);
+		const ranked = rankForSchedule(cfg.slots.filter(s => s.kind === kind && !s.virtual), sched.recipe.tags);
 		const free = ranked.find(s => !bySlot.has(s.id));
 		if (free) {
 			bySlot.set(free.id, placed(free.id));
@@ -148,8 +136,8 @@ export function getWeekData(weekKey: string): WeekData {
 		} else if (sched.on_conflict === 'add') {
 			// Hueco extra solo esta semana, detrás de los demás de su tipo
 			const id = -sched.id;
-			const maxPos = cfg.slots.filter(s => s.kind === kind && s.parent_id === null).reduce((m, s) => Math.max(m, s.position), -1);
-			cfg.slots = [...cfg.slots, { id, kind, parent_id: null, position: maxPos + 1, tags: [], virtual: true }];
+			const maxPos = cfg.slots.filter(s => s.kind === kind).reduce((m, s) => Math.max(m, s.position), -1);
+			cfg.slots = [...cfg.slots, { id, kind, position: maxPos + 1, tags: [], virtual: true }];
 			bySlot.set(id, placed(id));
 		}
 		// on_conflict === 'skip': no hacer nada si la comida está llena

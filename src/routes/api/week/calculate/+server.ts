@@ -21,14 +21,11 @@ export async function POST({ request }) {
 				.filter(s => s.weekday === weekday && s.meal_type === mealType && s.recipe)
 				.map(s => s.slot_id));
 			const push = (slotId: number, isAcc: number, tags: string[]) => {
-				if (!filled.has(slotId)) slotsToFill.push({ weekday, meal_type: mealType, slot_id: slotId, is_accompaniment: isAcc, required_tags: isAcc ? [] : tags });
+				if (!filled.has(slotId)) slotsToFill.push({ weekday, meal_type: mealType, slot_id: slotId, is_accompaniment: isAcc, required_tags: tags });
 			};
-			// Cada plato seguido de sus acompañamientos; al final los de toda la comida
-			for (const main of cfg.slots.filter(s => s.kind === 'main' && !s.virtual)) {
-				push(main.id, 0, main.tags);
-				for (const acc of cfg.slots.filter(s => s.kind === 'acc' && s.parent_id === main.id)) push(acc.id, 1, acc.tags);
-			}
-			for (const acc of cfg.slots.filter(s => s.kind === 'acc' && s.parent_id === null && !s.virtual)) push(acc.id, 1, acc.tags);
+			// Primero los platos y luego los acompañamientos
+			for (const main of cfg.slots.filter(s => s.kind === 'main' && !s.virtual)) push(main.id, 0, main.tags);
+			for (const acc of cfg.slots.filter(s => s.kind === 'acc' && !s.virtual)) push(acc.id, 1, acc.tags);
 		}
 	}
 

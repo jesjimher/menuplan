@@ -69,8 +69,8 @@ export function calculatePlan(weekKey: string, slotsToFill: SlotToFill[], curren
 				candidates = fillCandidates(slot, allRecipes, options, rules, tagCounts, personIds, weekKey, lastWeekByRecipe, currentWeekIdx, true);
 			}
 
-			// Filtro de required_tags (AND condition, solo platos principales)
-			if (!slot.is_accompaniment && slot.required_tags && slot.required_tags.length > 0) {
+			// Filtro de required_tags (AND condition)
+			if (slot.required_tags && slot.required_tags.length > 0) {
 				const rts = slot.required_tags.map(t => t.trim().toLowerCase());
 				const filtered = candidates.filter(r => {
 					const recipeTags = parseTags(r.tags);

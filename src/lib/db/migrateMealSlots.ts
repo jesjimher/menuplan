@@ -130,6 +130,10 @@ export function migrateToMealSlots(db: Database.Database): void {
 			tags           TEXT    NOT NULL DEFAULT ''
 		);
 	`);
+	// La migración 20 borra parent_slot_id y el SCHEMA base ya no la crea; esta migración aún la usa
+	if (!columnExists(db, 'meal_slots', 'parent_slot_id')) {
+		db.exec('ALTER TABLE meal_slots ADD COLUMN parent_slot_id INTEGER DEFAULT NULL');
+	}
 	const hasPlansTable = tableExists(db, 'week_plans');
 	const legacyPlans = columnExists(db, 'week_plans', 'slot_index');
 	const hasSlots = (db.prepare('SELECT COUNT(*) AS n FROM meal_slots').get() as { n: number }).n > 0;

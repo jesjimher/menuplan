@@ -137,20 +137,13 @@ describe('huecos con vigencia (meal_slots)', () => {
 		expect(mains(wk(-4))).toHaveLength(1);
 	});
 
-	it('los acompañamientos de un plato desaparecen con él', () => {
+	it('quitar un plato no toca los acompañamientos', () => {
 		const plato = mainSlot(WEEK, 1, 'comida');
-		const acc = addSlot(WEEK, 1, 'comida', 'acc', plato);
-		const general = accSlot(WEEK, 1, 'comida');
-		const cfg = getWeekData(WEEK).configs[1].comida;
-		expect(cfg.slots.find(s => s.id === acc)?.parent_id).toBe(plato);
+		const a1 = accSlot(WEEK, 1, 'comida', 0);
+		const a2 = accSlot(WEEK, 1, 'comida', 1);
 		removeSlot(WEEK, plato);
 		const left = getWeekData(WEEK).configs[1].comida.slots.map(s => s.id);
-		expect(left).toEqual([general]);
-	});
-
-	it('un acompañamiento no puede colgar de un plato que no existe esa semana', () => {
-		const plato = addSlot(WEEK, 1, 'comida', 'main');
-		expect(() => addSlot(PREV, 1, 'comida', 'acc', plato)).toThrow();
+		expect(left).toEqual([a1, a2]);
 	});
 });
 
@@ -290,11 +283,10 @@ describe('programaciones sobre huecos', () => {
 		expect(mains(NEXT).map(s => s.id)).not.toContain(real);
 	});
 
-	it('un acompañamiento programado prefiere los de toda la comida', () => {
+	it('un acompañamiento programado ocupa el primer acompañamiento libre', () => {
 		const ensalada = seedRecipe('Ensalada', 'acompañamiento');
-		const plato = mainSlot(WEEK, 1, 'comida');
-		addSlot(WEEK, 1, 'comida', 'acc', plato);
-		const general = accSlot(WEEK, 1, 'comida');
+		const general = accSlot(WEEK, 1, 'comida', 0);
+		accSlot(WEEK, 1, 'comida', 1);
 		upsertSchedule(ensalada.id, 1, 'comida', 1, 1, WEEK, 'skip', 5);
 		const accSlots = getWeekData(WEEK).slots.filter(s => s.is_accompaniment === 1);
 		expect(accSlots).toHaveLength(1);

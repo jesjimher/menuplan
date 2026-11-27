@@ -52,7 +52,6 @@ CREATE TABLE IF NOT EXISTS meal_slots (
     weekday        INTEGER NOT NULL,
     meal_type      TEXT    NOT NULL,
     kind           TEXT    NOT NULL CHECK(kind IN ('main','acc')),
-    parent_slot_id INTEGER DEFAULT NULL,
     effective_from TEXT    NOT NULL,
     effective_to   TEXT    DEFAULT NULL,
     position       INTEGER NOT NULL DEFAULT 0,

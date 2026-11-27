@@ -40,7 +40,6 @@
 		onTouchEnd,
 		onTouchMove,
 		onDeleteSlot,
-		onAddAccompaniment,
 		schedule,
 		slotSchedules = [],
 		onSchedule,
@@ -48,7 +47,6 @@
 		// Personas
 		people = [],
 		slotPeople = [],
-		peopleInherited = false,
 		onOpenPeople,
 	}: {
 		weekday: number;
@@ -85,17 +83,14 @@
 		onTouchMove: () => void;
 		/** Quitar el hueco (no solo su receta). */
 		onDeleteSlot?: () => void;
-		/** Añadir un acompañamiento que cuelgue de este plato. */
-		onAddAccompaniment?: () => void;
 		schedule?: ScheduleWithRecipe | null;
 		slotSchedules?: ScheduleWithRecipe[];
 		onSchedule?: () => void;
 		onEdit?: () => void;
 		/** Personas activas. */
 		people?: Person[];
-		/** Para quién es la receta (las propias o, en acompañamientos, las heredadas del plato). */
+		/** Para quién es la receta (vacío = para todos). */
 		slotPeople?: number[];
-		peopleInherited?: boolean;
 		onOpenPeople?: () => void;
 	} = $props();
 
@@ -146,7 +141,6 @@
 	const menuButtons = $derived.by(() => {
 		const items: { type: string }[] = [];
 		if (editingTagKey !== slotTagEditKey) items.push({ type: 'tag' });
-		if (onAddAccompaniment) items.push({ type: 'acc' });
 		items.push({ type: 'random' });
 		if (slot?.recipe && onSchedule) items.push({ type: 'schedule' });
 		if (canSetPeople) items.push({ type: 'people' });
@@ -165,76 +159,304 @@
 	<svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
 {/snippet}
 
-{#if isAcc}
-	<!-- Accompaniment slot -->
-	<div class="dropdown-container relative mt-1.5"
-		style:box-shadow={isDragOver ? '0 0 0 2px var(--primary)' : undefined}
-		style:outline={isMoveMode ? '2px dashed var(--primary)' : undefined}
-		style:outline-offset={isMoveMode ? '2px' : undefined}
-		on:dragover|preventDefault={onDragOver}
-		on:dragleave={onDragLeave}
-		on:drop|preventDefault={(e) => onDrop(e)}
+{#snippet scheduleBadge(pos = 'top-1.5 left-1.5')}
+	{#if slot?.recipe && schedule && onSchedule}
+		<button
+			on:click|stopPropagation={onSchedule}
+			class="absolute {pos} z-10 flex items-center justify-center rounded-full transition-opacity hover:opacity-100 {slotSchedules.length > 1 ? 'px-1.5 h-5 gap-0.5' : 'w-5 h-5'}"
+			style="background: var(--primary); color: white; opacity: 0.85;"
+			title={scheduleTooltip}
+			aria-label="Editar programación"
+		>
+			<svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+				<rect x="3" y="4" width="18" height="18" rx="2"/>
+				<line x1="16" y1="2" x2="16" y2="6"/>
+				<line x1="8" y1="2" x2="8" y2="6"/>
+				<line x1="3" y1="10" x2="21" y2="10"/>
+			</svg>
+			{#if slotSchedules.length > 1}
+				<span class="text-[9px] font-black leading-none">{slotSchedules.length}</span>
+			{/if}
+		</button>
+	{:else if slotSchedules.length > 1}
+		<div
+			class="absolute {pos} z-10 px-1.5 h-5 flex items-center justify-center gap-0.5 rounded-full"
+			style="background: var(--surface-container-highest); color: var(--text-muted); opacity: 0.8;"
+			title={scheduleTooltip}
+		>
+			<svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+				<rect x="3" y="4" width="18" height="18" rx="2"/>
+				<line x1="16" y1="2" x2="16" y2="6"/>
+				<line x1="8" y1="2" x2="8" y2="6"/>
+				<line x1="3" y1="10" x2="21" y2="10"/>
+			</svg>
+			<span class="text-[9px] font-black leading-none">{slotSchedules.length}</span>
+		</div>
+	{/if}
+{/snippet}
+
+{#snippet slotMenu()}
+	<!-- Backdrop para cerrar el menú al tocar fuera (solo en móvil vía CSS) -->
+	{#if menuOpen}
+		<button
+			class="menu-backdrop fixed inset-0 z-[98] cursor-default"
+			on:click|stopPropagation={closeMenu}
+			tabindex="-1"
+			aria-hidden="true"
+		></button>
+	{/if}
+
+	<!-- Contenedor del trigger + menú -->
+	<div
+		class="absolute right-1.5 top-1/2 -translate-y-1/2 z-[99]"
+		on:mouseenter={() => { if (!isTouchDevice) openMenu(); }}
+		on:mouseleave={() => { if (!isTouchDevice) closeMenuDelayed(); }}
 	>
-		<div class="relative group/acc">
-			<button
-				draggable={!isTouchDevice && !!slot?.recipe ? 'true' : 'false'}
-				class:opacity-40={isDragSource}
-				on:click|stopPropagation={onMoveClick}
-				on:dragstart={onDragStart}
-				on:dragend={onDragEnd}
-				on:touchstart|passive={onTouchStart}
-				on:touchend={onTouchEnd}
-				on:touchmove={onTouchMove}
-				on:contextmenu|preventDefault={() => {}}
-				class="w-full text-left text-xs transition-colors select-none pr-6 px-2 py-1.5 rounded-lg empty-accompaniment {slot?.recipe ? 'has-recipe filled-accompaniment' : ''}"
-				style="{slot?.recipe
-					? `background: var(--secondary-container); color: var(--secondary);`
-					: `background: transparent; border: 1px dashed var(--border); color: var(--text-muted);`}"
-			>
-				<span class="flex items-center gap-1.5">
-					<span class="flex-1 leading-snug {slot?.recipe ? 'font-semibold' : 'italic'}">
-						{slot?.recipe?.name ?? 'Elegir acompañamiento'}
-					</span>
-					{#if slot?.recipe && people.length > 0}
-						<span class="shrink-0 inline-flex" class:opacity-50={peopleInherited}>
-							<PeopleAvatars {people} ids={slotPeople} size={16} max={3} />
-						</span>
-					{/if}
-				</span>
-			</button>
-			{#if slot?.recipe || onDeleteSlot}
-				<div class="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/acc:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity flex gap-1">
-					{#if canSetPeople}
+		<!-- Móvil: columna vertical a la izquierda del trigger -->
+		{#if menuOpen}
+			<div class="vert-menu">
+				{#each menuButtons as btn}
+					{#if btn.type === 'tag'}
 						<button
-							on:click|stopPropagation={onOpenPeople}
-							class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors"
-							style="background: rgba(255,255,255,0.9); color: var(--primary);"
+							on:click|stopPropagation={() => { onSetEditingTag(slotTagEditKey); closeMenu(); }}
+							class="vert-btn slot-action-btn"
+							aria-label="Añadir tag requerido"
+						><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 shrink-0"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg><span>Añadir tag</span></button>
+
+					{:else if btn.type === 'random'}
+						<button
+							on:click|stopPropagation={() => { onRandom(); closeMenu(); }}
+							disabled={isBusy}
+							class="vert-btn slot-action-btn disabled:opacity-40 disabled:cursor-wait"
+							aria-label="Receta aleatoria"
+						><span class="shrink-0 text-sm">{isBusy ? '...' : '↻'}</span><span>Aleatoria</span></button>
+
+					{:else if btn.type === 'schedule'}
+						<button
+							on:click|stopPropagation={() => { onSchedule?.(); closeMenu(); }}
+							class="vert-btn slot-action-btn"
+							class:schedule-active={!!schedule}
+							aria-label="Programar receta periódica"
+						>
+							<svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<rect x="3" y="4" width="18" height="18" rx="2"/>
+								<line x1="16" y1="2" x2="16" y2="6"/>
+								<line x1="8" y1="2" x2="8" y2="6"/>
+								<line x1="3" y1="10" x2="21" y2="10"/>
+							</svg>
+							<span>{schedule ? `Cada ${schedule.every_n_weeks} sem.` : 'Programar'}</span>
+						</button>
+
+					{:else if btn.type === 'people'}
+						<button
+							on:click|stopPropagation={() => { onOpenPeople?.(); closeMenu(); }}
+							class="vert-btn slot-action-btn"
 							aria-label="Para quién"
-							title="Para quién"
-						>{@render usersIcon('w-3 h-3')}</button>
-					{/if}
-					{#if slot?.recipe}
+						>{@render usersIcon('w-3.5 h-3.5 shrink-0')}<span>Para quién</span></button>
+
+					{:else if btn.type === 'edit'}
 						<button
-							on:click|stopPropagation={onRemove}
-							class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors text-xs"
-							style="background: rgba(255,255,255,0.9); color: var(--error);"
+							on:click|stopPropagation={() => { onEdit?.(); closeMenu(); }}
+							class="vert-btn slot-action-btn"
+							aria-label="Editar receta"
+						><svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg><span>Editar</span></button>
+
+					{:else if btn.type === 'remove'}
+						<button
+							on:click|stopPropagation={() => { onRemove(); closeMenu(); }}
+							class="vert-btn slot-action-btn-danger"
 							aria-label="Quitar receta"
-							title="Quitar receta"
-						>&times;</button>
+						><span class="shrink-0 text-sm font-bold">&times;</span><span>Quitar</span></button>
 					{/if}
-					{#if onDeleteSlot}
-						<button
-							on:click|stopPropagation={onDeleteSlot}
-							class="w-5 h-5 flex items-center justify-center rounded-full shadow-sm transition-colors"
-							style="background: var(--error); color: white;"
-							aria-label="Eliminar acompañamiento"
-							title="Eliminar este acompañamiento"
-						><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
-					{/if}
-				</div>
+				{/each}
+			</div>
+		{/if}
+
+		<!-- Escritorio: botones circulares -->
+		{#each menuButtons as btn, i}
+				{#if btn.type === 'tag'}
+					<button
+						on:click|stopPropagation={() => { onSetEditingTag(slotTagEditKey); closeMenu(); }}
+						on:mouseenter={() => clearTimeout(closeTimer)}
+						class="circ-btn slot-action-btn"
+						class:circ-open={menuOpen}
+						style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
+						aria-label="Añadir tag requerido"
+					><span class="btn-label">Añadir tag</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg></button>
+
+				{:else if btn.type === 'random'}
+					<button
+						on:click|stopPropagation={() => { onRandom(); closeMenu(); }}
+						on:mouseenter={() => clearTimeout(closeTimer)}
+						disabled={isBusy}
+						class="circ-btn slot-action-btn disabled:opacity-40 disabled:cursor-wait"
+						class:circ-open={menuOpen}
+						style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
+						aria-label="Receta aleatoria"
+					><span class="btn-label">Aleatoria</span><span>{isBusy ? '...' : '↻'}</span></button>
+
+				{:else if btn.type === 'schedule'}
+					<button
+						on:click|stopPropagation={() => { onSchedule?.(); closeMenu(); }}
+						on:mouseenter={() => clearTimeout(closeTimer)}
+						class="circ-btn slot-action-btn"
+						class:circ-open={menuOpen}
+						class:schedule-active={!!schedule}
+						style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
+						aria-label="Programar receta periódica"
+					>
+						<span class="btn-label">{schedule ? `Cada ${schedule.every_n_weeks} sem.` : 'Programar'}</span>
+						<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<rect x="3" y="4" width="18" height="18" rx="2"/>
+							<line x1="16" y1="2" x2="16" y2="6"/>
+							<line x1="8" y1="2" x2="8" y2="6"/>
+							<line x1="3" y1="10" x2="21" y2="10"/>
+						</svg>
+					</button>
+
+				{:else if btn.type === 'people'}
+					<button
+						on:click|stopPropagation={() => { onOpenPeople?.(); closeMenu(); }}
+						on:mouseenter={() => clearTimeout(closeTimer)}
+						class="circ-btn slot-action-btn"
+						class:circ-open={menuOpen}
+						style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
+						aria-label="Para quién"
+					><span class="btn-label">Para quién</span>{@render usersIcon('w-3.5 h-3.5')}</button>
+
+				{:else if btn.type === 'edit'}
+					<button
+						on:click|stopPropagation={() => { onEdit?.(); closeMenu(); }}
+						on:mouseenter={() => clearTimeout(closeTimer)}
+						class="circ-btn slot-action-btn"
+						class:circ-open={menuOpen}
+						style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
+						aria-label="Editar receta"
+					><span class="btn-label">Editar</span><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+
+				{:else if btn.type === 'remove'}
+					<button
+						on:click|stopPropagation={() => { onRemove(); closeMenu(); }}
+						on:mouseenter={() => clearTimeout(closeTimer)}
+						class="circ-btn slot-action-btn-danger"
+						class:circ-open={menuOpen}
+						style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
+						aria-label="Quitar receta"
+					><span class="btn-label">Quitar</span><span>&times;</span></button>
+				{/if}
+			{/each}
+
+		<!-- Trigger: tres puntos, visible al hover del slot -->
+		<button
+			on:click|stopPropagation={() => { menuOpen = !menuOpen; }}
+			class="trigger-btn slot-action-btn w-7 h-7 flex items-center justify-center rounded-full opacity-0 group-hover/slot:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity text-base font-bold leading-none"
+			class:trigger-active={menuOpen}
+			aria-label="Opciones"
+			title="Opciones"
+		>⋮</button>
+	</div>
+{/snippet}
+
+{#snippet tagsBlock()}
+	<!-- Tags requeridos del slot -->
+	{#if slotTags.length > 0 || editingTagKey === slotTagEditKey}
+		<div class="mt-1.5 flex flex-wrap gap-1 items-center">
+			{#each slotTags as tag}
+				<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-sm"
+					style="background: var(--secondary-container); color: var(--secondary);">
+					{tag}
+					<button
+						on:click|stopPropagation={() => onRemoveTag(tag)}
+						class="hover:opacity-60 transition-opacity font-bold"
+						aria-label="Quitar tag {tag}"
+						title="Quitar"
+					>&times;</button>
+				</span>
+			{/each}
+			{#if editingTagKey === slotTagEditKey}
+				<TagInput
+					autofocus
+					value=""
+					tags={allTags}
+					placeholder="tag requerido..."
+					class="text-xs"
+					onchange={(v) => onAddTag(v)}
+					onkeydown={(e) => {
+						if (e.key === 'Escape') onSetEditingTag(null);
+						if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+					}}
+				/>
 			{/if}
 		</div>
+	{/if}
+{/snippet}
 
+{#if isAcc}
+	<!-- Acompañamiento: tarjeta horizontal compacta (miniatura + nombre), con las mismas acciones que un plato -->
+	<div class="relative shrink-0">
+		{#if onDeleteSlot}
+			<button
+				on:click|stopPropagation={onDeleteSlot}
+				class="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full z-20 transition-opacity opacity-30 hover:opacity-100"
+				style="background: var(--error); color: white;"
+				aria-label="Eliminar acompañamiento"
+				title="Eliminar este acompañamiento"
+			><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-2.5 h-2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+		{/if}
+		<div class="dropdown-container relative rounded-xl"
+			style:box-shadow={isDragOver ? '0 0 0 2px var(--primary)' : undefined}
+			style:outline={isMoveMode ? '2px dashed var(--primary)' : undefined}
+			style:outline-offset={isMoveMode ? '2px' : undefined}
+			on:dragover|preventDefault={onDragOver}
+			on:dragleave={onDragLeave}
+			on:drop|preventDefault={(e) => onDrop(e)}
+		>
+			<div class="relative group/slot">
+				<button
+					draggable={!isTouchDevice && !!slot?.recipe ? 'true' : 'false'}
+					class:opacity-40={isDragSource}
+					on:click|stopPropagation={onMoveClick}
+					on:dragstart={onDragStart}
+					on:dragend={onDragEnd}
+					on:touchstart|passive={onTouchStart}
+					on:touchend={onTouchEnd}
+					on:touchmove={onTouchMove}
+					on:contextmenu|preventDefault={() => {}}
+					class="w-full text-left select-none flex items-center gap-2 p-1.5 pr-9 rounded-xl {slot?.recipe ? 'acc-filled shadow-sm' : 'acc-empty'}"
+					style="{slot?.recipe
+						? 'background: var(--surface); color: var(--text);'
+						: 'background: var(--surface-container-low); border: 2px dashed var(--border); color: var(--text-muted);'}"
+				>
+					<span class="acc-thumb shrink-0 w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center"
+						style="background: {slot?.recipe ? 'var(--secondary-container)' : 'transparent'}; color: {slot?.recipe ? 'var(--secondary)' : 'var(--text-muted)'};">
+						{#if slot?.recipe?.image_type}
+							<img src="/api/recipes/{slot.recipe.id}/image" alt={slot.recipe.name}
+								loading="lazy" decoding="async"
+								class="w-full h-full object-cover group-hover/slot:scale-105 transition-transform duration-500"
+								on:error={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
+						{:else if slot?.recipe}
+							<!-- Sin imagen: cuenco -->
+							<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8 7c0-1.5 1-2 1-3.5M12 7c0-1.5 1-2 1-3.5M16 7c0-1.5 1-2 1-3.5"/></svg>
+						{:else}
+							<svg class="w-5 h-5 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 4.5v15m7.5-7.5h-15"/></svg>
+						{/if}
+					</span>
+					<span class="flex-1 min-w-0 flex flex-col gap-1">
+						{#if slot?.recipe}
+							<span class="text-xs font-semibold leading-snug line-clamp-2">{slot.recipe.name}</span>
+							{#if people.length > 0}
+								<span class="inline-flex"><PeopleAvatars {people} ids={slotPeople} size={16} max={3} /></span>
+							{/if}
+						{:else}
+							<span class="text-xs font-medium">Elegir acompañamiento</span>
+						{/if}
+					</span>
+				</button>
+				{@render scheduleBadge('top-0.5 left-0.5')}
+				{@render slotMenu()}
+			</div>
+		</div>
+		{@render tagsBlock()}
 	</div>
 {:else}
 	<!-- Main recipe slot -->
@@ -300,39 +522,7 @@
 						</div>
 					{/if}
 				</button>
-				{#if slot?.recipe && schedule && onSchedule}
-					<button
-						on:click|stopPropagation={onSchedule}
-						class="absolute top-1.5 left-1.5 z-10 flex items-center justify-center rounded-full transition-opacity hover:opacity-100 {slotSchedules.length > 1 ? 'px-1.5 h-5 gap-0.5' : 'w-5 h-5'}"
-						style="background: var(--primary); color: white; opacity: 0.85;"
-						title={scheduleTooltip}
-						aria-label="Editar programación"
-					>
-						<svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-							<rect x="3" y="4" width="18" height="18" rx="2"/>
-							<line x1="16" y1="2" x2="16" y2="6"/>
-							<line x1="8" y1="2" x2="8" y2="6"/>
-							<line x1="3" y1="10" x2="21" y2="10"/>
-						</svg>
-						{#if slotSchedules.length > 1}
-							<span class="text-[9px] font-black leading-none">{slotSchedules.length}</span>
-						{/if}
-					</button>
-				{:else if slotSchedules.length > 1}
-					<div
-						class="absolute top-1.5 left-1.5 z-10 px-1.5 h-5 flex items-center justify-center gap-0.5 rounded-full"
-						style="background: var(--surface-container-highest); color: var(--text-muted); opacity: 0.8;"
-						title={scheduleTooltip}
-					>
-						<svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-							<rect x="3" y="4" width="18" height="18" rx="2"/>
-							<line x1="16" y1="2" x2="16" y2="6"/>
-							<line x1="8" y1="2" x2="8" y2="6"/>
-							<line x1="3" y1="10" x2="21" y2="10"/>
-						</svg>
-						<span class="text-[9px] font-black leading-none">{slotSchedules.length}</span>
-					</div>
-				{/if}
+				{@render scheduleBadge()}
 				{#if slot?.recipe && people.length > 0}
 					<button
 						on:click|stopPropagation={() => onOpenPeople?.()}
@@ -341,217 +531,12 @@
 						aria-label="Cambiar para quién es"
 					><PeopleAvatars {people} ids={slotPeople} size={22} /></button>
 				{/if}
-				<!-- Backdrop para cerrar el menú al tocar fuera (solo en móvil vía CSS) -->
-				{#if menuOpen}
-					<button
-						class="menu-backdrop fixed inset-0 z-[98] cursor-default"
-						on:click|stopPropagation={closeMenu}
-						tabindex="-1"
-						aria-hidden="true"
-					></button>
-				{/if}
-
-				<!-- Contenedor del trigger + menú -->
-				<div
-					class="absolute right-1.5 top-1/2 -translate-y-1/2 z-[99]"
-					on:mouseenter={() => { if (!isTouchDevice) openMenu(); }}
-					on:mouseleave={() => { if (!isTouchDevice) closeMenuDelayed(); }}
-				>
-					<!-- Móvil: columna vertical a la izquierda del trigger -->
-					{#if menuOpen}
-						<div class="vert-menu">
-							{#each menuButtons as btn}
-								{#if btn.type === 'tag'}
-									<button
-										on:click|stopPropagation={() => { onSetEditingTag(slotTagEditKey); closeMenu(); }}
-										class="vert-btn slot-action-btn"
-										aria-label="Añadir tag requerido"
-									><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 shrink-0"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg><span>Añadir tag</span></button>
-
-								{:else if btn.type === 'acc'}
-									<button
-										on:click|stopPropagation={() => { onAddAccompaniment?.(); closeMenu(); }}
-										class="vert-btn slot-action-btn"
-										aria-label="Añadir acompañamiento a este plato"
-									><span class="shrink-0 text-sm font-bold">+</span><span>Acompañamiento</span></button>
-
-								{:else if btn.type === 'random'}
-									<button
-										on:click|stopPropagation={() => { onRandom(); closeMenu(); }}
-										disabled={isBusy}
-										class="vert-btn slot-action-btn disabled:opacity-40 disabled:cursor-wait"
-										aria-label="Receta aleatoria"
-									><span class="shrink-0 text-sm">{isBusy ? '...' : '↻'}</span><span>Aleatoria</span></button>
-
-								{:else if btn.type === 'schedule'}
-									<button
-										on:click|stopPropagation={() => { onSchedule?.(); closeMenu(); }}
-										class="vert-btn slot-action-btn"
-										class:schedule-active={!!schedule}
-										aria-label="Programar receta periódica"
-									>
-										<svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-											<rect x="3" y="4" width="18" height="18" rx="2"/>
-											<line x1="16" y1="2" x2="16" y2="6"/>
-											<line x1="8" y1="2" x2="8" y2="6"/>
-											<line x1="3" y1="10" x2="21" y2="10"/>
-										</svg>
-										<span>{schedule ? `Cada ${schedule.every_n_weeks} sem.` : 'Programar'}</span>
-									</button>
-
-								{:else if btn.type === 'people'}
-									<button
-										on:click|stopPropagation={() => { onOpenPeople?.(); closeMenu(); }}
-										class="vert-btn slot-action-btn"
-										aria-label="Para quién"
-									>{@render usersIcon('w-3.5 h-3.5 shrink-0')}<span>Para quién</span></button>
-
-								{:else if btn.type === 'edit'}
-									<button
-										on:click|stopPropagation={() => { onEdit?.(); closeMenu(); }}
-										class="vert-btn slot-action-btn"
-										aria-label="Editar receta"
-									><svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg><span>Editar</span></button>
-
-								{:else if btn.type === 'remove'}
-									<button
-										on:click|stopPropagation={() => { onRemove(); closeMenu(); }}
-										class="vert-btn slot-action-btn-danger"
-										aria-label="Quitar receta"
-									><span class="shrink-0 text-sm font-bold">&times;</span><span>Quitar</span></button>
-								{/if}
-							{/each}
-						</div>
-					{/if}
-
-					<!-- Escritorio: botones circulares -->
-					{#each menuButtons as btn, i}
-							{#if btn.type === 'tag'}
-								<button
-									on:click|stopPropagation={() => { onSetEditingTag(slotTagEditKey); closeMenu(); }}
-									on:mouseenter={() => clearTimeout(closeTimer)}
-									class="circ-btn slot-action-btn"
-									class:circ-open={menuOpen}
-									style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
-									aria-label="Añadir tag requerido"
-								><span class="btn-label">Añadir tag</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg></button>
-
-							{:else if btn.type === 'acc'}
-								<button
-									on:click|stopPropagation={() => { onAddAccompaniment?.(); closeMenu(); }}
-									on:mouseenter={() => clearTimeout(closeTimer)}
-									class="circ-btn slot-action-btn"
-									class:circ-open={menuOpen}
-									style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
-									aria-label="Añadir acompañamiento a este plato"
-								><span class="btn-label">Acompañamiento</span><span class="font-bold">+</span></button>
-
-							{:else if btn.type === 'random'}
-								<button
-									on:click|stopPropagation={() => { onRandom(); closeMenu(); }}
-									on:mouseenter={() => clearTimeout(closeTimer)}
-									disabled={isBusy}
-									class="circ-btn slot-action-btn disabled:opacity-40 disabled:cursor-wait"
-									class:circ-open={menuOpen}
-									style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
-									aria-label="Receta aleatoria"
-								><span class="btn-label">Aleatoria</span><span>{isBusy ? '...' : '↻'}</span></button>
-
-							{:else if btn.type === 'schedule'}
-								<button
-									on:click|stopPropagation={() => { onSchedule?.(); closeMenu(); }}
-									on:mouseenter={() => clearTimeout(closeTimer)}
-									class="circ-btn slot-action-btn"
-									class:circ-open={menuOpen}
-									class:schedule-active={!!schedule}
-									style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
-									aria-label="Programar receta periódica"
-								>
-									<span class="btn-label">{schedule ? `Cada ${schedule.every_n_weeks} sem.` : 'Programar'}</span>
-									<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-										<rect x="3" y="4" width="18" height="18" rx="2"/>
-										<line x1="16" y1="2" x2="16" y2="6"/>
-										<line x1="8" y1="2" x2="8" y2="6"/>
-										<line x1="3" y1="10" x2="21" y2="10"/>
-									</svg>
-								</button>
-
-							{:else if btn.type === 'people'}
-								<button
-									on:click|stopPropagation={() => { onOpenPeople?.(); closeMenu(); }}
-									on:mouseenter={() => clearTimeout(closeTimer)}
-									class="circ-btn slot-action-btn"
-									class:circ-open={menuOpen}
-									style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
-									aria-label="Para quién"
-								><span class="btn-label">Para quién</span>{@render usersIcon('w-3.5 h-3.5')}</button>
-
-							{:else if btn.type === 'edit'}
-								<button
-									on:click|stopPropagation={() => { onEdit?.(); closeMenu(); }}
-									on:mouseenter={() => clearTimeout(closeTimer)}
-									class="circ-btn slot-action-btn"
-									class:circ-open={menuOpen}
-									style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
-									aria-label="Editar receta"
-								><span class="btn-label">Editar</span><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
-
-							{:else if btn.type === 'remove'}
-								<button
-									on:click|stopPropagation={() => { onRemove(); closeMenu(); }}
-									on:mouseenter={() => clearTimeout(closeTimer)}
-									class="circ-btn slot-action-btn-danger"
-									class:circ-open={menuOpen}
-									style="--tx: {btn.tx}px; --ty: {btn.ty}px; --i: {i}"
-									aria-label="Quitar receta"
-								><span class="btn-label">Quitar</span><span>&times;</span></button>
-							{/if}
-						{/each}
-
-					<!-- Trigger: tres puntos, visible al hover del slot -->
-					<button
-						on:click|stopPropagation={() => { menuOpen = !menuOpen; }}
-						class="trigger-btn slot-action-btn w-7 h-7 flex items-center justify-center rounded-full opacity-0 group-hover/slot:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity text-base font-bold leading-none"
-						class:trigger-active={menuOpen}
-						aria-label="Opciones"
-						title="Opciones"
-					>⋮</button>
-				</div>
+				{@render slotMenu()}
 			</div>
 
 		</div>
 
-		<!-- Tags requeridos del slot -->
-		{#if slotTags.length > 0 || editingTagKey === slotTagEditKey}
-			<div class="mt-1.5 flex flex-wrap gap-1 items-center">
-				{#each slotTags as tag}
-					<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-sm"
-						style="background: var(--secondary-container); color: var(--secondary);">
-						{tag}
-						<button
-							on:click|stopPropagation={() => onRemoveTag(tag)}
-							class="hover:opacity-60 transition-opacity font-bold"
-							aria-label="Quitar tag {tag}"
-							title="Quitar"
-						>&times;</button>
-					</span>
-				{/each}
-				{#if editingTagKey === slotTagEditKey}
-					<TagInput
-						autofocus
-						value=""
-						tags={allTags}
-						placeholder="tag requerido..."
-						class="text-xs"
-						onchange={(v) => onAddTag(v)}
-						onkeydown={(e) => {
-							if (e.key === 'Escape') onSetEditingTag(null);
-							if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-						}}
-					/>
-				{/if}
-			</div>
-		{/if}
+		{@render tagsBlock()}
 	</div>
 {/if}
 
@@ -619,19 +604,16 @@
 		font-weight: 500;
 		color: var(--text-muted);
 	}
-	.empty-accompaniment {
+	.acc-empty,
+	.acc-filled {
 		transition: all 0.2s ease;
 	}
-	.empty-accompaniment:hover:not(.has-recipe) {
+	.acc-empty:hover {
 		border-style: solid;
-		box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-		transform: scale(1.01);
+		box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 	}
-	.filled-accompaniment {
-		transition: all 0.2s ease;
-	}
-	.filled-accompaniment:hover {
-		box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+	.acc-filled:hover {
+		box-shadow: 0 6px 16px rgba(0,0,0,0.15);
 		transform: translateY(-1px);
 	}
 	.leftover-badge {

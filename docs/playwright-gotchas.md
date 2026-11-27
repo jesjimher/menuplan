@@ -47,6 +47,8 @@ await browser.close();
 
 **El día seleccionado en la tira de días móvil** se detecta por el estilo inline `background: var(--primary)` **sin** `border` (el día de hoy sin seleccionar tiene `border: 1.5px solid var(--primary)` pero fondo distinto). No hay clase CSS para esto.
 
+**Selector de días móvil:** los días se escriben «Lun», «Mar»… y salen en mayúsculas por CSS, así que `getByText('LUN')` no los encuentra. Seleccionarlos por posición: `page.locator('div.sm\\:hidden > button').nth(weekday - 1)`.
+
 **Orden de los botones `.nav-btn` en la página semana:** `nth(0)`=semana anterior (←), `nth(1)`=Hoy, `nth(2)`=semana siguiente (→), `nth(3)`=Recalcular (oculto en móvil). Usar `nth(2)` para navegar adelante, **no** `nth(1)`.
 
 ## Eventos táctiles

@@ -57,6 +57,8 @@ export class WeekDragDrop {
 			onDragEnd: () => this.reset(),
 			onDragOver: (e: DragEvent) => {
 				if (!this.dragSource) return;
+				// Platos y acompañamientos no se mezclan: sin resaltado y cursor de «no se puede»
+				if (this.dragSource.isAcc !== coord.isAcc) { e.dataTransfer!.dropEffect = 'none'; this.dragOver = null; return; }
 				this.dragModifier = this.ctrlHeld || e.ctrlKey || e.metaKey;
 				e.dataTransfer!.dropEffect = this.dragModifier ? 'copy' : 'move';
 				this.dragOver = key;
@@ -67,6 +69,7 @@ export class WeekDragDrop {
 			onDrop: (e: DragEvent) => {
 				if (!this.dragSource) return;
 				const src = this.dragSource;
+				if (src.isAcc !== coord.isAcc) { this.reset(); return; }
 				const mod = this.ctrlHeld || e.ctrlKey || e.metaKey || this.dragModifier;
 				this.reset();
 				this.#onDropSlot(src, coord, mod);
