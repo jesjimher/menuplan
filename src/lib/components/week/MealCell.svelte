@@ -5,7 +5,7 @@
 	import RecipeSlot from './RecipeSlot.svelte';
 	import EditableNote from './EditableNote.svelte';
 	import SlotAddButtons from './SlotAddButtons.svelte';
-	import type { MealConfig, SlotData, ScheduleWithRecipe, Person } from '$lib/types/index.js';
+	import type { MealConfig, MealSlot, SlotData, ScheduleWithRecipe, Person } from '$lib/types/index.js';
 	import type { WeekDragDrop } from '$lib/utils/weekDragDrop.svelte.js';
 
 	let {
@@ -55,6 +55,35 @@
 	let row = $derived(isComida ? 2 : 3);
 </script>
 
+{#snippet slotCard(ms: MealSlot, isAcc: number)}
+	{@const slotId = ms.id}
+	{@const slot = getSlot(weekday, mealType, slotId, isAcc)}
+	{@const key = slotKey(weekday, mealType, slotId, isAcc)}
+	{@const callbacks = makeSlotCallbacks(weekday, mealType, slotId, isAcc)}
+	{#if !isSlotHidden(weekday, mealType, slotId, isAcc)}
+		<RecipeSlot
+			{weekday} {mealType} {slotId} {isAcc}
+			{slot} slotKeyStr={key} {cfg} {allTags}
+			isBusy={busySlots.has(key)}
+			isDragSource={!!dnd.dragSource && key === slotKey(dnd.dragSource.weekday, dnd.dragSource.mealType, dnd.dragSource.slotId, dnd.dragSource.isAcc)}
+			isDragOver={dnd.dragOver === key}
+			{isMoveMode}
+			{isTouchDevice}
+			{editingTagKey} slotTags={ms.tags} slotTagEditKey={`tag-${slotId}`}
+			schedule={slot?.schedule ?? null}
+			slotSchedules={isAcc ? accSlotSchedules : slotSchedules}
+			{...callbacks}
+			{people}
+			slotPeople={slotPeopleIds(weekday, mealType, slotId, isAcc)}
+			onDeleteSlot={ms.virtual
+				// Hueco que solo existe porque lo añade una programación: quitarlo es quitar la receta programada
+				? () => onRemoveSlot(slotId, isAcc)
+				: () => onRemoveMealSlot(slotId)}
+		/>
+	{/if}
+{/snippet}
+
+
 <div class="flex-1 flex flex-col {isComida ? '' : 'mt-2 lg:mt-0 lg:pt-3'}"
 	style="background: {isToday ? 'var(--primary-light)' : `var(--${mealType}-band)`}; grid-column: {col}; grid-row: {row};">
 
@@ -96,35 +125,18 @@
 
 		<!-- Slots: primero los platos y luego los acompañamientos -->
 		<div class="px-2 pb-3 pt-2 flex-1 flex flex-col gap-2">
-			{#each [...mainSlots, ...accSlots] as ms (ms.id)}
-				{@const slotId = ms.id}
-				{@const isAcc = ms.kind === 'acc' ? 1 : 0}
-				{@const slot = getSlot(weekday, mealType, slotId, isAcc)}
-				{@const key = slotKey(weekday, mealType, slotId, isAcc)}
-				{@const callbacks = makeSlotCallbacks(weekday, mealType, slotId, isAcc)}
-
-				{#if !isSlotHidden(weekday, mealType, slotId, isAcc)}
-				<RecipeSlot
-					{weekday} {mealType} {slotId} {isAcc}
-					{slot} slotKeyStr={key} {cfg} {allTags}
-					isBusy={busySlots.has(key)}
-					isDragSource={!!dnd.dragSource && key === slotKey(dnd.dragSource.weekday, dnd.dragSource.mealType, dnd.dragSource.slotId, dnd.dragSource.isAcc)}
-					isDragOver={dnd.dragOver === key}
-					{isMoveMode}
-					{isTouchDevice}
-					{editingTagKey} slotTags={ms.tags} slotTagEditKey={`tag-${slotId}`}
-					schedule={slot?.schedule ?? null}
-					slotSchedules={isAcc ? accSlotSchedules : slotSchedules}
-					{...callbacks}
-					{people}
-					slotPeople={slotPeopleIds(weekday, mealType, slotId, isAcc)}
-					onDeleteSlot={ms.virtual
-						// Hueco que solo existe porque lo añade una programación: quitarlo es quitar la receta programada
-						? () => onRemoveSlot(slotId, isAcc)
-						: () => onRemoveMealSlot(slotId)}
-				/>
-				{/if}
+			{#each mainSlots as ms (ms.id)}
+				{@render slotCard(ms, 0)}
 			{/each}
+
+			<!-- Acompañamientos: dos por fila cuando la columna es lo bastante ancha (móvil, pantallas anchas) -->
+			{#if accSlots.length > 0}
+				<div class="acc-grid">
+					{#each accSlots as ms (ms.id)}
+						{@render slotCard(ms, 1)}
+					{/each}
+				</div>
+			{/if}
 
 			<!-- Botones añadir justo después del último slot -->
 			<SlotAddButtons class="pt-2"
@@ -148,3 +160,13 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	.acc-grid {
+		display: grid;
+		/* Tantas columnas de ≥150px como quepan: una en las columnas estrechas de escritorio, dos en móvil */
+		grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
+		align-items: start;
+		gap: 0.5rem;
+	}
+</style>

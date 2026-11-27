@@ -393,7 +393,8 @@
 
 {#if isAcc}
 	<!-- Acompañamiento: tarjeta horizontal compacta (miniatura + nombre), con las mismas acciones que un plato -->
-	<div class="relative shrink-0">
+	<!-- @container: en tarjetas estrechas (< 11rem) miniatura más pequeña y textos cortos -->
+	<div class="relative shrink-0 @container">
 		{#if onDeleteSlot}
 			<button
 				on:click|stopPropagation={onDeleteSlot}
@@ -422,12 +423,12 @@
 					on:touchend={onTouchEnd}
 					on:touchmove={onTouchMove}
 					on:contextmenu|preventDefault={() => {}}
-					class="w-full text-left select-none flex items-center gap-2 p-1.5 pr-9 rounded-xl {slot?.recipe ? 'acc-filled shadow-sm' : 'acc-empty'}"
+					class="w-full text-left select-none flex items-center gap-2 p-1.5 [@media(hover:none)]:pr-9 rounded-xl {slot?.recipe ? 'acc-filled shadow-sm' : 'acc-empty'}"
 					style="{slot?.recipe
 						? 'background: var(--surface); color: var(--text);'
 						: 'background: var(--surface-container-low); border: 2px dashed var(--border); color: var(--text-muted);'}"
 				>
-					<span class="acc-thumb shrink-0 w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center"
+					<span class="acc-thumb shrink-0 w-12 h-12 @max-[11rem]:w-10 @max-[11rem]:h-10 rounded-lg overflow-hidden flex items-center justify-center"
 						style="background: {slot?.recipe ? 'var(--secondary-container)' : 'transparent'}; color: {slot?.recipe ? 'var(--secondary)' : 'var(--text-muted)'};">
 						{#if slot?.recipe?.image_type}
 							<img src="/api/recipes/{slot.recipe.id}/image" alt={slot.recipe.name}
@@ -443,18 +444,19 @@
 					</span>
 					<span class="flex-1 min-w-0 flex flex-col gap-1">
 						{#if slot?.recipe}
-							<span class="text-xs font-semibold leading-snug line-clamp-2">{slot.recipe.name}</span>
+							<span class="text-xs font-semibold leading-snug line-clamp-2 break-words" title={slot.recipe.name}>{slot.recipe.name}</span>
 						{:else}
-							<span class="text-xs font-medium">Elegir acompañamiento</span>
+							<span class="text-xs font-medium @max-[11rem]:hidden">Elegir acompañamiento</span>
+							<span class="text-xs font-medium hidden @max-[11rem]:inline">Elegir</span>
 						{/if}
 					</span>
 				</button>
 				{@render scheduleBadge('top-0.5 left-0.5')}
 				{#if slot?.recipe && people.length > 0}
-					<!-- Sobre la miniatura (centro en x = 6px de padding + 24px), como en los platos -->
+					<!-- Sobre la miniatura (centro en x = 6px de padding + mitad de la miniatura), como en los platos -->
 					<button
 						on:click|stopPropagation={() => onOpenPeople?.()}
-						class="absolute z-10 inline-flex rounded-full left-[30px] -translate-x-1/2 bottom-2"
+						class="absolute z-10 inline-flex rounded-full left-[30px] @max-[11rem]:left-[26px] -translate-x-1/2 bottom-2"
 						disabled={!canSetPeople}
 						aria-label="Cambiar para quién es"
 					><PeopleAvatars {people} ids={slotPeople} size={16} max={3} /></button>
