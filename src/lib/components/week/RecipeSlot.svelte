@@ -444,15 +444,21 @@
 					<span class="flex-1 min-w-0 flex flex-col gap-1">
 						{#if slot?.recipe}
 							<span class="text-xs font-semibold leading-snug line-clamp-2">{slot.recipe.name}</span>
-							{#if people.length > 0}
-								<span class="inline-flex"><PeopleAvatars {people} ids={slotPeople} size={16} max={3} /></span>
-							{/if}
 						{:else}
 							<span class="text-xs font-medium">Elegir acompañamiento</span>
 						{/if}
 					</span>
 				</button>
 				{@render scheduleBadge('top-0.5 left-0.5')}
+				{#if slot?.recipe && people.length > 0}
+					<!-- Sobre la miniatura (centro en x = 6px de padding + 24px), como en los platos -->
+					<button
+						on:click|stopPropagation={() => onOpenPeople?.()}
+						class="absolute z-10 inline-flex rounded-full left-[30px] -translate-x-1/2 bottom-2"
+						disabled={!canSetPeople}
+						aria-label="Cambiar para quién es"
+					><PeopleAvatars {people} ids={slotPeople} size={16} max={3} /></button>
+				{/if}
 				{@render slotMenu()}
 			</div>
 		</div>
