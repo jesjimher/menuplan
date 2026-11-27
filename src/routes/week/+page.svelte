@@ -1145,15 +1145,11 @@
 		</div>
 	{/if}
 
-	{#if dnd.dragSource}
+	{#if dnd.dragSource && !dnd.dragModifier}
 		<!-- Aviso durante el arrastre: sin Ctrl el plato solo se mueve -->
 		<div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full shadow-lg pointer-events-none text-sm font-bold whitespace-nowrap"
-			style="background: {dnd.dragModifier ? 'var(--primary)' : 'var(--text)'}; color: {dnd.dragModifier ? 'white' : 'var(--surface)'};">
-			{#if dnd.dragModifier}
-				Suelta para elegir: mover, copiar o restos
-			{:else}
-				Mantén <kbd class="px-1.5 py-0.5 rounded" style="background: rgba(127,127,127,0.35);">Ctrl</kbd> al soltar para copiar o marcar como restos
-			{/if}
+			style="background: var(--text); color: var(--surface);">
+			Mantén <kbd class="px-1.5 py-0.5 rounded" style="background: rgba(127,127,127,0.35);">Ctrl</kbd> al soltar para copiar o marcar como restos
 		</div>
 	{/if}
 
